@@ -502,21 +502,6 @@ class Application(Entity):
         url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
                                                           id_=self.id,
                                                           group_id=group_id)
-        # payload = {u'adCountryCode': None,
-        #            u'co': None,
-        #            u'countryCode': None,
-        #            u'departmentNumber': None,
-        #            u'description': None,
-        #            u'division': None,
-        #            u'dn': None,
-        #            u'facsimileTelephoneNumber': None,
-        #            u'honorificPrefix': None,
-        #            u'honorificSuffix': None,
-        #            u'managerDn': None,
-        #            u'organizationalUnit': u'ou=users,ou=ad,dc=tst,dc=enexis,dc=it',
-        #            u'preferredLanguage': None,
-        #            u'primaryGroupId': None}
-        # response = self._okta.session.put(url, data=json.dumps(payload))
         response = self._okta.session.put(url)
         if not response.ok:
             self._logger.error(('Adding group failed '
