@@ -164,8 +164,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        results = self._okta.session.get(url)  # noqa
-        return [User(self._okta, data) for data in results.json()]
+        return [User(self._okta, data) for data in self._get_paginated_url(url)]
 
     @property
     def applications(self):
@@ -176,8 +175,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('apps', {}).get('href')
-        response = self._okta.session.get(url)  # noqa
-        return [Application(self._okta, data) for data in response.json()] if response.ok else None
+        return [Application(self._okta, data) for data in self._get_paginated_url(url)]
 
     def delete(self):
         """Deletes the group from okta
