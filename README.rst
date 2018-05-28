@@ -17,4 +17,4 @@ Todo
 ----
 
 * This code is MVP. It requires a lot of optimizations and extensions.
-Things to do are, try to make the retrieving faster and implement smart caching for entities.
+* Things to do are, try to make the retrieving faster and implement smart caching for entities.
