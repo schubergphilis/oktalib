@@ -111,19 +111,46 @@ class Okta(object):
             self._logger.error(response.json())
         return Group(self, response.json()) if response.ok else None
 
+    def get_group_type_by_name(self, name, group_type='OKTA_GROUP'):
+        """Retrieves the group type of okta by name
+
+        Args:
+            group_type: The type of okta group to retrieve
+            name: The name of the group to retrieve
+
+        Returns:
+            Group: The group if a match is found else None
+
+        """
+        group = next((group for group in self.groups
+                      if (group.name.lower() == name.lower() and group.type == group_type)), None)
+        return group
+
     def get_group_by_name(self, name):
-        """Retrieves a group by name
+        """Retrieves the first group (of any type) by name
 
         Args:
             name: The name of the group to retrieve
 
         Returns:
-            Host: The group if a match is found else None
+            Group: The group if a match is found else None
 
         """
         group = next((group for group in self.groups
                       if group.name.lower() == name.lower()), None)
         return group
+
+    def search_groups_by_name(self, name):
+        """Retrieves the groups (of any type) by name
+
+        Args:
+            name: The name of the groups to retrieve
+
+        Returns:
+            list: A list of groups if a match is found else an empty list
+
+        """
+        return [group for group in self.groups if group.name.lower() == name.lower()]
 
     def delete_group(self, name):
         """Deletes a group from okta
@@ -231,6 +258,18 @@ class Okta(object):
         """
         return next((user for user in self.users
                      if user.login == login), None)
+
+    def search_users_by_email(self, email):
+        """Retrieves a list of users by email
+
+        Args:
+            email: The email to match the user with
+
+        Returns:
+            list: The users if found, empty list otherwise
+
+        """
+        return [user for user in self.users if user.email.lower() == email.lower()]
 
     @property
     def applications(self):

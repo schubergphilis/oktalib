@@ -164,7 +164,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [User(self._okta, data) for data in self._get_paginated_url(url)]
+        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
 
     @property
     def applications(self):
@@ -175,7 +175,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('apps', {}).get('href')
-        return [Application(self._okta, data) for data in self._get_paginated_url(url)]
+        return [Application(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
 
     def delete(self):
         """Deletes the group from okta
@@ -971,3 +971,19 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         if not response.ok:
             self._logger.error(response.text)
         return response.ok
+
+    def update_profile(self, new_profile):
+        """Update a user's profile in okta
+
+        Args:
+            new_profile: A object with attributes to change (example: {'profile': {'firstName': 'Test'}})
+
+        Returns:
+            Bool: True or False depending on success
+
+        """
+        url = '{api}/users/{id_}'.format(api=self._okta.api, id_=self.id)
+        response = self._okta.session.post(url, data=json.dumps(new_profile))
+        if not response.ok:
+            self._logger.error(response.json())
+        return True if response.ok else False
