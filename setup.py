@@ -28,7 +28,7 @@ version = open('.VERSION').read()
 setup(
     name='''oktalib''',
     version=version,
-    description='''A library to interface with okta through it's restful api''',
+    description='''A library to interface with okta through a restful api''',
     long_description=readme + '\n\n' + history,
     author='''Costas Tyfoxylos''',
     author_email='''ctyfoxylos@schubergphilis.com''',
