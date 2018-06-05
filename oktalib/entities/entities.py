@@ -22,7 +22,7 @@
 #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 #  DEALINGS IN THE SOFTWARE.
 #
-
+#  pylint: disable=too-many-lines
 """
 Main code for entities
 
@@ -926,13 +926,21 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """Sets a temporary password for the user
 
         Returns:
-            True on success, False otherwise
+            string: Password on success, None otherwise
 
         """
         url = ('{api}/users/{id_}/lifecycle'
                '/expire_password?tempPassword=true').format(api=self._okta.api,
                                                             id_=self.id)
-        return self._post_lifecycle(url, "Setting a temporary password failed")
+        response = self._okta.session.post(url)
+        if not response.ok:
+            error = ('{message}\n'
+                     'Response :{response}').format(message="Setting a temporary password failed",
+                                                    response=response.text)
+            self._logger.error(error)
+        else:
+            self._update()
+        return response.json().get('tempPassword', None)
 
     def suspend(self):
         """Suspends the user
@@ -987,3 +995,20 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         if not response.ok:
             self._logger.error(response.json())
         return True if response.ok else False
+
+    def update_security_question(self, password, question, answer):
+        """Changes the user's security question and answer
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        url = '{api}/users/{id_}/credentials/change_recovery_question'.format(api=self._okta.api,
+                                                                              id_=self.id)
+        payload = {"password": {"value": password},
+                   "recovery_question": {"question": question,
+                                         "answer": answer}}
+        response = self._okta.session.post(url, data=json.dumps(payload))
+        if not response.ok:
+            self._logger.error(response.text)
+        return response.ok
