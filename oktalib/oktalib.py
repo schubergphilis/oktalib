@@ -257,7 +257,7 @@ class Okta(object):
 
         """
         return next((user for user in self.users
-                     if user.login == login), None)
+                     if user.login.lower() == login.lower()), None)
 
     def search_users_by_email(self, email):
         """Retrieves a list of users by email
