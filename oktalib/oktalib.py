@@ -267,6 +267,22 @@ class Okta(object):
         return next((User(self, data) for data in response.json()
                      if data.get('profile', {}).get('login', '') == login), None)
 
+    def search_users(self, value):
+        """Retrieves a list of users by looking into name, last name and email
+
+        Args:
+            value: The value to match with
+
+        Returns:
+            list: The users if found, empty list otherwise
+
+        """
+        url = '{api}/users?q={value}'.format(api=self.api, value=value)
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return [User(self, data) for data in response.json()]
+
     def search_users_by_email(self, email):
         """Retrieves a list of users by email
 
