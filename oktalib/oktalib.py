@@ -122,8 +122,8 @@ class Okta(object):
             Group: The group if a match is found else None
 
         """
-        group = next((group for group in self.groups
-                      if (group.name.lower() == name.lower() and group.type == group_type)), None)
+        group = next((group for group in self.search_groups_by_name(name)
+                      if group.type == group_type), None)
         return group
 
     def get_group_by_name(self, name):
@@ -136,9 +136,8 @@ class Okta(object):
             Group: The group if a match is found else None
 
         """
-        group = next((group for group in self.groups
-                      if group.name.lower() == name.lower()), None)
-        return group
+        return next((group for group in self.search_groups_by_name(name)
+                     if group.name == name), None)
 
     def search_groups_by_name(self, name):
         """Retrieves the groups (of any type) by name
@@ -150,7 +149,11 @@ class Okta(object):
             list: A list of groups if a match is found else an empty list
 
         """
-        return [group for group in self.groups if group.name.lower() == name.lower()]
+        url = '{api}/groups?q={name}'.format(api=self.api, name=name)
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return [Group(self, data) for data in response.json()] if response.ok else []
 
     def delete_group(self, name):
         """Deletes a group from okta
@@ -256,8 +259,13 @@ class Okta(object):
             User: The user if found, None otherwise
 
         """
-        return next((user for user in self.users
-                     if user.login.lower() == login.lower()), None)
+        url = '{api}/users?filter=profile.login+eq+"{login}"'.format(api=self.api, login=login)
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        return next((User(self, data) for data in response.json()
+                     if data.get('profile', {}).get('login', '') == login), None)
 
     def search_users_by_email(self, email):
         """Retrieves a list of users by email
@@ -269,7 +277,11 @@ class Okta(object):
             list: The users if found, empty list otherwise
 
         """
-        return [user for user in self.users if user.email.lower() == email.lower()]
+        url = '{api}/users?filter=profile.email+eq+"{email}"'.format(api=self.api, email=email)
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return [User(self, data) for data in response.json()]
 
     @property
     def applications(self):
