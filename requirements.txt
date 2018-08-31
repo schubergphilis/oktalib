@@ -7,5 +7,5 @@
 #
 # Please use Pipfile to update the requirements.
 #
-dateutils==0.6.6
-requests==2.18.4
+dateutils>=0.6.6
+requests>=2.18.4

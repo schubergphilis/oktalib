@@ -58,7 +58,6 @@ setup(
                       'README.rst',
                       'USAGE.rst',
                       'Pipfile',
-                      'Pipfile.lock',
                       'requirements.txt',
                       'dev-requirements.txt']),
                 ]
