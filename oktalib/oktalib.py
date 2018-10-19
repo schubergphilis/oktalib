@@ -57,7 +57,7 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
-class Okta(object):
+class Okta:
     """Models the api of okta"""
 
     def __init__(self, host, token):

@@ -203,7 +203,7 @@ class Group(Entity):
             raise InvalidApplication(application_label)
         return application.add_group_by_id(self.id)
 
-    def remove_from_application_with_label(self, application_label):  # pylint: disable=invalid-name
+    def remove_from_application_with_label(self, application_label):
         """Removes the group from an application
 
         Args:

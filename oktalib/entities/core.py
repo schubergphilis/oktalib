@@ -51,7 +51,7 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
-class Entity(object):
+class Entity:
     """The core object of okta"""
 
     def __init__(self, okta_instance, data):
