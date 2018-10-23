@@ -980,6 +980,20 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             self._logger.error(response.text)
         return response.ok
 
+    def set_password(self, password):
+        """Set a password for the user
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        url = '{api}/users/{id_}'.format(api=self._okta.api, id_=self.id)
+        payload = {'credentials': {'password': {'value': password}}}
+        response = self._okta.session.put(url, data=json.dumps(payload))
+        if not response.ok:
+            self._logger.error(response.text)
+        return response.ok
+
     def update_profile(self, new_profile):
         """Update a user's profile in okta
 
