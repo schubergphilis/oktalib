@@ -5,5 +5,10 @@
         "make"
     ],
     "environment_variables": [
+    ],
+    "upload_environment_variables": [
+        "PYPI_UPLOAD_USERNAME",
+        "PYPI_UPLOAD_PASSWORD",
+        "PYPI_URL"
     ]
 }
