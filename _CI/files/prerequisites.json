@@ -1,7 +1,6 @@
 {
     "executables": [
         "pipenv",
-        "git",
         "make"
     ],
     "environment_variables": [
