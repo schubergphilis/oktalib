@@ -19,3 +19,9 @@ History
 ------------------
 
 * Added setting of user password capability
+
+
+1.1.1 (25-10-2018)
+------------------
+
+* Updated template and dependencies
