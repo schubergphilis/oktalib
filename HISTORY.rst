@@ -25,3 +25,9 @@ History
 ------------------
 
 * Updated template and dependencies
+
+
+1.1.2 (17-12-2018)
+------------------
+
+* Updated requests version.
