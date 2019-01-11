@@ -31,3 +31,9 @@ History
 ------------------
 
 * Updated requests version.
+
+
+1.1.3 (11-01-2019)
+------------------
+
+* Updated requests module and fixed requirements generation.
