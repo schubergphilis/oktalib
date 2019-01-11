@@ -66,9 +66,9 @@ LOGGER.addHandler(logging.NullHandler())
 
 Package = namedtuple('Package', ['name', 'version'])
 
-REQUIREMENTS_HEADER = """# 
+REQUIREMENTS_HEADER = """#
 # Please do not manually update this file since the requirements are managed
-# by pipenv through Pipfile and Pipfile.lock . 
+# by pipenv through Pipfile and Pipfile.lock .
 #
 # This file is created and managed automatically by the template and it is left
 # here only for backwards compatibility reasons with python's ecosystem.
@@ -273,8 +273,8 @@ def clean_up(items):
 
 
 def get_top_level_dependencies():
-    packages = Project().parsed_pipfile.get('packages', {}).keys()
-    dev_packages = Project().parsed_pipfile.get('dev-packages', {}).keys()
+    packages = list(Project().parsed_pipfile.get('packages', {}).keys())
+    dev_packages = list(Project().parsed_pipfile.get('dev-packages', {}).keys())
     return packages, dev_packages
 
 
