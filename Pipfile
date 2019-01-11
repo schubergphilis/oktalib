@@ -26,5 +26,5 @@ coloredlogs = "~=10.0"
 emoji = "~=0.5.1"
 
 [packages]
-requests = "~=2.20.1"
+requests = "~=2.21.0"
 dateutils = "~=0.6.6"
