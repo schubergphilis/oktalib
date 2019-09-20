@@ -24,7 +24,7 @@
 #
 
 """
-Main code for oktalib
+Main code for oktalib.
 
 .. _Google Python Style Guide:
    http://google.github.io/styleguide/pyguide.html
@@ -58,7 +58,7 @@ LOGGER.addHandler(logging.NullHandler())
 
 
 class Okta:
-    """Models the api of okta"""
+    """Models the api of okta."""
 
     def __init__(self, host, token):
         logger_name = u'{base}.{suffix}'.format(base=LOGGER_BASENAME,
@@ -68,7 +68,6 @@ class Okta:
         self.api = '{host}/api/v1'.format(host=host)
         self.token = token
         self.session = self._setup_session()
-        self.limit = '1000'
 
     def _setup_session(self):
         session = Session()
@@ -84,7 +83,7 @@ class Okta:
 
     @property
     def groups(self):
-        """The groups configured in okta
+        """The groups configured in okta.
 
         Returns:
             list: The list of groups configured in okta
@@ -94,7 +93,7 @@ class Okta:
         return [Group(self, data) for data in self._get_paginated_url(url)]
 
     def create_group(self, name, description):
-        """Creates a group in okta
+        """Creates a group in okta.
 
         Args:
             name: The name of the group to create
@@ -113,7 +112,7 @@ class Okta:
         return Group(self, response.json()) if response.ok else None
 
     def get_group_type_by_name(self, name, group_type='OKTA_GROUP'):
-        """Retrieves the group type of okta by name
+        """Retrieves the group type of okta by name.
 
         Args:
             group_type: The type of okta group to retrieve
@@ -128,7 +127,7 @@ class Okta:
         return group
 
     def get_group_by_name(self, name):
-        """Retrieves the first group (of any type) by name
+        """Retrieves the first group (of any type) by name.
 
         Args:
             name: The name of the group to retrieve
@@ -141,7 +140,7 @@ class Okta:
                      if group.name == name), None)
 
     def search_groups_by_name(self, name):
-        """Retrieves the groups (of any type) by name
+        """Retrieves the groups (of any type) by name.
 
         Args:
             name: The name of the groups to retrieve
@@ -157,7 +156,7 @@ class Okta:
         return [Group(self, data) for data in response.json()] if response.ok else []
 
     def delete_group(self, name):
-        """Deletes a group from okta
+        """Deletes a group from okta.
 
         Args:
             name: The name of the group to delete
@@ -193,7 +192,7 @@ class Okta:
     @staticmethod
     def _get_next_link(response):
         links = response.headers.get('Link')
-        if links:  # pylint: disable=no-else-return
+        if links:
             link_text = next((link for link in links.split(',')
                               if 'next' in link), None)
             if link_text:  # pylint: disable=no-else-return
@@ -206,7 +205,7 @@ class Okta:
 
     @property
     def users(self):
-        """The users configured in okta
+        """The users configured in okta.
 
         Returns:
             list: The list of users configured in okta
@@ -222,7 +221,7 @@ class Okta:
                     login,
                     password=None,
                     enabled=True):
-        """Creates a user in okta
+        """Creates a user in okta.
 
         Args:
             first_name: The first name of the user
@@ -251,7 +250,7 @@ class Okta:
         return User(self, response.json()) if response.ok else None
 
     def get_user_by_login(self, login):
-        """Retrieves a user by login
+        """Retrieves a user by login.
 
         Args:
             login: The login to match the user with
@@ -269,7 +268,7 @@ class Okta:
                      if data.get('profile', {}).get('login', '') == login), None)
 
     def search_users(self, value):
-        """Retrieves a list of users by looking into name, last name and email
+        """Retrieves a list of users by looking into name, last name and email.
 
         Args:
             value: The value to match with
@@ -285,7 +284,7 @@ class Okta:
         return [User(self, data) for data in response.json()]
 
     def search_users_by_email(self, email):
-        """Retrieves a list of users by email
+        """Retrieves a list of users by email.
 
         Args:
             email: The email to match the user with
@@ -302,25 +301,23 @@ class Okta:
 
     @property
     def applications(self):
-        """The applications configured in okta
+        """The applications configured in okta.
 
         Returns:
             list: The list of applications configured in okta
 
         """
-        url = '{api}/apps?limit={limit}'.format(api=self.api, limit=self.limit)
-        response = self.session.get(url)
-        if not response.ok:
-            self._logger.error(response.json())
-        return [Application(self, data) for data in response.json()]
+        url = '{api}/apps'.format(api=self.api)
+        return [Application(self, data) for data in self._get_paginated_url(url)]
 
     def get_application_by_id(self, id_):
-        """Retrieves an application by id
+        """Retrieves an application by id.
 
         Args:
             id_: The id of the application to retrieve
 
         Returns:
+            Application Object
 
         """
         app = next((app for app in self.applications
@@ -328,12 +325,13 @@ class Okta:
         return app
 
     def get_application_by_label(self, label):
-        """Retrieves an application by label
+        """Retrieves an application by label.
 
         Args:
             label: The label of the application to retrieve
 
         Returns:
+            Application Object
 
         """
         app = next((app for app in self.applications
@@ -341,7 +339,7 @@ class Okta:
         return app
 
     def assign_group_to_application(self, application_label, group_name):
-        """Assigns a group to an application
+        """Assigns a group to an application.
 
         Args:
             application_label: The label of the application to assign the group to
@@ -360,7 +358,7 @@ class Okta:
         return application.add_group_by_id(group.id)
 
     def remove_group_from_application(self, application_label, group_name):
-        """Removes a group from an application
+        """Removes a group from an application.
 
         Args:
             application_label: The label of the application to remove the group from

@@ -24,7 +24,7 @@
 #
 
 """
-entities package
+entities package.
 
 Import all parts from entities here
 

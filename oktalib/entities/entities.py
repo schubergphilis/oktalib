@@ -24,7 +24,7 @@
 #
 #  pylint: disable=too-many-lines
 """
-Main code for entities
+Main code for entities.
 
 .. _Google Python Style Guide:
    http://google.github.io/styleguide/pyguide.html
@@ -56,14 +56,14 @@ LOGGER.addHandler(logging.NullHandler())
 
 
 class Group(Entity):
-    """Models the group object of okta"""
+    """Models the group object of okta."""
 
     def __init__(self, okta_instance, data):
         Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
-        """The url of the group
+        """The url of the group.
 
         Returns:
             string: The url of the group
@@ -73,7 +73,7 @@ class Group(Entity):
 
     @property
     def type(self):
-        """The type of the group
+        """The type of the group.
 
         Returns:
             string: The name of the type of the group
@@ -83,7 +83,7 @@ class Group(Entity):
 
     @property
     def profile(self):
-        """The profile of the group
+        """The profile of the group.
 
         Returns:
             dict: The profile of the group
@@ -93,7 +93,7 @@ class Group(Entity):
 
     @property
     def name(self):
-        """The name of the group
+        """The name of the group.
 
         Returns:
             string: The name of the group
@@ -115,7 +115,7 @@ class Group(Entity):
 
     @property
     def description(self):
-        """The description of the group
+        """The description of the group.
 
         Returns:
             string: The description of the group
@@ -137,7 +137,7 @@ class Group(Entity):
 
     @property
     def last_membership_updated_at(self):
-        """The date and time of the group's last membership update
+        """The date and time of the group's last membership update.
 
         Returns:
             datetime: The datetime object of when the group's memberships were last updated
@@ -147,7 +147,7 @@ class Group(Entity):
 
     @property
     def object_classes(self):
-        """The classes of the group
+        """The classes of the group.
 
         Returns:
             tuple: The tuple of the classes of the group
@@ -157,7 +157,7 @@ class Group(Entity):
 
     @property
     def users(self):
-        """The users of the group
+        """The users of the group.
 
         Returns:
             list: A list of User objects for the users of the group
@@ -168,7 +168,7 @@ class Group(Entity):
 
     @property
     def applications(self):
-        """The applications of the group
+        """The applications of the group.
 
         Returns:
             list: A list of Application objects for the applications of the group
@@ -178,7 +178,7 @@ class Group(Entity):
         return [Application(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
 
     def delete(self):
-        """Deletes the group from okta
+        """Deletes the group from okta.
 
         Returns:
             bool: True on success, False otherwise
@@ -189,7 +189,7 @@ class Group(Entity):
         return response.ok
 
     def add_to_application_with_label(self, application_label):
-        """Adds the group to an application
+        """Adds the group to an application.
 
         Args:
             application_label: The label of the application to add the group to
@@ -204,7 +204,7 @@ class Group(Entity):
         return application.add_group_by_id(self.id)
 
     def remove_from_application_with_label(self, application_label):
-        """Removes the group from an application
+        """Removes the group from an application.
 
         Args:
             application_label: The label of the application to remove the group from
@@ -219,7 +219,7 @@ class Group(Entity):
         return application.remove_group_by_id(self.id)
 
     def add_user_by_login(self, login):
-        """Adds a user to the group
+        """Adds a user to the group.
 
         Args:
             login: The login of the user to add
@@ -242,7 +242,7 @@ class Group(Entity):
         return response.ok
 
     def remove_user_by_login(self, login):
-        """Removes a user from the group
+        """Removes a user from the group.
 
         Args:
             login: The login of the user to remove
@@ -265,7 +265,7 @@ class Group(Entity):
         return response.ok
 
     def add_user_by_id(self, id_):
-        """Adds a user to the group
+        """Adds a user to the group.
 
         Args:
             id_: The id of the user to add
@@ -284,7 +284,7 @@ class Group(Entity):
         return response.ok
 
     def remove_user_by_id(self, id_):
-        """Remove a user from the group
+        """Remove a user from the group.
 
         Args:
             id_: The id of the user to remove
@@ -304,14 +304,14 @@ class Group(Entity):
 
 
 class Application(Entity):
-    """Models the apps in okta"""
+    """Models the apps in okta."""
 
     def __init__(self, okta_instance, data):
         Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
-        """The url of the application
+        """The url of the application.
 
         Returns:
             string: The url of the application
@@ -321,7 +321,7 @@ class Application(Entity):
 
     @property
     def name(self):
-        """The name of the application
+        """The name of the application.
 
         Returns:
             basestring: The name of the application
@@ -331,7 +331,7 @@ class Application(Entity):
 
     @property
     def label(self):
-        """The label of the application
+        """The label of the application.
 
         Returns:
             basestring: The label of the application
@@ -341,7 +341,7 @@ class Application(Entity):
 
     @property
     def status(self):
-        """The status of the application
+        """The status of the application.
 
         Returns:
             basestring: The status of the application
@@ -351,7 +351,7 @@ class Application(Entity):
 
     @property
     def accessibility(self):
-        """The accessibility of the application
+        """The accessibility of the application.
 
         Returns:
             dictionary: The accessibility of the application
@@ -361,7 +361,7 @@ class Application(Entity):
 
     @property
     def visibility(self):
-        """The visibility of the application
+        """The visibility of the application.
 
         Returns:
             dictionary: The visibility of the application
@@ -371,7 +371,7 @@ class Application(Entity):
 
     @property
     def features(self):
-        """The features of the application
+        """The features of the application.
 
         Returns:
             dictionary: The features of the application
@@ -381,7 +381,7 @@ class Application(Entity):
 
     @property
     def sign_on_mode(self):
-        """The sign on mode of the application
+        """The sign on mode of the application.
 
         Returns:
             basestring: The sign on mode of the application
@@ -391,7 +391,7 @@ class Application(Entity):
 
     @property
     def credentials(self):
-        """The credentials of the application
+        """The credentials of the application.
 
         Returns:
             dictionary: The credentials of the application
@@ -401,7 +401,7 @@ class Application(Entity):
 
     @property
     def settings(self):
-        """The settings of the application
+        """The settings of the application.
 
         Returns:
             dictionary: The settings of the application
@@ -411,7 +411,7 @@ class Application(Entity):
 
     @property
     def notification_settings(self):
-        """The notification settings of the application
+        """The notification settings of the application.
 
         Returns:
             dictionary: The notification settings of the application
@@ -421,7 +421,7 @@ class Application(Entity):
 
     @property
     def sign_on_settings(self):
-        """The sign on settings of the application
+        """The sign on settings of the application.
 
         Returns:
             dictionary: The sign on settings of the application
@@ -431,7 +431,7 @@ class Application(Entity):
 
     @property
     def users(self):
-        """The users of the application
+        """The users of the application.
 
         Returns:
             list: A list of User objects for the users of the application
@@ -442,7 +442,7 @@ class Application(Entity):
 
     @property
     def groups(self):
-        """The groups of the application
+        """The groups of the application.
 
         Returns:
             list: A list of Group objects for the groups of the application
@@ -453,7 +453,7 @@ class Application(Entity):
 
     @property
     def activate(self):
-        """Activates the application
+        """Activates the application.
 
         Returns:
             bool: True on success, False otherwise
@@ -471,7 +471,7 @@ class Application(Entity):
 
     @property
     def deactivate(self):
-        """Deactivates the application
+        """Deactivates the application.
 
         Returns:
             bool: True on success, False otherwise
@@ -488,7 +488,7 @@ class Application(Entity):
         return response.ok
 
     def add_group_by_id(self, group_id):
-        """Adds a group to the application
+        """Adds a group to the application.
 
         Args:
             group_id: The id of the group to add
@@ -507,7 +507,7 @@ class Application(Entity):
         return response.ok
 
     def add_group_by_name(self, group_name):
-        """Adds a group to the application
+        """Adds a group to the application.
 
         Args:
             group_name: The name of the group to add
@@ -529,7 +529,7 @@ class Application(Entity):
         return response.ok
 
     def remove_group_by_id(self, group_id):
-        """Removes a group from the application
+        """Removes a group from the application.
 
         Args:
             group_id: The id of the group to remove
@@ -548,7 +548,7 @@ class Application(Entity):
         return response.ok
 
     def remove_group_by_name(self, group_name):
-        """Removes a group from the application
+        """Removes a group from the application.
 
         Args:
             group_name: The name of the group to remove
@@ -571,14 +571,14 @@ class Application(Entity):
 
 
 class User(Entity):  # pylint: disable=too-many-public-methods
-    """Models the user object of okta"""
+    """Models the user object of okta."""
 
     def __init__(self, okta_instance, data):
         Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
-        """The url of the user
+        """The url of the user.
 
         Returns:
             string: The url of the user
@@ -588,7 +588,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def status(self):
-        """The status of the user
+        """The status of the user.
 
         Returns:
             string: The status of the user
@@ -598,7 +598,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def activated_at(self):
-        """The date and time of the users's activation
+        """The date and time of the users's activation.
 
         Returns:
             datetime: The datetime object of when the user was activated
@@ -608,7 +608,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def status_changed_at(self):
-        """The date and time of the users's status change
+        """The date and time of the users's status change.
 
         Returns:
             datetime: The datetime object of when the user had last changed status
@@ -618,7 +618,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def last_login_at(self):
-        """The date and time of the users's last login
+        """The date and time of the users's last login.
 
         Returns:
             datetime: The datetime object of when the user last logged in
@@ -628,7 +628,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def password_changed_at(self):
-        """The date and time of the users's last password change
+        """The date and time of the users's last password change.
 
         Returns:
             datetime: The datetime object of when the user last changed password
@@ -638,7 +638,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def first_name(self):
-        """The first name of the user
+        """The first name of the user.
 
         Returns:
             string: The first name of the user
@@ -648,7 +648,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def last_name(self):
-        """The last name of the user
+        """The last name of the user.
 
         Returns:
             string: The last name of the user
@@ -658,7 +658,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def manager(self):
-        """The manager of the user
+        """The manager of the user.
 
         Returns:
             string: The manager of the user
@@ -668,7 +668,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def display_name(self):
-        """The display name of the user
+        """The display name of the user.
 
         Returns:
             string: The display name of the user
@@ -678,7 +678,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def title(self):
-        """The title of the user
+        """The title of the user.
 
         Returns:
             string: The title of the user
@@ -688,7 +688,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def locale(self):
-        """The locale of the user
+        """The locale of the user.
 
         Returns:
             string: The locale of the user
@@ -698,7 +698,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def employee_number(self):
-        """The employee number of the user
+        """The employee number of the user.
 
         Returns:
             string: The employee number of the user
@@ -708,7 +708,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def zip_code(self):
-        """The zip code of the user
+        """The zip code of the user.
 
         Returns:
             string: The zip code of the user
@@ -718,7 +718,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def city(self):
-        """The city of the user
+        """The city of the user.
 
         Returns:
             string: The city of the user
@@ -728,7 +728,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def street_address(self):
-        """The street address of the user
+        """The street address of the user.
 
         Returns:
             string: The street address of the user
@@ -738,7 +738,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def contry_code(self):
-        """The contry code of the user
+        """The contry code of the user.
 
         Returns:
             string: The country code of the user
@@ -748,7 +748,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def organization(self):
-        """The organization of the user
+        """The organization of the user.
 
         Returns:
             string: The organization of the user
@@ -758,7 +758,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def department(self):
-        """The department of the user
+        """The department of the user.
 
         Returns:
             string: The department of the user
@@ -768,7 +768,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def primary_phone(self):
-        """The primary phone of the user
+        """The primary phone of the user.
 
         Returns:
             string: The primary phone of the user
@@ -778,7 +778,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def mobile_phone(self):
-        """The mobile phone of the user
+        """The mobile phone of the user.
 
         Returns:
             string: The mobile phone of the user
@@ -788,7 +788,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def email(self):
-        """The email of the user
+        """The email of the user.
 
         Returns:
             string: The email of the user
@@ -798,7 +798,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def second_email(self):
-        """The second email of the user
+        """The second email of the user.
 
         Returns:
             string: The second email of the user
@@ -808,7 +808,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def login(self):
-        """The login of the user
+        """The login of the user.
 
         Returns:
             string: The login of the user
@@ -818,7 +818,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def credentials(self):
-        """The credentials of the user
+        """The credentials of the user.
 
         Returns:
             dictionary: The credentials of the user
@@ -828,7 +828,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
     @property
     def groups(self):
-        """Lists the groups the user is a member of
+        """Lists the groups the user is a member of.
 
         Returns:
             list: A list of Group objects for which the user is member of
@@ -838,7 +838,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return [Group(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
 
     def delete(self):
-        """Deletes the user from okta
+        """Deletes the user from okta.
 
         Returns:
             bool: True on success, False otherwise
@@ -866,7 +866,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return response.ok
 
     def activate(self):
-        """Activate the user
+        """Activate the user.
 
         Returns:
             True on success, False otherwise
@@ -878,7 +878,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, 'Activating user failed')
 
     def deactivate(self):
-        """Deactivate the user
+        """Deactivate the user.
 
         Returns:
             True on success, False otherwise
@@ -889,7 +889,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, 'Deactivating user failed')
 
     def unlock(self):
-        """Unlocks the user
+        """Unlocks the user.
 
         Returns:
             True on success, False otherwise
@@ -900,7 +900,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, 'Unlocking user failed')
 
     def expire_password(self):
-        """Expires the user's password
+        """Expires the user's password.
 
         Returns:
             True on success, False otherwise
@@ -911,7 +911,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, "Expiring user's password failed")
 
     def reset_password(self):
-        """Resets the user's password
+        """Resets the user's password.
 
         Returns:
             True on success, False otherwise
@@ -923,7 +923,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, "Reseting user's password failed")
 
     def set_temporary_password(self):
-        """Sets a temporary password for the user
+        """Sets a temporary password for the user.
 
         Returns:
             string: Password on success, None otherwise
@@ -943,7 +943,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return response.json().get('tempPassword', None)
 
     def suspend(self):
-        """Suspends the user
+        """Suspends the user.
 
         Returns:
             True on success, False otherwise
@@ -954,7 +954,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, "Suspending user failed")
 
     def unsuspend(self):
-        """Unsuspends the user
+        """Unsuspends the user.
 
         Returns:
             True on success, False otherwise
@@ -965,7 +965,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._post_lifecycle(url, "Unsuspending user failed")
 
     def update_password(self, old_password, new_password):
-        """Changes the user's password
+        """Changes the user's password.
 
         Returns:
             True on success, False otherwise
@@ -981,7 +981,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return response.ok
 
     def set_password(self, password):
-        """Set a password for the user
+        """Set a password for the user.
 
         Returns:
             True on success, False otherwise
@@ -995,7 +995,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return response.ok
 
     def update_profile(self, new_profile):
-        """Update a user's profile in okta
+        """Update a user's profile in okta.
 
         Args:
             new_profile: A object with attributes to change (example: {'profile': {'firstName': 'Test'}})
@@ -1008,10 +1008,10 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         response = self._okta.session.post(url, data=json.dumps(new_profile))
         if not response.ok:
             self._logger.error(response.json())
-        return True if response.ok else False
+        return True if response.ok else False  # pylint: disable=simplifiable-if-expression
 
     def update_security_question(self, password, question, answer):
-        """Changes the user's security question and answer
+        """Changes the user's security question and answer.
 
         Returns:
             True on success, False otherwise

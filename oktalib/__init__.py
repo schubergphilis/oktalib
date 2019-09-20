@@ -24,7 +24,7 @@
 #
 
 """
-oktalib package
+oktalib package.
 
 Import all parts from oktalib here
 

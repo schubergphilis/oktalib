@@ -24,7 +24,7 @@
 #
 
 """
-Main code for core
+Main code for core.
 
 .. _Google Python Style Guide:
    http://google.github.io/styleguide/pyguide.html
@@ -52,7 +52,7 @@ LOGGER.addHandler(logging.NullHandler())
 
 
 class Entity:
-    """The core object of okta"""
+    """The core object of okta."""
 
     def __init__(self, okta_instance, data):
         logger_name = u'{base}.{suffix}'.format(base=LOGGER_BASENAME,
@@ -69,7 +69,7 @@ class Entity:
 
     @property
     def url(self):
-        """The url of the entity
+        """The url of the entity.
 
         Returns:
              None in the core entity.
@@ -82,7 +82,7 @@ class Entity:
 
     @property
     def id(self):  # pylint: disable=invalid-name
-        """The id of the entity
+        """The id of the entity.
 
         Returns:
             basestring: The internal id of the entity
@@ -92,7 +92,7 @@ class Entity:
 
     @property
     def created_at(self):
-        """The date and time of the group's creation
+        """The date and time of the group's creation.
 
         Returns:
             datetime: The datetime object of when the group was created
@@ -102,7 +102,7 @@ class Entity:
 
     @property
     def last_updated_at(self):
-        """The date and time of the entity's last update
+        """The date and time of the entity's last update.
 
         Returns:
             datetime: The datetime object of when the entity was last updated
