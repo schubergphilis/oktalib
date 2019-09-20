@@ -43,3 +43,9 @@ History
 ------------------
 
 * Update get_applicatio_by_id
+
+
+1.1.5 (20-09-2019)
+------------------
+
+* Added limit
