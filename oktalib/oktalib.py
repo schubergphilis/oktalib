@@ -322,9 +322,11 @@ class Okta:
         Returns:
 
         """
-        app = next((app for app in self.applications
-                    if app.id == id_), None)
-        return app
+        url = '{api}/apps/{id_}'.format(api=self.api, id_=id_)
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return Application(self, response.json()) if response.ok else None
 
     def get_application_by_label(self, label):
         """Retrieves an application by label
