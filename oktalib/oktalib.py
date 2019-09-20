@@ -68,6 +68,7 @@ class Okta:
         self.api = '{host}/api/v1'.format(host=host)
         self.token = token
         self.session = self._setup_session()
+        self.limit = '1000'
 
     def _setup_session(self):
         session = Session()
@@ -307,7 +308,7 @@ class Okta:
             list: The list of applications configured in okta
 
         """
-        url = '{api}/apps'.format(api=self.api)
+        url = '{api}/apps?limit={limit}'.format(api=self.api, limit=self.limit)
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -322,11 +323,9 @@ class Okta:
         Returns:
 
         """
-        url = '{api}/apps/{id_}'.format(api=self.api, id_=id_)
-        response = self.session.get(url)
-        if not response.ok:
-            self._logger.error(response.json())
-        return Application(self, response.json()) if response.ok else None
+        app = next((app for app in self.applications
+                    if app.id == id_), None)
+        return app
 
     def get_application_by_label(self, label):
         """Retrieves an application by label
@@ -341,7 +340,7 @@ class Okta:
                     if app.label.lower() == label.lower()), None)
         return app
 
-    def assing_group_to_application(self, application_label, group_name):
+    def assign_group_to_application(self, application_label, group_name):
         """Assigns a group to an application
 
         Args:
