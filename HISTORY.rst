@@ -37,3 +37,9 @@ History
 ------------------
 
 * Updated requests module and fixed requirements generation.
+
+
+1.1.4 (20-09-2019)
+------------------
+
+* Update get_applicatio_by_id
