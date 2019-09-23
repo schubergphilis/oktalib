@@ -49,3 +49,9 @@ History
 ------------------
 
 * Added limit
+
+
+1.1.6 (23-09-2019)
+------------------
+
+* Fix applications method
