@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# File: build.py
+# File: reset.py
 #
 # Copyright 2018 Costas Tyfoxylos
 #
@@ -23,54 +23,29 @@
 #  DEALINGS IN THE SOFTWARE.
 #
 
-
-import logging
 import os
+import sys
 import shutil
+import stat
+import logging
 
 # this sets up everything and MUST be included before any third party module in every step
 import _initialize_template
 
-from bootstrap import bootstrap
-from emoji import emojize
-from configuration import BUILD_REQUIRED_FILES, LOGGING_LEVEL, PROJECT_SLUG
-from library import execute_command, clean_up, save_requirements
+from configuration import ENVIRONMENT_VARIABLES
+from library import clean_up, get_project_root_path
 
 # This is the main prefix used for logging
-LOGGER_BASENAME = '''_CI.build'''
+LOGGER_BASENAME = '''_CI.reset'''
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
-def build():
-    bootstrap()
-    clean_up(('build', 'dist'))
-    success = execute_command('pipenv lock')
-    if success:
-        LOGGER.info('Successfully created lock file %s %s',
-                     emojize(':white_heavy_check_mark:'),
-                     emojize(':thumbs_up:'))
-    else:
-        LOGGER.error('%s Errors creating lock file! %s',
-                      emojize(':cross_mark:'),
-                      emojize(':crying_face:'))
-        raise SystemExit(1)
-    save_requirements()
-    for file in BUILD_REQUIRED_FILES:
-        shutil.copy(file, os.path.join(f'{PROJECT_SLUG}', file))
-    success = execute_command('python setup.py sdist bdist_egg')
-    if success:
-        LOGGER.info('%s Successfully built artifact %s',
-                    emojize(':white_heavy_check_mark:'),
-                    emojize(':thumbs_up:'))
-    else:
-        LOGGER.error('%s Errors building artifact! %s',
-                     emojize(':cross_mark:'),
-                     emojize(':crying_face:'))
-    clean_up([os.path.join(f'{PROJECT_SLUG}', file)
-              for file in BUILD_REQUIRED_FILES])
-    return True if success else False
+def reset(environment_variables):
+    pipfile_path = environment_variables.get('PIPENV_PIPFILE', 'Pipfile')
+    venv = os.path.join(get_project_root_path(), os.path.dirname(pipfile_path), '.venv')
+    clean_up(venv)
 
 
 if __name__ == '__main__':
-    raise SystemExit(0 if build() else 1)
+    reset(ENVIRONMENT_VARIABLES)

@@ -1008,7 +1008,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         response = self._okta.session.post(url, data=json.dumps(new_profile))
         if not response.ok:
             self._logger.error(response.json())
-        return True if response.ok else False  # pylint: disable=simplifiable-if-expression
+        return response.ok
 
     def update_security_question(self, password, question, answer):
         """Changes the user's security question and answer.

@@ -200,8 +200,7 @@ class Okta:
                 return link
             else:
                 return False
-        else:
-            return False
+        return False
 
     @property
     def users(self):

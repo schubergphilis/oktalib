@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# File: configuration.py
 #
 # Copyright 2018 Costas Tyfoxylos
 #
@@ -58,3 +59,5 @@ LOGGERS_TO_DISABLE = ['sh.command',
                       'sh.stream_bufferer']
 
 BRANCHES_SUPPORTED_FOR_TAG = ['master']
+
+PROJECT_SLUG = ENVIRONMENT_VARIABLES.get('PROJECT_SLUG')

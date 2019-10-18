@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# File: build.py
+# File: rebuild_pipfile.py
 #
-# Copyright 2018 Costas Tyfoxylos
+# Copyright 2019 Ilija Matoski
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to
@@ -23,54 +23,35 @@
 #  DEALINGS IN THE SOFTWARE.
 #
 
-
 import logging
-import os
-import shutil
+import argparse
 
 # this sets up everything and MUST be included before any third party module in every step
 import _initialize_template
 
 from bootstrap import bootstrap
-from emoji import emojize
-from configuration import BUILD_REQUIRED_FILES, LOGGING_LEVEL, PROJECT_SLUG
-from library import execute_command, clean_up, save_requirements
+from library import update_pipfile
 
 # This is the main prefix used for logging
 LOGGER_BASENAME = '''_CI.build'''
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
+def get_arguments():
+    parser = argparse.ArgumentParser(description='Regenerates Pipfile based on Pipfile.lock')
+    parser.add_argument('--stdout',
+                        help='Output the Pipfile to stdout',
+                        action="store_true",
+                        default=False)
+    args = parser.parse_args()
+    return args
 
-def build():
+
+def execute():
     bootstrap()
-    clean_up(('build', 'dist'))
-    success = execute_command('pipenv lock')
-    if success:
-        LOGGER.info('Successfully created lock file %s %s',
-                     emojize(':white_heavy_check_mark:'),
-                     emojize(':thumbs_up:'))
-    else:
-        LOGGER.error('%s Errors creating lock file! %s',
-                      emojize(':cross_mark:'),
-                      emojize(':crying_face:'))
-        raise SystemExit(1)
-    save_requirements()
-    for file in BUILD_REQUIRED_FILES:
-        shutil.copy(file, os.path.join(f'{PROJECT_SLUG}', file))
-    success = execute_command('python setup.py sdist bdist_egg')
-    if success:
-        LOGGER.info('%s Successfully built artifact %s',
-                    emojize(':white_heavy_check_mark:'),
-                    emojize(':thumbs_up:'))
-    else:
-        LOGGER.error('%s Errors building artifact! %s',
-                     emojize(':cross_mark:'),
-                     emojize(':crying_face:'))
-    clean_up([os.path.join(f'{PROJECT_SLUG}', file)
-              for file in BUILD_REQUIRED_FILES])
-    return True if success else False
+    args = get_arguments()
+    return update_pipfile(args.stdout)
 
 
 if __name__ == '__main__':
-    raise SystemExit(0 if build() else 1)
+    raise SystemExit(not execute())
