@@ -61,3 +61,9 @@ History
 ------------------
 
 * bumped dependencies
+
+
+1.1.8 (18-10-2019)
+------------------
+
+* Updated template and bumped dependencies
