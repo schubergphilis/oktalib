@@ -55,3 +55,9 @@ History
 ------------------
 
 * Fix applications method
+
+
+1.1.7 (18-10-2019)
+------------------
+
+* bumped dependencies
