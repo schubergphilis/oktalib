@@ -584,6 +584,11 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
     def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
         """Assigns okta group to a okta pplication with saml user roles.
 
+        Args:
+            group_id: The id of the group to be associated
+            role: The role which will assume the SAML Roles
+            saml_roles: the SAML Role to be assumed
+
         Returns:
             string: The status of the assignment
 
