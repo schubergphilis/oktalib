@@ -496,7 +496,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         url = '{api}/internal/apps/{app_id_}/types'.format(api=self._okta.api,
                                                            app_id_=self.id)
         response = self._okta.session.get(url)
-        return json.loads(response.text).get('SamlIamRole')
+        return json.loads(response.text).get('SamlIamRole', [])
 
 
     def add_group_by_id(self, group_id):
