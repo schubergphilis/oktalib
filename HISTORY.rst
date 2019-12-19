@@ -67,3 +67,9 @@ History
 ------------------
 
 * Updated template and bumped dependencies
+
+
+1.1.9 (19-12-2019)
+------------------
+
+* Added feature for aws application
