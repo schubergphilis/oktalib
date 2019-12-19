@@ -8,4 +8,4 @@
 # Please use Pipfile to update the requirements.
 #
 requests~=2.22.0
-dateutils~=0.6.6
+dateutils~=0.6.7

@@ -302,8 +302,7 @@ class Group(Entity):
                                 'Response :{}').format(response.text))
         return response.ok
 
-
-class Application(Entity):
+class Application(Entity):  # pylint: disable=too-many-public-methods
     """Models the apps in okta."""
 
     def __init__(self, okta_instance, data):
@@ -487,6 +486,19 @@ class Application(Entity):
             self._update()
         return response.ok
 
+    def get_associated_saml_roles(self):
+        """Returns the Saml IAM Roles associated with the application.
+
+        Returns:
+            list: List of saml iam roles
+
+        """
+        url = '{api}/internal/apps/{app_id_}/types'.format(api=self._okta.api,
+                                                           app_id_=self.id)
+        response = self._okta.session.get(url)
+        return json.loads(response.text).get('SamlIamRole', [])
+
+
     def add_group_by_id(self, group_id):
         """Adds a group to the application.
 
@@ -566,6 +578,28 @@ class Application(Entity):
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(('Adding group failed '
+                                'Response :{}').format(response.text))
+        return response.ok
+
+    def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
+        """Assigns an okta group to an okta application with saml user roles.
+
+        Args:
+            group_id: The id of the group to be associated
+            role: The aws role that okta uses to assume SAML roles in other accounts
+            saml_roles: the SAML Role to be assumed
+
+        Returns:
+            Bool: The status of the assignment( True or False )
+
+        """
+        url = '{api}/apps/{app_id_}/groups/{group_id_}'.format(api=self._okta.api,
+                                                               app_id_=self.id,
+                                                               group_id_=group_id)
+        payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
+        response = self._okta.session.put(url, json=payload)
+        if not response.ok:
+            self._logger.error(('Assigning group to the application failed '
                                 'Response :{}').format(response.text))
         return response.ok
 
