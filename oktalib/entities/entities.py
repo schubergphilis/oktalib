@@ -487,7 +487,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         return response.ok
 
     def get_associated_saml_roles(self):
-        """Gives the Saml IAM Roles associated with the application.
+        """Returns the Saml IAM Roles associated with the application.
 
         Returns:
             list: List of saml iam roles
@@ -582,15 +582,15 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         return response.ok
 
     def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
-        """Assigns okta group to a okta pplication with saml user roles.
+        """Assigns an okta group to an okta application with saml user roles.
 
         Args:
             group_id: The id of the group to be associated
-            role: The role which will assume the SAML Roles
+            role: The aws role that okta uses to assume SAML roles in other accounts
             saml_roles: the SAML Role to be assumed
 
         Returns:
-            string: The status of the assignment
+            Bool: The status of the assignment( True or False )
 
         """
         url = '{api}/apps/{app_id_}/groups/{group_id_}'.format(api=self._okta.api,
