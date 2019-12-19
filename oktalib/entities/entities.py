@@ -598,7 +598,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
                                                                group_id_=group_id)
         payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
         response = self._okta.session.put(url, json=payload)
-        return response
+        if not response.ok:
+            self._logger.error(('Assigning group to the application failed '
+                                'Response :{}').format(response.text))
+        return response.ok
 
 
 class User(Entity):  # pylint: disable=too-many-public-methods
