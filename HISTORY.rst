@@ -79,3 +79,9 @@ History
 -------------------
 
 * Added api exhaustion backoff.
+
+
+1.1.11 (13-01-2020)
+-------------------
+
+* Corrected Pipfile.lock issue.
