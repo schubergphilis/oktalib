@@ -35,7 +35,8 @@ from ._version import __version__
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidUser,
-                                InvalidApplication)
+                                InvalidApplication,
+                                ApiLimitReached)
 
 from .oktalib import Okta
 
@@ -57,6 +58,7 @@ assert AuthFailed
 assert InvalidGroup
 assert InvalidUser
 assert InvalidApplication
+assert ApiLimitReached
 
 # assert objects
 assert Okta

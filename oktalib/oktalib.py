@@ -33,10 +33,12 @@ Main code for oktalib.
 
 import logging
 import json
+import backoff
 from requests import Session
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
-                                InvalidApplication)
+                                InvalidApplication,
+                                ApiLimitReached)
 from .entities import (Group,
                        User,
                        Application)
@@ -173,11 +175,17 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
+    @backoff.on_exception(backoff.expo,
+                          ApiLimitReached,
+                          max_time=60)
     def _get_paginated_url(self, url, result_limit=100):
         results = []
         params = {'limit': result_limit}
         try:
             response = self.session.get(url, params=params)
+            if response.status_code == 429:
+                LOGGER.warning('Api is exhausted for endpoint, backing off.')
+                raise ApiLimitReached
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
