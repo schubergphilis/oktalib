@@ -56,3 +56,7 @@ class InvalidUser(Exception):
 
 class InvalidApplication(Exception):
     """The application provided is invalid."""
+
+
+class ApiPressure(Exception):
+    """The api limits are close to being reached."""
