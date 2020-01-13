@@ -73,3 +73,9 @@ History
 ------------------
 
 * Added feature for aws application
+
+
+1.1.10 (13-01-2020)
+-------------------
+
+* Added api exhaustion backoff.
