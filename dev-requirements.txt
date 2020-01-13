@@ -21,4 +21,3 @@ twine~=1.13.0
 coloredlogs~=10.0
 emoji~=0.5.4
 toml~=0.10.0
-backoff~=1.10.0

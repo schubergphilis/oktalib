@@ -9,3 +9,4 @@
 #
 requests~=2.22.0
 dateutils~=0.6.7
+backoff~=1.10.0
