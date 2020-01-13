@@ -58,5 +58,5 @@ class InvalidApplication(Exception):
     """The application provided is invalid."""
 
 
-class ApiPressure(Exception):
+class ApiLimitReached(Exception):
     """The api limits are close to being reached."""

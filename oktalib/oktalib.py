@@ -38,7 +38,7 @@ from requests import Session
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
-                                ApiPressure)
+                                ApiLimitReached)
 from .entities import (Group,
                        User,
                        Application)
@@ -176,7 +176,7 @@ class Okta:
         return group.delete()
 
     @backoff.on_exception(backoff.expo,
-                          ApiPressure,
+                          ApiLimitReached,
                           max_time=60)
     def _get_paginated_url(self, url, result_limit=100):
         results = []
@@ -185,7 +185,7 @@ class Okta:
             response = self.session.get(url, params=params)
             if response.status_code == 429:
                 LOGGER.warning('Api is exhausted for endpoint, backing off.')
-                raise ApiPressure
+                raise ApiLimitReached
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
