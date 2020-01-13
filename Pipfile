@@ -18,9 +18,9 @@ twine = "~=1.13.0"
 coloredlogs = "~=10.0"
 emoji = "~=0.5.3"
 toml = "~=0.10.0"
-backoff = "~=1.10.0"
 
 
 [packages]
 requests = "~=2.22.0"
 dateutils = "~=0.6.6"
+backoff = "~=1.10.0"
