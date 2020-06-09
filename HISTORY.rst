@@ -85,3 +85,9 @@ History
 -------------------
 
 * Corrected Pipfile.lock issue.
+
+
+1.1.12 (09-06-2020)
+-------------------
+
+* Bumped requests
