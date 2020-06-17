@@ -450,7 +450,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         groups = []
         url = self._data.get('_links', {}).get('groups', {}).get('href')
         for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
-            groups.append(self._okta.get_group_by_id(group.get('id')))
+            groups.append(self._okta.get_group_by_id(group.get('id', '')))
         return groups
 
     @property
