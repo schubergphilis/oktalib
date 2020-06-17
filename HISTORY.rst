@@ -91,3 +91,9 @@ History
 -------------------
 
 * Bumped requests
+
+
+1.1.13 (17-06-2020)
+-------------------
+
+* fixed applications entity
