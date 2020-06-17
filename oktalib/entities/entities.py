@@ -447,8 +447,34 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             list: A list of Group objects for the groups of the application
 
         """
+        groups = []
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        return [Group(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            groups.append(self._okta.get_group_by_id(group.get('id', '')))
+        return groups
+
+    @property
+    def group_assignments(self):
+        """The Role Assignments to the application.
+
+        Returns:
+            list: A list of Group assignments for application
+
+        """
+        url = self._data.get('_links', {}).get('groups', {}).get('href')
+        return self._okta._get_paginated_url(url)  # pylint: disable=protected-access
+
+    @property
+    def user_assignments(self):
+        """The Role Assignments to the application.
+
+        Returns:
+            list: A list of User assignments for application
+
+        """
+        url = self._data.get('_links', {}).get('users', {}).get('href')
+        return self._okta._get_paginated_url(url)  # pylint: disable=protected-access
+
 
     @property
     def activate(self):

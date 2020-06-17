@@ -141,6 +141,22 @@ class Okta:
         return next((group for group in self.search_groups_by_name(name)
                      if group.name == name), None)
 
+    def get_group_by_id(self, group_id):
+        """Retrieves the group (of any type) by id.
+
+        Args:
+            id: The id of the group to retrieve
+
+        Returns:
+            Group: The group if a match is found else None
+
+        """
+        url = '{api}/groups/{id}'.format(api=self.api, id=group_id)
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return Group(self, response.json()) if response.ok else None
+
     def search_groups_by_name(self, name):
         """Retrieves the groups (of any type) by name.
 
