@@ -21,6 +21,6 @@ toml = "~=0.10.0"
 
 
 [packages]
-requests = "~=2.23.0"
+requests = "~=2.24.0"
 dateutils = "~=0.6.6"
 backoff = "~=1.10.0"
