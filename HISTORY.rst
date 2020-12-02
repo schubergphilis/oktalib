@@ -103,3 +103,9 @@ History
 ------------------
 
 * bumped requests
+
+
+1.3.0 (02-12-2020)
+------------------
+
+* Bumped requests
