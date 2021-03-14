@@ -302,6 +302,7 @@ class Group(Entity):
                                 'Response :{}').format(response.text))
         return response.ok
 
+
 class Application(Entity):  # pylint: disable=too-many-public-methods
     """Models the apps in okta."""
 
@@ -475,7 +476,6 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         url = self._data.get('_links', {}).get('users', {}).get('href')
         return self._okta._get_paginated_url(url)  # pylint: disable=protected-access
 
-
     @property
     def activate(self):
         """Activates the application.
@@ -523,7 +523,6 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
                                                            app_id_=self.id)
         response = self._okta.session.get(url)
         return json.loads(response.text).get('SamlIamRole', [])
-
 
     def add_group_by_id(self, group_id):
         """Adds a group to the application.
@@ -706,6 +705,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('firstName')
 
+    @first_name.setter
+    def first_name(self, value):
+        """First name setter."""
+        if self.update_profile({'profile': {'firstName': value}}):
+            self._update()
+
     @property
     def last_name(self):
         """The last name of the user.
@@ -715,6 +720,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('lastName')
+
+    @last_name.setter
+    def last_name(self, value):
+        """Last name setter."""
+        if self.update_profile({'profile': {'lastName': value}}):
+            self._update()
 
     @property
     def manager(self):
@@ -726,6 +737,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('manager')
 
+    @manager.setter
+    def manager(self, value):
+        """Manager setter."""
+        if self.update_profile({'profile': {'manager': value}}):
+            self._update()
+
     @property
     def display_name(self):
         """The display name of the user.
@@ -735,6 +752,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('displayName')
+
+    @display_name.setter
+    def display_name(self, value):
+        """Display name setter."""
+        if self.update_profile({'profile': {'displayName': value}}):
+            self._update()
 
     @property
     def title(self):
@@ -746,6 +769,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('title')
 
+    @title.setter
+    def title(self, value):
+        """Title setter."""
+        if self.update_profile({'profile': {'title': value}}):
+            self._update()
+
     @property
     def locale(self):
         """The locale of the user.
@@ -755,6 +784,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('locale')
+
+    @locale.setter
+    def locale(self, value):
+        """Locale setter."""
+        if self.update_profile({'profile': {'locale': value}}):
+            self._update()
 
     @property
     def employee_number(self):
@@ -766,6 +801,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('employeeNumber')
 
+    @employee_number.setter
+    def employee_number(self, value):
+        """Employee number setter."""
+        if self.update_profile({'profile': {'employeeNumber': value}}):
+            self._update()
+
     @property
     def zip_code(self):
         """The zip code of the user.
@@ -775,6 +816,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('zipCode')
+
+    @zip_code.setter
+    def zip_code(self, value):
+        """Zip number setter."""
+        if self.update_profile({'profile': {'zipCode': value}}):
+            self._update()
 
     @property
     def city(self):
@@ -786,6 +833,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('city')
 
+    @city.setter
+    def city(self, value):
+        """City setter."""
+        if self.update_profile({'profile': {'city': value}}):
+            self._update()
+
     @property
     def street_address(self):
         """The street address of the user.
@@ -795,6 +848,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('streetAddress')
+
+    @street_address.setter
+    def street_address(self, value):
+        """Street address setter."""
+        if self.update_profile({'profile': {'streetAddress': value}}):
+            self._update()
 
     @property
     def contry_code(self):
@@ -806,6 +865,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('countryCode')
 
+    @contry_code.setter
+    def contry_code(self, value):
+        """Country code setter."""
+        if self.update_profile({'profile': {'countryCode': value}}):
+            self._update()
+
     @property
     def organization(self):
         """The organization of the user.
@@ -815,6 +880,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('organization')
+
+    @organization.setter
+    def organization(self, value):
+        """Organization setter."""
+        if self.update_profile({'profile': {'organization': value}}):
+            self._update()
 
     @property
     def department(self):
@@ -826,6 +897,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('department')
 
+    @department.setter
+    def department(self, value):
+        """Department setter."""
+        if self.update_profile({'profile': {'department': value}}):
+            self._update()
+
     @property
     def primary_phone(self):
         """The primary phone of the user.
@@ -835,6 +912,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('primaryPhone')
+
+    @primary_phone.setter
+    def primary_phone(self, value):
+        """Primary phone setter."""
+        if self.update_profile({'profile': {'primaryPhone': value}}):
+            self._update()
 
     @property
     def mobile_phone(self):
@@ -846,6 +929,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('mobilePhone')
 
+    @mobile_phone.setter
+    def mobile_phone(self, value):
+        """Mobile phone setter."""
+        if self.update_profile({'profile': {'mobilePhone': value}}):
+            self._update()
+
     @property
     def email(self):
         """The email of the user.
@@ -855,6 +944,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('email')
+
+    @email.setter
+    def email(self, value):
+        """Email setter."""
+        if self.update_profile({'profile': {'email': value}}):
+            self._update()
 
     @property
     def second_email(self):
@@ -866,6 +961,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         """
         return self._data.get('profile', {}).get('secondEmail')
 
+    @second_email.setter
+    def second_email(self, value):
+        """Second email setter."""
+        if self.update_profile({'profile': {'secondEmail': value}}):
+            self._update()
+
     @property
     def login(self):
         """The login of the user.
@@ -875,6 +976,12 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         return self._data.get('profile', {}).get('login')
+
+    @login.setter
+    def login(self, value):
+        """Login setter."""
+        if self.update_profile({'profile': {'login': value}}):
+            self._update()
 
     @property
     def credentials(self):
