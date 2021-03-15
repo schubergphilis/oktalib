@@ -60,3 +60,7 @@ class InvalidApplication(Exception):
 
 class ApiLimitReached(Exception):
     """The api limits are close to being reached."""
+
+
+class UnableToUpdate(Exception):
+    """Could not update use property."""
