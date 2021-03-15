@@ -109,3 +109,9 @@ History
 ------------------
 
 * Bumped requests
+
+
+1.4.0 (15-03-2021)
+------------------
+
+* Added property setters for user attributes.
