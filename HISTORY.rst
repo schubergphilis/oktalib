@@ -115,3 +115,9 @@ History
 ------------------
 
 * Added property setters for user attributes.
+
+
+1.4.1 (26-04-2021)
+------------------
+
+* Bumped dependencies.
