@@ -133,3 +133,9 @@ History
 ------------------
 
 * Updated reference of pypi to simple from legacy.
+
+
+1.4.4 (08-06-2021)
+------------------
+
+* Updated pypi reference.
