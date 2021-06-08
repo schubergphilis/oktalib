@@ -139,3 +139,9 @@ History
 ------------------
 
 * Updated pypi reference.
+
+
+1.4.5 (08-06-2021)
+------------------
+
+* Reverted pypi reference to legacy.
