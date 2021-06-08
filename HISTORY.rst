@@ -127,3 +127,9 @@ History
 ------------------
 
 * Bumped dependencies.
+
+
+1.4.3 (08-06-2021)
+------------------
+
+* Updated reference of pypi to simple from legacy.
