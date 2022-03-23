@@ -56,6 +56,72 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
+class Role:
+    """Models a (saml?) role as part of a group assingment."""
+
+    def __init__(self, role_text):
+        self._text = role_text
+        self._account_target, self._account_role = self._parse_text(role_text)
+
+    @staticmethod
+    def _parse_text(role_text):
+        if not role_text:
+            return None, None
+        account_target, role_name = role_text.split(' -- ')
+        return account_target.rstrip(']').lstrip('['), role_name
+
+    @property
+    def account_target(self):
+        """Account target."""
+        return self._account_target
+
+    @property
+    def account_role(self):
+        """Account role."""
+        return self._account_role
+
+
+class GroupAssignment(Entity):
+    """Models the group assignment object of okta for apps."""
+
+    def __init__(self, okta_instance, data):
+        Entity.__init__(self, okta_instance, data)
+
+    @property
+    def priority(self):
+        """The priority of the group assignment.
+
+        Returns:
+            int: The priority of the group.
+
+        """
+        return self._data.get('priority')
+
+    @property
+    def group(self):
+        """The group that the group assignment refers to.
+
+        Returns:
+            group (Group): The group that the group assignment refers to.
+
+        """
+        url = self._data.get('_links', {}).get('group', {}).get('href')
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(response.text)
+        return Group(self._okta, response.json())
+
+    @property
+    def profile_role(self):
+        """Profile pole."""
+        return Role(self._data.get('profile', {}).get('role'))
+
+    @property
+    def profile_saml_roles(self):
+        """Profile saml roles."""
+        return [Role(entry) for entry in self._data.get('profile', {}).get('samlRoles', [])]
+
+
 class Group(Entity):
     """Models the group object of okta."""
 
@@ -464,7 +530,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        return self._okta._get_paginated_url(url)  # pylint: disable=protected-access
+        return [GroupAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
 
     @property
     def user_assignments(self):
