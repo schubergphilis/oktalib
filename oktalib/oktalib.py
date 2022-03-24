@@ -35,6 +35,7 @@ import logging
 import json
 import backoff
 from requests import Session
+from cachetools import cached, TTLCache
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
@@ -84,6 +85,7 @@ class Okta:
         return session
 
     @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """The groups configured in okta.
 
@@ -227,6 +229,7 @@ class Okta:
         return False
 
     @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users configured in okta.
 
@@ -323,6 +326,7 @@ class Okta:
         return [User(self, data) for data in response.json()]
 
     @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def applications(self):
         """The applications configured in okta.
 

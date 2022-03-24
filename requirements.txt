@@ -7,6 +7,7 @@
 #
 # Please use Pipfile to update the requirements.
 #
-requests>=2.25.1
+requests>=2.27.1
 dateutils>=0.6.12
-backoff>=1.10.0
+backoff>=1.11.1
+cachetools~=4.2.4
