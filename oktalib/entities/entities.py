@@ -58,32 +58,6 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
-class AWSApplicationSamlRole:
-    """Models an aws application saml role as part of a group assignment."""
-
-    def __init__(self, role_text):
-        self._text = role_text
-        self._account_target, self._account_role = self._parse_text(role_text)
-
-    @staticmethod
-    def _parse_text(role_text):
-        account_target, role_name = role_text.split(' -- ')
-        return account_target.rstrip(']').lstrip('['), role_name
-
-    @property
-    def account_target(self):
-        """Account target."""
-        return self._account_target
-
-    @property
-    def account_role(self):
-        """Account role."""
-        return self._account_role
-
-    def __repr__(self):
-        return f'AWS account: "{self.account_target}" assuming role: "{self.account_role}"'
-
-
 class Group(Entity):
     """Models the group object of okta."""
 
@@ -353,7 +327,7 @@ class GroupAssignment(Group):
         return self._group_assignment_data.get('priority')
 
     def _get_group_data(self):
-        """The group data of the parent group that the group assignment refers to.
+        """The group data of the inherited group that the group assignment refers to.
 
         Returns:
             group_data (dict): The group data of the parent group that the group assignment refers to.
@@ -369,14 +343,13 @@ class GroupAssignment(Group):
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_role(self):
         """Profile role."""
-        profile_role = self._group_assignment_data.get('profile', {}).get('role')
-        return AWSApplicationSamlRole(profile_role) if profile_role else None
+        return self._group_assignment_data.get('profile', {}).get('role')
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_saml_roles(self):
         """Profile saml roles."""
-        return [AWSApplicationSamlRole(entry) for entry in self._group_assignment_data.get('profile', {}).get('samlRoles', [])]
+        return self._group_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
 class User(Entity):  # pylint: disable=too-many-public-methods
@@ -983,14 +956,13 @@ class UserAssignment(User):
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_role(self):
         """Profile pole."""
-        profile_role = self._user_assignment_data.get('profile', {}).get('role')
-        return AWSApplicationSamlRole(profile_role) if profile_role else None
+        return self._user_assignment_data.get('profile', {}).get('role')
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_saml_roles(self):
         """Profile saml roles."""
-        return [AWSApplicationSamlRole(entry) for entry in self._user_assignment_data.get('profile', {}).get('samlRoles', [])]
+        return self._user_assignment_data.get('profile', {}).get('samlRoles', []
 
 
 class Application(Entity):  # pylint: disable=too-many-public-methods
