@@ -962,7 +962,7 @@ class UserAssignment(User):
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_saml_roles(self):
         """Profile saml roles."""
-        return self._user_assignment_data.get('profile', {}).get('samlRoles', []
+        return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
 class Application(Entity):  # pylint: disable=too-many-public-methods
