@@ -955,7 +955,7 @@ class UserAssignment(User):
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_role(self):
-        """Profile pole."""
+        """Profile role."""
         return self._user_assignment_data.get('profile', {}).get('role')
 
     @property
