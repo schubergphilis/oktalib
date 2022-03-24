@@ -1149,10 +1149,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
     @property
     @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def group_assignments(self):
-        """The Role Assignments to the application.
+        """The group assignments to the application.
 
         Returns:
-            list: A list of Group assignments for application
+            list: A list of group assignments for application
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
