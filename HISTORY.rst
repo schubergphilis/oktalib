@@ -145,3 +145,9 @@ History
 ------------------
 
 * Reverted pypi reference to legacy.
+
+
+1.5.0 (24-03-2022)
+------------------
+
+* Added User and Group assignment roles.
