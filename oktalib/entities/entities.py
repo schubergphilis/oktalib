@@ -1302,7 +1302,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         Args:
             group_id: The id of the group to be associated
             role: The aws role that okta uses to assume SAML roles in other accounts
-            saml_roles: the SAML Role to be assumed
+            saml_roles: the SAML Roles to be assumed
 
         Returns:
             Bool: The status of the assignment( True or False )
