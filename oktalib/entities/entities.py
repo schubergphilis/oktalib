@@ -34,6 +34,8 @@ Main code for entities.
 import json
 import logging
 
+from cachetools import cached, TTLCache
+
 from oktalib.oktalibexceptions import (InvalidApplication,
                                        InvalidUser,
                                        InvalidGroup,
@@ -157,6 +159,7 @@ class Group(Entity):
         return tuple(self._data.get('objectClass'))
 
     @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users of the group.
 
@@ -304,330 +307,49 @@ class Group(Entity):
         return response.ok
 
 
-class Application(Entity):  # pylint: disable=too-many-public-methods
-    """Models the apps in okta."""
+class GroupAssignment(Group):
+    """Models the group assignment object of okta for apps."""
 
     def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
+        self._okta = okta_instance
+        self._group_assignment_data = data
+        group_data = self._get_group_data()
+        Group.__init__(self, okta_instance, group_data)
 
     @property
-    def url(self):
-        """The url of the application.
+    def priority(self):
+        """The priority of the group assignment.
 
         Returns:
-            string: The url of the application
+            int: The priority of the group.
 
         """
-        return '{api}/apps/{id_}'.format(api=self._okta.api, id_=self.id)
+        return self._group_assignment_data.get('priority')
 
-    @property
-    def name(self):
-        """The name of the application.
+    def _get_group_data(self):
+        """The group data of the inherited group that the group assignment refers to.
 
         Returns:
-            basestring: The name of the application
+            group_data (dict): The group data of the parent group that the group assignment refers to.
 
         """
-        return self._data.get('name')
-
-    @property
-    def label(self):
-        """The label of the application.
-
-        Returns:
-            basestring: The label of the application
-
-        """
-        return self._data.get('label')
-
-    @property
-    def status(self):
-        """The status of the application.
-
-        Returns:
-            basestring: The status of the application
-
-        """
-        return self._data.get('status')
-
-    @property
-    def accessibility(self):
-        """The accessibility of the application.
-
-        Returns:
-            dictionary: The accessibility of the application
-
-        """
-        return self._data.get('accessibility')
-
-    @property
-    def visibility(self):
-        """The visibility of the application.
-
-        Returns:
-            dictionary: The visibility of the application
-
-        """
-        return self._data.get('visibility')
-
-    @property
-    def features(self):
-        """The features of the application.
-
-        Returns:
-            dictionary: The features of the application
-
-        """
-        return self._data.get('features')
-
-    @property
-    def sign_on_mode(self):
-        """The sign on mode of the application.
-
-        Returns:
-            basestring: The sign on mode of the application
-
-        """
-        return self._data.get('sign_on_mode')
-
-    @property
-    def credentials(self):
-        """The credentials of the application.
-
-        Returns:
-            dictionary: The credentials of the application
-
-        """
-        return self._data.get('credentials')
-
-    @property
-    def settings(self):
-        """The settings of the application.
-
-        Returns:
-            dictionary: The settings of the application
-
-        """
-        return self._data.get('settings', {}).get('app')
-
-    @property
-    def notification_settings(self):
-        """The notification settings of the application.
-
-        Returns:
-            dictionary: The notification settings of the application
-
-        """
-        return self._data.get('settings', {}).get('notifications')
-
-    @property
-    def sign_on_settings(self):
-        """The sign on settings of the application.
-
-        Returns:
-            dictionary: The sign on settings of the application
-
-        """
-        return self._data.get('settings', {}).get('signOn')
-
-    @property
-    def users(self):
-        """The users of the application.
-
-        Returns:
-            list: A list of User objects for the users of the application
-
-        """
-        url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
-
-    @property
-    def groups(self):
-        """The groups of the application.
-
-        Returns:
-            list: A list of Group objects for the groups of the application
-
-        """
-        groups = []
-        url = self._data.get('_links', {}).get('groups', {}).get('href')
-        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
-            groups.append(self._okta.get_group_by_id(group.get('id', '')))
-        return groups
-
-    @property
-    def group_assignments(self):
-        """The Role Assignments to the application.
-
-        Returns:
-            list: A list of Group assignments for application
-
-        """
-        url = self._data.get('_links', {}).get('groups', {}).get('href')
-        return self._okta._get_paginated_url(url)  # pylint: disable=protected-access
-
-    @property
-    def user_assignments(self):
-        """The Role Assignments to the application.
-
-        Returns:
-            list: A list of User assignments for application
-
-        """
-        url = self._data.get('_links', {}).get('users', {}).get('href')
-        return self._okta._get_paginated_url(url)  # pylint: disable=protected-access
-
-    @property
-    def activate(self):
-        """Activates the application.
-
-        Returns:
-            bool: True on success, False otherwise
-
-        """
-        if self.status == 'ACTIVE':
-            return True
-        url = self._data.get('_links', {}).get('activate').get('href')
-        response = self._okta.session.post(url)  # noqa
-        if not response.ok:
-            self._logger.error('Response :{response}'.format(response=response.text))
-        else:
-            self._update()
-        return response.ok
-
-    @property
-    def deactivate(self):
-        """Deactivates the application.
-
-        Returns:
-            bool: True on success, False otherwise
-
-        """
-        if self.status == 'INACTIVE':
-            return True
-        url = self._data.get('_links', {}).get('deactivate').get('href')
-        response = self._okta.session.post(url)  # noqa
-        if not response.ok:
-            self._logger.error('Response :{response}'.format(response=response.text))
-        else:
-            self._update()
-        return response.ok
-
-    def get_associated_saml_roles(self):
-        """Returns the Saml IAM Roles associated with the application.
-
-        Returns:
-            list: List of saml iam roles
-
-        """
-        url = '{api}/internal/apps/{app_id_}/types'.format(api=self._okta.api,
-                                                           app_id_=self.id)
+        url = self._group_assignment_data.get('_links', {}).get('group', {}).get('href')
         response = self._okta.session.get(url)
-        return json.loads(response.text).get('SamlIamRole', [])
-
-    def add_group_by_id(self, group_id):
-        """Adds a group to the application.
-
-        Args:
-            group_id: The id of the group to add
-
-        Returns:
-            True on success, False otherwise
-
-        """
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group_id)
-        response = self._okta.session.put(url)
         if not response.ok:
-            self._logger.error(('Adding group failed '
-                                'Response :{}').format(response.text))
-        return response.ok
+            self._logger.error(response.text)
+        return response.json()
 
-    def add_group_by_name(self, group_name):
-        """Adds a group to the application.
+    @property
+    @cached(cache=TTLCache(maxsize=100, ttl=60))
+    def profile_role(self):
+        """Profile role."""
+        return self._group_assignment_data.get('profile', {}).get('role')
 
-        Args:
-            group_name: The name of the group to add
-
-        Returns:
-            True on success, False otherwise
-
-        """
-        group = self._okta.get_group_by_name(group_name)
-        if not group:
-            raise InvalidGroup(group_name)
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group.id)
-        response = self._okta.session.put(url, data=json.dumps({}))
-        if not response.ok:
-            self._logger.error(('Adding group failed '
-                                'Response :{}').format(response.text))
-        return response.ok
-
-    def remove_group_by_id(self, group_id):
-        """Removes a group from the application.
-
-        Args:
-            group_id: The id of the group to remove
-
-        Returns:
-            True on success, False otherwise
-
-        """
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group_id)
-        response = self._okta.session.delete(url)
-        if not response.ok:
-            self._logger.error(('Removing group failed '
-                                'Response :{}').format(response.text))
-        return response.ok
-
-    def remove_group_by_name(self, group_name):
-        """Removes a group from the application.
-
-        Args:
-            group_name: The name of the group to remove
-
-        Returns:
-            True on success, False otherwise
-
-        """
-        group = self._okta.get_group_by_name(group_name)
-        if not group:
-            raise InvalidGroup(group_name)
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group.id)
-        response = self._okta.session.delete(url)
-        if not response.ok:
-            self._logger.error(('Adding group failed '
-                                'Response :{}').format(response.text))
-        return response.ok
-
-    def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
-        """Assigns an okta group to an okta application with saml user roles.
-
-        Args:
-            group_id: The id of the group to be associated
-            role: The aws role that okta uses to assume SAML roles in other accounts
-            saml_roles: the SAML Role to be assumed
-
-        Returns:
-            Bool: The status of the assignment( True or False )
-
-        """
-        url = '{api}/apps/{app_id_}/groups/{group_id_}'.format(api=self._okta.api,
-                                                               app_id_=self.id,
-                                                               group_id_=group_id)
-        payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
-        response = self._okta.session.put(url, json=payload)
-        if not response.ok:
-            self._logger.error(('Assigning group to the application failed '
-                                'Response :{}').format(response.text))
-        return response.ok
+    @property
+    @cached(cache=TTLCache(maxsize=100, ttl=60))
+    def profile_saml_roles(self):
+        """Profile saml roles."""
+        return self._group_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
 class User(Entity):  # pylint: disable=too-many-public-methods
@@ -982,6 +704,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._data.get('credentials')
 
     @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """Lists the groups the user is a member of.
 
@@ -1180,4 +903,417 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         response = self._okta.session.post(url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.text)
+        return response.ok
+
+
+class UserAssignment(User):
+    """Models the user assignment object of okta for apps."""
+
+    def __init__(self, okta_instance, data):
+        self._okta = okta_instance
+        self._user_assignment_data = data
+        user_data = self._get_user_data()
+        User.__init__(self, okta_instance, user_data)
+
+    def _get_user_data(self):
+        """The parent user data that the user assignment refers to.
+
+        Returns:
+            user_data (dict): The parent user data that the user assignment refers to.
+
+        """
+        url = self._user_assignment_data.get('_links', {}).get('user', {}).get('href')
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(response.text)
+        return response.json()
+
+    @property
+    def group(self):
+        """The group that the user assignment refers to.
+
+        Returns:
+            group (Group): The group that the user assignment refers to.
+
+        """
+        url = self._user_assignment_data.get('_links', {}).get('group', {}).get('href')
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(response.text)
+        return Group(self._okta, response.json())
+
+    @property
+    def email(self):
+        """The email of the user.
+
+        Returns:
+            email (str): The email of the user.
+
+        """
+        return self._user_assignment_data.get('profile', {}).get('email')
+
+    @property
+    @cached(cache=TTLCache(maxsize=100, ttl=60))
+    def profile_role(self):
+        """Profile role."""
+        return self._user_assignment_data.get('profile', {}).get('role')
+
+    @property
+    @cached(cache=TTLCache(maxsize=100, ttl=60))
+    def profile_saml_roles(self):
+        """Profile saml roles."""
+        return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
+
+
+class Application(Entity):  # pylint: disable=too-many-public-methods
+    """Models the apps in okta."""
+
+    def __init__(self, okta_instance, data):
+        Entity.__init__(self, okta_instance, data)
+
+    @property
+    def url(self):
+        """The url of the application.
+
+        Returns:
+            string: The url of the application
+
+        """
+        return '{api}/apps/{id_}'.format(api=self._okta.api, id_=self.id)
+
+    @property
+    def name(self):
+        """The name of the application.
+
+        Returns:
+            basestring: The name of the application
+
+        """
+        return self._data.get('name')
+
+    @property
+    def label(self):
+        """The label of the application.
+
+        Returns:
+            basestring: The label of the application
+
+        """
+        return self._data.get('label')
+
+    @property
+    def status(self):
+        """The status of the application.
+
+        Returns:
+            basestring: The status of the application
+
+        """
+        return self._data.get('status')
+
+    @property
+    def accessibility(self):
+        """The accessibility of the application.
+
+        Returns:
+            dictionary: The accessibility of the application
+
+        """
+        return self._data.get('accessibility')
+
+    @property
+    def visibility(self):
+        """The visibility of the application.
+
+        Returns:
+            dictionary: The visibility of the application
+
+        """
+        return self._data.get('visibility')
+
+    @property
+    def features(self):
+        """The features of the application.
+
+        Returns:
+            dictionary: The features of the application
+
+        """
+        return self._data.get('features')
+
+    @property
+    def sign_on_mode(self):
+        """The sign on mode of the application.
+
+        Returns:
+            basestring: The sign on mode of the application
+
+        """
+        return self._data.get('sign_on_mode')
+
+    @property
+    def credentials(self):
+        """The credentials of the application.
+
+        Returns:
+            dictionary: The credentials of the application
+
+        """
+        return self._data.get('credentials')
+
+    @property
+    def settings(self):
+        """The settings of the application.
+
+        Returns:
+            dictionary: The settings of the application
+
+        """
+        return self._data.get('settings', {}).get('app')
+
+    @property
+    def notification_settings(self):
+        """The notification settings of the application.
+
+        Returns:
+            dictionary: The notification settings of the application
+
+        """
+        return self._data.get('settings', {}).get('notifications')
+
+    @property
+    def sign_on_settings(self):
+        """The sign on settings of the application.
+
+        Returns:
+            dictionary: The sign on settings of the application
+
+        """
+        return self._data.get('settings', {}).get('signOn')
+
+    @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
+    def users(self):
+        """The users of the application.
+
+        Returns:
+            list: A list of User objects for the users of the application
+
+        """
+        url = self._data.get('_links', {}).get('users', {}).get('href')
+        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+
+    @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
+    def groups(self):
+        """The groups of the application.
+
+        Returns:
+            list: A list of Group objects for the groups of the application
+
+        """
+        groups = []
+        url = self._data.get('_links', {}).get('groups', {}).get('href')
+        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            groups.append(self._okta.get_group_by_id(group.get('id', '')))
+        return groups
+
+    @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
+    def group_assignments(self):
+        """The group assignments to the application.
+
+        Returns:
+            list: A list of group assignments for application
+
+        """
+        url = self._data.get('_links', {}).get('groups', {}).get('href')
+        return [GroupAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+
+    def get_group_assignment_by_group_name(self, name):
+        """Retrieves a group assignment by a group name.
+
+        Args:
+            name: The name of the group assignment to retrieve.
+
+        Returns:
+            group_assignment (GroupAssignment) : The matching group assignment if found else None.
+
+        """
+        return next((group for group in self.group_assignments if group.name == name), None)
+
+    @property
+    @cached(cache=TTLCache(maxsize=9000, ttl=60))
+    def user_assignments(self):
+        """The user assignments to the application.
+
+        Returns:
+            list: A list of user assignments for application
+
+        """
+        url = self._data.get('_links', {}).get('users', {}).get('href')
+        return [UserAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+
+    def get_user_assignment_by_email(self, email):
+        """Retrieves a user assignment by a user email.
+
+        Args:
+            email: The email of the user assignment to retrieve.
+
+        Returns:
+            user_assignment (UserAssignment) : The matching user assignment if found else None.
+
+        """
+        return next((user for user in self.user_assignments if user.email == email), None)
+
+    @property
+    def activate(self):
+        """Activates the application.
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
+        if self.status == 'ACTIVE':
+            return True
+        url = self._data.get('_links', {}).get('activate').get('href')
+        response = self._okta.session.post(url)  # noqa
+        if not response.ok:
+            self._logger.error('Response :{response}'.format(response=response.text))
+        else:
+            self._update()
+        return response.ok
+
+    @property
+    def deactivate(self):
+        """Deactivates the application.
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
+        if self.status == 'INACTIVE':
+            return True
+        url = self._data.get('_links', {}).get('deactivate').get('href')
+        response = self._okta.session.post(url)  # noqa
+        if not response.ok:
+            self._logger.error('Response :{response}'.format(response=response.text))
+        else:
+            self._update()
+        return response.ok
+
+    def get_associated_saml_roles(self):
+        """Returns the Saml IAM Roles associated with the application.
+
+        Returns:
+            list: List of saml iam roles
+
+        """
+        url = '{api}/internal/apps/{app_id_}/types'.format(api=self._okta.api,
+                                                           app_id_=self.id)
+        response = self._okta.session.get(url)
+        return json.loads(response.text).get('SamlIamRole', [])
+
+    def add_group_by_id(self, group_id):
+        """Adds a group to the application.
+
+        Args:
+            group_id: The id of the group to add
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
+                                                          id_=self.id,
+                                                          group_id=group_id)
+        response = self._okta.session.put(url)
+        if not response.ok:
+            self._logger.error(('Adding group failed '
+                                'Response :{}').format(response.text))
+        return response.ok
+
+    def add_group_by_name(self, group_name):
+        """Adds a group to the application.
+
+        Args:
+            group_name: The name of the group to add
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        group = self._okta.get_group_by_name(group_name)
+        if not group:
+            raise InvalidGroup(group_name)
+        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
+                                                          id_=self.id,
+                                                          group_id=group.id)
+        response = self._okta.session.put(url, data=json.dumps({}))
+        if not response.ok:
+            self._logger.error(('Adding group failed '
+                                'Response :{}').format(response.text))
+        return response.ok
+
+    def remove_group_by_id(self, group_id):
+        """Removes a group from the application.
+
+        Args:
+            group_id: The id of the group to remove
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
+                                                          id_=self.id,
+                                                          group_id=group_id)
+        response = self._okta.session.delete(url)
+        if not response.ok:
+            self._logger.error(('Removing group failed '
+                                'Response :{}').format(response.text))
+        return response.ok
+
+    def remove_group_by_name(self, group_name):
+        """Removes a group from the application.
+
+        Args:
+            group_name: The name of the group to remove
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        group = self._okta.get_group_by_name(group_name)
+        if not group:
+            raise InvalidGroup(group_name)
+        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
+                                                          id_=self.id,
+                                                          group_id=group.id)
+        response = self._okta.session.delete(url)
+        if not response.ok:
+            self._logger.error(('Adding group failed '
+                                'Response :{}').format(response.text))
+        return response.ok
+
+    def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
+        """Assigns an okta group to an okta application with saml user roles.
+
+        Args:
+            group_id: The id of the group to be associated
+            role: The aws role that okta uses to assume SAML roles in other accounts
+            saml_roles: the SAML Roles to be assumed
+
+        Returns:
+            Bool: The status of the assignment( True or False )
+
+        """
+        url = '{api}/apps/{app_id_}/groups/{group_id_}'.format(api=self._okta.api,
+                                                               app_id_=self.id,
+                                                               group_id_=group_id)
+        payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
+        response = self._okta.session.put(url, json=payload)
+        if not response.ok:
+            self._logger.error(('Assigning group to the application failed '
+                                'Response :{}').format(response.text))
         return response.ok
