@@ -90,6 +90,21 @@ class Entity:
         """
         return self._data.get('id')
 
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        """Override the default equals behavior."""
+        if not isinstance(other, self.__class__):
+            raise ValueError(f'Not a {self.__class__.__name__} object')
+        return hash(self) == hash(other)
+
+    def __ne__(self, other):
+        """Override the default unequal behavior."""
+        if not isinstance(other, self.__class__):
+            raise ValueError(f'Not a {self.__class__.__name__} object')
+        return hash(self) != hash(other)
+
     @property
     def created_at(self):
         """The date and time of the group's creation.
