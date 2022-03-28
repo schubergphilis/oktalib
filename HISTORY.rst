@@ -151,3 +151,9 @@ History
 ------------------
 
 * Added User and Group assignment roles.
+
+
+1.6.0 (28-03-2022)
+------------------
+
+* Made entities comparable.
