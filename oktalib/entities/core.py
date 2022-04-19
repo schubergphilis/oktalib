@@ -55,15 +55,14 @@ class Entity:
     """The core object of okta."""
 
     def __init__(self, okta_instance, data):
-        logger_name = u'{base}.{suffix}'.format(base=LOGGER_BASENAME,
-                                                suffix=self.__class__.__name__)
+        logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
         self._okta = okta_instance
         self._data = self._parse_data(data)
 
     def _parse_data(self, data):
         if not isinstance(data, dict):
-            self._logger.error('Invalid data received :{}'.format(data))
+            self._logger.error(f'Invalid data received: {data}')
             data = {}
         return data
 
@@ -135,8 +134,7 @@ class Entity:
     def _update(self):
         response = self._okta.session.get(self.url)
         if not response.ok:
-            self._logger.error(('Error getting entities data. '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Error getting entities data. Response: {response.text}')
             return False
         self._data = response.json()
         return True

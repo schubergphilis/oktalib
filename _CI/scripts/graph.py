@@ -47,7 +47,7 @@ def graph():
                             '-o png '
                             '-A '
                             '-f PUB_ONLY '
-                            '-p graphs {}').format(os.path.join('..', f'{PROJECT_SLUG}'))
+                            f'-p graphs {os.path.join("..", f"{PROJECT_SLUG}")}')
     success = execute_command(create_graph_command)
     if success:
         LOGGER.info('%s Successfully created graph images %s',
