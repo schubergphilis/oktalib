@@ -70,6 +70,7 @@ class Okta:
         self.api = f'{host}/api/v1'
         self.token = token
         self.session = self._setup_session()
+        self._monkey_patch_session()
 
     def _setup_session(self):
         session = Session()
@@ -83,6 +84,19 @@ class Okta:
             raise AuthFailed(response.content)
         return session
 
+    def _monkey_patch_session(self):
+        """
+        Gets original request method and overrides it with the patched one
+        It also sets Token and User namedtuples as well as the renew token
+        method as session attributes.
+        :return: Response instance
+        """
+        self.session.original_request = self.session.request
+        self.session.request = self._patched_request
+
+    @backoff.on_exception(backoff.expo,
+                          ApiLimitReached,
+                          max_time=60)
     def _patched_request(self, method, url, **kwargs):
         """
         Patch the orginal request method from requests.Sessions library.
@@ -99,12 +113,11 @@ class Okta:
             Response: Response instance.
         """
         self._logger.debug(f'Using patched request for method {method}, url {url}')
-        response = self.session.request(method, url, **kwargs)
+        response = self.session.original_request(url, **kwargs)
         if response.status_code == 429:
             LOGGER.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
-
 
     @property
     @cached(cache=TTLCache(maxsize=9000, ttl=60))
@@ -176,7 +189,7 @@ class Okta:
 
         """
         url = f'{self.api}/groups/{group_id}'
-        response = self._patched_request('GET', url)
+        response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
         return Group(self, response.json()) if response.ok else None
@@ -192,7 +205,7 @@ class Okta:
 
         """
         url = f'{self.api}/groups?q={name}'
-        response = self._patched_request('GET', url)
+        response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
         return [Group(self, data) for data in response.json()] if response.ok else []
@@ -222,11 +235,11 @@ class Okta:
         results = []
         params = {'limit': result_limit}
         try:
-            response = self._patched_request('GET', params=params)
+            response = self.session.get(params=params)
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
-                response = self._patched_request('GET', url=next_link, params=params)
+                response = self.session.get(url=next_link, params=params)
                 results.extend(response.json())
                 next_link = self._get_next_link(response)
             return results
@@ -289,7 +302,7 @@ class Okta:
                                'login': login}}
         if password:
             payload.update({'credentials': {'password': {'value': password}}})
-        response = self._patched_request('POST', url=url, data=json.dumps(payload))
+        response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
         return User(self, response.json()) if response.ok else None
@@ -305,7 +318,7 @@ class Okta:
 
         """
         url = f'{self.api}/users?filter=profile.login+eq+"{login}"'
-        response = self._patched_request('GET', url)
+        response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
             return None
@@ -323,7 +336,7 @@ class Okta:
 
         """
         url = f'{self.api}/users?q={value}'
-        response = self._patched_request('GET', url)
+        response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
         return [User(self, data) for data in response.json()]
@@ -339,7 +352,7 @@ class Okta:
 
         """
         url = f'{self.api}/users?filter=profile.email+eq+"{email}"'
-        response = self._patched_request('GET', url)
+        response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
         return [User(self, data) for data in response.json()]
