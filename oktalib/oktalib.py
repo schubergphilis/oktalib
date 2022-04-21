@@ -85,11 +85,11 @@ class Okta:
         return session
 
     def _monkey_patch_session(self):
-        """
-        Gets original request method and overrides it with the patched one
-        It also sets Token and User namedtuples as well as the renew token
-        method as session attributes.
-        :return: Response instance
+        """Gets original request method and overrides it with the patched one.
+
+        Returns:
+            Response: Response instance.
+
         """
         self.session.original_request = self.session.request
         self.session.request = self._patched_request
@@ -98,8 +98,7 @@ class Okta:
                           ApiLimitReached,
                           max_time=60)
     def _patched_request(self, method, url, **kwargs):
-        """
-        Patch the orginal request method from requests.Sessions library.
+        """Patch the orginal request method from requests.Sessions library.
 
         Args:
             method (str): HTTP verb as string.
@@ -111,11 +110,12 @@ class Okta:
 
         Returns:
             Response: Response instance.
+
         """
         self._logger.debug(f'Using patched request for method {method}, url {url}')
-        response = self.session.original_request(url, **kwargs)
+        response = self.session.original_request(method, url, **kwargs)
         if response.status_code == 429:
-            LOGGER.warning('Api is exhausted for endpoint, backing off.')
+            self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
 
@@ -235,7 +235,7 @@ class Okta:
         results = []
         params = {'limit': result_limit}
         try:
-            response = self.session.get(params=params)
+            response = self.session.get(url=url, params=params)
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
