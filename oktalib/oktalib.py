@@ -64,25 +64,60 @@ class Okta:
     """Models the api of okta."""
 
     def __init__(self, host, token):
-        logger_name = u'{base}.{suffix}'.format(base=LOGGER_BASENAME,
-                                                suffix=self.__class__.__name__)
+        logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
         self.host = host
-        self.api = '{host}/api/v1'.format(host=host)
+        self.api = f'{host}/api/v1'
         self.token = token
         self.session = self._setup_session()
+        self._monkey_patch_session()
 
     def _setup_session(self):
         session = Session()
         session.get(self.host)
         session.headers.update({'accept': 'application/json',
                                 'content-type': 'application/json',
-                                'authorization': 'SSWS {}'.format(self.token)})
-        url = '{api}/users/me/'.format(api=self.api)
+                                'authorization': f'SSWS {self.token}'})
+        url = f'{self.api}/users/me/'
         response = session.get(url)
         if not response.ok:
             raise AuthFailed(response.content)
         return session
+
+    def _monkey_patch_session(self):
+        """Gets original request method and overrides it with the patched one.
+
+        Returns:
+            Response: Response instance.
+
+        """
+        self.session.original_request = self.session.request
+        self.session.request = self._patched_request
+
+    @backoff.on_exception(backoff.expo,
+                          ApiLimitReached,
+                          max_time=60)
+    def _patched_request(self, method, url, **kwargs):
+        """Patch the orginal request method from requests.Sessions library.
+
+        Args:
+            method (str): HTTP verb as string.
+            url (str): string.
+            kwargs: keyword arguments.
+
+        Raises:
+            ApiLimitReached: Raised when the Okta API limit is reached.
+
+        Returns:
+            Response: Response instance.
+
+        """
+        self._logger.debug(f'Using patched request for method {method}, url {url}')
+        response = self.session.original_request(method, url, **kwargs)
+        if response.status_code == 429:
+            self._logger.warning('Api is exhausted for endpoint, backing off.')
+            raise ApiLimitReached
+        return response
 
     @property
     @cached(cache=TTLCache(maxsize=9000, ttl=60))
@@ -93,7 +128,7 @@ class Okta:
             list: The list of groups configured in okta
 
         """
-        url = '{api}/groups'.format(api=self.api)
+        url = f'{self.api}/groups'
         return [Group(self, data) for data in self._get_paginated_url(url)]
 
     def create_group(self, name, description):
@@ -107,7 +142,7 @@ class Okta:
             The created group object on success, None otherwise
 
         """
-        url = '{api}/groups'.format(api=self.api)
+        url = f'{self.api}/groups'
         payload = {'profile': {'name': name,
                                'description': description}}
         response = self.session.post(url, data=json.dumps(payload))
@@ -153,7 +188,7 @@ class Okta:
             Group: The group if a match is found else None
 
         """
-        url = '{api}/groups/{id}'.format(api=self.api, id=group_id)
+        url = f'{self.api}/groups/{group_id}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -169,7 +204,7 @@ class Okta:
             list: A list of groups if a match is found else an empty list
 
         """
-        url = '{api}/groups?q={name}'.format(api=self.api, name=name)
+        url = f'{self.api}/groups?q={name}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -200,19 +235,16 @@ class Okta:
         results = []
         params = {'limit': result_limit}
         try:
-            response = self.session.get(url, params=params)
-            if response.status_code == 429:
-                LOGGER.warning('Api is exhausted for endpoint, backing off.')
-                raise ApiLimitReached
+            response = self.session.get(url=url, params=params)
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
-                response = self.session.get(next_link)
+                response = self.session.get(url=next_link, params=params)
                 results.extend(response.json())
                 next_link = self._get_next_link(response)
             return results
         except ValueError:
-            self._logger.error('Error getting url :%s', url)
+            self._logger.error(f'Error getting url: {url}')
             return []
 
     @staticmethod
@@ -237,7 +269,7 @@ class Okta:
             list: The list of users configured in okta
 
         """
-        url = '{api}/users'.format(api=self.api)
+        url = f'{self.api}/users'
         return [User(self, data) for data in self._get_paginated_url(url)]
 
     def create_user(self,  # pylint: disable=too-many-arguments
@@ -263,14 +295,14 @@ class Okta:
 
         """
         enabled = 'true' if enabled else 'false'
-        url = '{api}/users?activate={enabled}'.format(api=self.api, enabled=enabled)
+        url = f'{self.api}/users?activate={enabled}'
         payload = {'profile': {'firstName': first_name,
                                'lastName': last_name,
                                'email': email,
                                'login': login}}
         if password:
             payload.update({'credentials': {'password': {'value': password}}})
-        response = self.session.post(url, data=json.dumps(payload))
+        response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
         return User(self, response.json()) if response.ok else None
@@ -285,7 +317,7 @@ class Okta:
             User: The user if found, None otherwise
 
         """
-        url = '{api}/users?filter=profile.login+eq+"{login}"'.format(api=self.api, login=login)
+        url = f'{self.api}/users?filter=profile.login+eq+"{login}"'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -303,7 +335,7 @@ class Okta:
             list: The users if found, empty list otherwise
 
         """
-        url = '{api}/users?q={value}'.format(api=self.api, value=value)
+        url = f'{self.api}/users?q={value}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -319,7 +351,7 @@ class Okta:
             list: The users if found, empty list otherwise
 
         """
-        url = '{api}/users?filter=profile.email+eq+"{email}"'.format(api=self.api, email=email)
+        url = f'{self.api}/users?filter=profile.email+eq+"{email}"'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -334,7 +366,7 @@ class Okta:
             list: The list of applications configured in okta
 
         """
-        url = '{api}/apps'.format(api=self.api)
+        url = f'{self.api}/apps'
         return [Application(self, data) for data in self._get_paginated_url(url)]
 
     def get_application_by_id(self, id_):

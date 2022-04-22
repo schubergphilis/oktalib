@@ -48,15 +48,15 @@ def check_branch():
     git = Git()
     if git.get_current_branch() not in BRANCHES_SUPPORTED_FOR_TAG:
         accepted_branches = ', '.join(BRANCHES_SUPPORTED_FOR_TAG)
-        print("Tagging is only supported on {} "
-              "you should not tag any other branch, exiting!".format(accepted_branches))
+        print(f"Tagging is only supported on {accepted_branches} "
+              "you should not tag any other branch, exiting!")
         raise SystemExit(1)
 
 
 def push(current_version):
     git = Git()
     git.commit('Updated history file with changelog', 'HISTORY.rst')
-    git.commit('Set version to {}'.format(current_version), '.VERSION')
+    git.commit(f'Set version to {current_version}.VERSION')
     git.add_tag(current_version)
     git.push()
     git.push('origin', current_version)

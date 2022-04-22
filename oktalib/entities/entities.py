@@ -72,7 +72,7 @@ class Group(Entity):
             string: The url of the group
 
         """
-        return '{api}/groups/{id_}'.format(api=self._okta.api, id_=self.id)
+        return f'{self._okta.api}/groups/{self.id}'
 
     @property
     def type(self):
@@ -106,13 +106,12 @@ class Group(Entity):
 
     @name.setter
     def name(self, value):
-        url = '{api}/groups/{id_}'.format(api=self._okta.api, id_=self.id)
+        url = f'{self._okta.api}/groups/{self.id}'
         payload = {'profile': {'name': value,
                                'description': self.description}}
         response = self._okta.session.put(url, data=json.dumps(payload))
         if not response.ok:
-            self._logger.error(('Setting name failed. '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Setting name failed. Response: {response.text}')
         else:
             self._update()
 
@@ -128,13 +127,12 @@ class Group(Entity):
 
     @description.setter
     def description(self, value):
-        url = '{api}/groups/{id_}'.format(api=self._okta.api, id_=self.id)
+        url = f'{self._okta.api}/groups/{self.id}'
         payload = {'profile': {'name': self.name,
                                'description': value}}
         response = self._okta.session.put(url, data=json.dumps(payload))
         if not response.ok:
-            self._logger.error(('Setting description failed. '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Setting description failed. Response: {response.text}')
         else:
             self._update()
 
@@ -188,7 +186,7 @@ class Group(Entity):
             bool: True on success, False otherwise
 
         """
-        url = '{api}/groups/{id}'.format(api=self._okta.api, id=self.id)
+        url = f'{self._okta.api}/groups/{self.id}'
         response = self._okta.session.delete(url)
         return response.ok
 
@@ -236,13 +234,10 @@ class Group(Entity):
                      if user.login.lower() == login.lower()), None)
         if not user:
             raise InvalidUser(login)
-        url = '{api}/groups/{id_}/users/{user_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          user_id=user.id)
+        url = f'{self._okta.api}/groups/{self.id}/users/{user.id}'
         response = self._okta.session.put(url)
         if not response.ok:
-            self._logger.error(('Adding user failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Adding user failed. Response: {response.text}')
         return response.ok
 
     def remove_user_by_login(self, login):
@@ -259,13 +254,10 @@ class Group(Entity):
                      if user.login == login), None)
         if not user:
             raise InvalidUser(login)
-        url = '{api}/groups/{id_}/users/{user_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          user_id=user.id)
+        url = f'{self._okta.api}/groups/{self.id}/users/{user.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
-            self._logger.error(('Removing user failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Removing user failed. Response: {response.text}')
         return response.ok
 
     def add_user_by_id(self, id_):
@@ -278,13 +270,10 @@ class Group(Entity):
             True on success, False otherwise
 
         """
-        url = '{api}/groups/{id_}/users/{user_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          user_id=id_)
+        url = f'{self._okta.api}/groups/{self.id}/users/{id_}'
         response = self._okta.session.put(url)
         if not response.ok:
-            self._logger.error(('Adding user failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Adding user failed. Response: {response.text}')
         return response.ok
 
     def remove_user_by_id(self, id_):
@@ -297,13 +286,10 @@ class Group(Entity):
             True on success, False otherwise
 
         """
-        url = '{api}/groups/{id_}/users/{user_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          user_id=id_)
+        url = f'{self._okta.api}/groups/{self.id}/users/{id_}'
         response = self._okta.session.delete(url)
         if not response.ok:
-            self._logger.error(('Removing user failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Removing user failed. Response: {response.text}')
         return response.ok
 
 
@@ -712,7 +698,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             list: A list of Group objects for which the user is member of
 
         """
-        url = '{api}/users/{id_}/groups'.format(api=self._okta.api, id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/groups'
         return [Group(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
 
     def delete(self):
@@ -735,9 +721,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
     def _post_lifecycle(self, url, message):
         response = self._okta.session.post(url)
         if not response.ok:
-            error = ('{message}\n'
-                     'Response :{response}').format(message=message,
-                                                    response=response.text)
+            error = (f'{message}\nResponse: {response.text}')
             self._logger.error(error)
         else:
             self._update()
@@ -750,9 +734,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = ('{api}/users/{id_}/'
-               'lifecycle/activate?sendEmail=false').format(api=self._okta.api,
-                                                            id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/activate?sendEmail=false'
         return self._post_lifecycle(url, 'Activating user failed')
 
     def deactivate(self):
@@ -762,8 +744,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/lifecycle/deactivate'.format(api=self._okta.api,
-                                                              id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/deactivate'
         return self._post_lifecycle(url, 'Deactivating user failed')
 
     def unlock(self):
@@ -773,8 +754,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/lifecycle/unlock'.format(api=self._okta.api,
-                                                          id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/unlock'
         return self._post_lifecycle(url, 'Unlocking user failed')
 
     def expire_password(self):
@@ -784,8 +764,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/lifecycle/expire_password'.format(api=self._okta.api,
-                                                                   id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/expire_password'
         return self._post_lifecycle(url, "Expiring user's password failed")
 
     def reset_password(self):
@@ -795,9 +774,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = ('{api}/users/{id_}/lifecycle'
-               '/reset_password??sendEmail=false').format(api=self._okta.api,
-                                                          id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/reset_password??sendEmail=false'
         return self._post_lifecycle(url, "Reseting user's password failed")
 
     def set_temporary_password(self):
@@ -807,14 +784,10 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             string: Password on success, None otherwise
 
         """
-        url = ('{api}/users/{id_}/lifecycle'
-               '/expire_password?tempPassword=true').format(api=self._okta.api,
-                                                            id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/expire_password?tempPassword=true'
         response = self._okta.session.post(url)
         if not response.ok:
-            error = ('{message}\n'
-                     'Response :{response}').format(message="Setting a temporary password failed",
-                                                    response=response.text)
+            error = f'Setting a temporary password failed\nResponse: {response.text}'
             self._logger.error(error)
         else:
             self._update()
@@ -827,8 +800,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/lifecycle/suspend'.format(api=self._okta.api,
-                                                           id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/suspend'
         return self._post_lifecycle(url, "Suspending user failed")
 
     def unsuspend(self):
@@ -838,8 +810,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/lifecycle/unsuspend'.format(api=self._okta.api,
-                                                             id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/unsuspend'
         return self._post_lifecycle(url, "Unsuspending user failed")
 
     def update_password(self, old_password, new_password):
@@ -849,8 +820,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/credentials/change_password'.format(api=self._okta.api,
-                                                                     id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/credentials/change_password'
         payload = {'oldPassword': {'value': old_password},
                    'newPassword': {'value': new_password}}
         response = self._okta.session.post(url, data=json.dumps(payload))
@@ -865,7 +835,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}'.format(api=self._okta.api, id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}'
         payload = {'credentials': {'password': {'value': password}}}
         response = self._okta.session.put(url, data=json.dumps(payload))
         if not response.ok:
@@ -882,7 +852,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             Bool: True or False depending on success
 
         """
-        url = '{api}/users/{id_}'.format(api=self._okta.api, id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}'
         response = self._okta.session.post(url, data=json.dumps(new_profile))
         if not response.ok:
             self._logger.error(response.json())
@@ -895,8 +865,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/users/{id_}/credentials/change_recovery_question'.format(api=self._okta.api,
-                                                                              id_=self.id)
+        url = f'{self._okta.api}/users/{self.id}/credentials/change_recovery_question'
         payload = {"password": {"value": password},
                    "recovery_question": {"question": question,
                                          "answer": answer}}
@@ -979,7 +948,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             string: The url of the application
 
         """
-        return '{api}/apps/{id_}'.format(api=self._okta.api, id_=self.id)
+        return f'{self._okta.api}/apps/{self.id}'
 
     @property
     def name(self):
@@ -1179,7 +1148,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         url = self._data.get('_links', {}).get('activate').get('href')
         response = self._okta.session.post(url)  # noqa
         if not response.ok:
-            self._logger.error('Response :{response}'.format(response=response.text))
+            self._logger.error(f'Response: {response.text}')
         else:
             self._update()
         return response.ok
@@ -1197,7 +1166,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         url = self._data.get('_links', {}).get('deactivate').get('href')
         response = self._okta.session.post(url)  # noqa
         if not response.ok:
-            self._logger.error('Response :{response}'.format(response=response.text))
+            self._logger.error(f'Response: {response.text}')
         else:
             self._update()
         return response.ok
@@ -1209,8 +1178,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             list: List of saml iam roles
 
         """
-        url = '{api}/internal/apps/{app_id_}/types'.format(api=self._okta.api,
-                                                           app_id_=self.id)
+        url = f'{self._okta.api}/internal/apps/{self.id}/types'
         response = self._okta.session.get(url)
         return json.loads(response.text).get('SamlIamRole', [])
 
@@ -1224,13 +1192,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group_id)
+        url = f'{self._okta.api}/apps/{self.id}/groups/{group_id}'
         response = self._okta.session.put(url)
         if not response.ok:
-            self._logger.error(('Adding group failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Adding group failed. Response: {response.text}')
         return response.ok
 
     def add_group_by_name(self, group_name):
@@ -1246,13 +1211,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         group = self._okta.get_group_by_name(group_name)
         if not group:
             raise InvalidGroup(group_name)
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group.id)
+        url = f'{self._okta.api}/apps/{self.id}/groups/{group.id}'
         response = self._okta.session.put(url, data=json.dumps({}))
         if not response.ok:
-            self._logger.error(('Adding group failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Adding group failed. Response: {response.text}')
         return response.ok
 
     def remove_group_by_id(self, group_id):
@@ -1265,13 +1227,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             True on success, False otherwise
 
         """
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group_id)
+        url = f'{self._okta.api}/apps/{self.id}/groups/{group_id}'
         response = self._okta.session.delete(url)
         if not response.ok:
-            self._logger.error(('Removing group failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Removing group failed. Response: {response.text}')
         return response.ok
 
     def remove_group_by_name(self, group_name):
@@ -1287,13 +1246,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         group = self._okta.get_group_by_name(group_name)
         if not group:
             raise InvalidGroup(group_name)
-        url = '{api}/apps/{id_}/groups/{group_id}'.format(api=self._okta.api,
-                                                          id_=self.id,
-                                                          group_id=group.id)
+        url = f'{self._okta.api}/apps/{self.id}/groups/{group.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
-            self._logger.error(('Adding group failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Adding group failed. Response: {response.text}')
         return response.ok
 
     def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
@@ -1308,12 +1264,9 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             Bool: The status of the assignment( True or False )
 
         """
-        url = '{api}/apps/{app_id_}/groups/{group_id_}'.format(api=self._okta.api,
-                                                               app_id_=self.id,
-                                                               group_id_=group_id)
+        url = f'{self._okta.api}/apps/{self.id}/groups/{group_id}'
         payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
-            self._logger.error(('Assigning group to the application failed '
-                                'Response :{}').format(response.text))
+            self._logger.error(f'Assigning group to the application failed. Response: {response.text}')
         return response.ok
