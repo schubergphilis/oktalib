@@ -169,3 +169,9 @@ History
 ------------------
 
 * Fixed bugs with handling of api rate limits courtesy of Yorick Hoorneman <yhoorneman@schubergphilis.com>
+
+
+1.6.1 (22-04-2022)
+------------------
+
+* Fixed bugs with handling of api limits courtesy of Yorick Hoorneman <yhoorneman@schubergphilis.com>
