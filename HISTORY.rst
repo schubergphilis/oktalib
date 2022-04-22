@@ -157,15 +157,3 @@ History
 ------------------
 
 * Made entities comparable.
-
-
-1.6.1 (22-04-2022)
-------------------
-
-* Fixed bugs with api rate limit handling courtesy of Yorick Hoorneman <yhoorneman@schubergphilis.com>
-
-
-1.6.2 (22-04-2022)
-------------------
-
-* Properly releasing.
