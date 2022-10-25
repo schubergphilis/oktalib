@@ -31,18 +31,21 @@ Main code for oktalib.
 
 """
 
-import logging
 import json
+import logging
+from urllib.parse import urlparse, parse_qsl
+
 import backoff
-from requests import Session
 from cachetools import cached, TTLCache
+from requests import Session
+
+from .entities import (Group,
+                       User,
+                       Application)
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
                                 ApiLimitReached)
-from .entities import (Group,
-                       User,
-                       Application)
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -239,7 +242,9 @@ class Okta:
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
-                response = self.session.get(url=next_link, params=params)
+                url, link_params = self._parse_next_url(next_link)
+                link_params.update(params)
+                response = self.session.get(url=url, params=link_params)
                 results.extend(response.json())
                 next_link = self._get_next_link(response)
             return results
@@ -248,16 +253,21 @@ class Okta:
             return []
 
     @staticmethod
+    def _parse_next_url(link):
+        parse_result = urlparse(link)
+        url = f'{parse_result.scheme}://{parse_result.netloc}{parse_result.path}'
+        params = dict(parse_qsl(parse_result.query))
+        return url, params
+
+    @staticmethod
     def _get_next_link(response):
         links = response.headers.get('Link')
         if links:
             link_text = next((link for link in links.split(',')
                               if 'next' in link), None)
-            if link_text:  # pylint: disable=no-else-return
+            if link_text:
                 link = link_text.split('>')[0].split('<')[1]
                 return link
-            else:
-                return False
         return False
 
     @property
@@ -367,7 +377,8 @@ class Okta:
 
         """
         url = f'{self.api}/apps'
-        return [Application(self, data) for data in self._get_paginated_url(url)]
+        # Fun fact, the api can return inconsistent types, so after a json value it might return a string.
+        return [Application(self, data) for data in self._get_paginated_url(url) if isinstance(data, dict)]
 
     def get_application_by_id(self, id_):
         """Retrieves an application by id.
@@ -395,6 +406,20 @@ class Okta:
         """
         app = next((app for app in self.applications
                     if app.label.lower() == label.lower()), None)
+        return app
+
+    def get_application_by_name(self, name):
+        """Retrieves an application by name.
+
+        Args:
+            name: The name of the application to retrieve
+
+        Returns:
+            Application Object
+
+        """
+        app = next((app for app in self.applications
+                    if app.name.lower() == name.lower()), None)
         return app
 
     def assign_group_to_application(self, application_label, group_name):
