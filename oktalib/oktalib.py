@@ -33,13 +33,18 @@ Main code for oktalib.
 
 import logging
 import json
+
+from urllib.parse import urlparse, parse_qsl
+
 import backoff
+
 from requests import Session
 from cachetools import cached, TTLCache
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
-                                ApiLimitReached)
+                                ApiLimitReached,
+                                ServerError)
 from .entities import (Group,
                        User,
                        Application)
@@ -236,10 +241,17 @@ class Okta:
         params = {'limit': result_limit}
         try:
             response = self.session.get(url=url, params=params)
+            if not response.ok:
+                try:
+                    raise ServerError(response.json().get('errorSummary'))
+                except ValueError:
+                    raise ServerError(response.text)
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:
-                response = self.session.get(url=next_link, params=params)
+                url, link_params = self._parse_next_url(next_link)
+                link_params.update(params)
+                response = self.session.get(url=url, params=link_params)
                 results.extend(response.json())
                 next_link = self._get_next_link(response)
             return results
@@ -248,16 +260,21 @@ class Okta:
             return []
 
     @staticmethod
+    def _parse_next_url(link):
+        parse_result = urlparse(link)
+        url = f'{parse_result.scheme}://{parse_result.netloc}{parse_result.path}'
+        params = dict(parse_qsl(parse_result.query))
+        return url, params
+
+    @staticmethod
     def _get_next_link(response):
         links = response.headers.get('Link')
         if links:
             link_text = next((link for link in links.split(',')
                               if 'next' in link), None)
-            if link_text:  # pylint: disable=no-else-return
+            if link_text:
                 link = link_text.split('>')[0].split('<')[1]
                 return link
-            else:
-                return False
         return False
 
     @property

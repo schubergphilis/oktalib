@@ -36,7 +36,8 @@ from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidUser,
                                 InvalidApplication,
-                                ApiLimitReached)
+                                ApiLimitReached,
+                                ServerError)
 
 from .oktalib import Okta
 
@@ -59,6 +60,7 @@ assert InvalidGroup
 assert InvalidUser
 assert InvalidApplication
 assert ApiLimitReached
+assert ServerError
 
 # assert objects
 assert Okta

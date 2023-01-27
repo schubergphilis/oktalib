@@ -64,3 +64,7 @@ class ApiLimitReached(Exception):
 
 class UnableToUpdate(Exception):
     """Could not update use property."""
+
+
+class ServerError(Exception):
+    """A server has responded with an error code."""
