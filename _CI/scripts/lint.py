@@ -41,7 +41,7 @@ LOGGER.addHandler(logging.NullHandler())
 
 def lint():
     bootstrap()
-    success = execute_command('prospector -DFM')
+    success = execute_command('prospector -DFM --no-autodetect')
     if success:
         LOGGER.info('%s No linting errors found! %s',
                     emojize(':white_heavy_check_mark:'),

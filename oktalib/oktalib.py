@@ -245,7 +245,7 @@ class Okta:
                 try:
                     raise ServerError(response.json().get('errorSummary'))
                 except ValueError:
-                    raise ServerError(response.text)
+                    raise ServerError(response.text) from None
             results.extend(response.json())
             next_link = self._get_next_link(response)
             while next_link:

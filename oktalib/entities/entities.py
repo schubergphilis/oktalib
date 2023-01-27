@@ -338,7 +338,7 @@ class GroupAssignment(Group):
         return self._group_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-class User(Entity):  # pylint: disable=too-many-public-methods
+class User(Entity):
     """Models the user object of okta."""
 
     def __init__(self, okta_instance, data):
@@ -934,7 +934,7 @@ class UserAssignment(User):
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-class Application(Entity):  # pylint: disable=too-many-public-methods
+class Application(Entity):
     """Models the apps in okta."""
 
     def __init__(self, okta_instance, data):
