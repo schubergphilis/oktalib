@@ -27,7 +27,7 @@
 Main code for entities.
 
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 
 """
 
@@ -162,7 +162,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield User(self._okta, data)
 
     @property
@@ -174,7 +174,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('apps', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield Application(self._okta, data)
 
     def delete(self):
@@ -693,7 +693,7 @@ class User(Entity):
 
         """
         url = f'{self._okta.api}/users/{self.id}/groups'
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield Group(self._okta, data)
 
     def delete(self):
@@ -716,8 +716,7 @@ class User(Entity):
     def _post_lifecycle(self, url, message):
         response = self._okta.session.post(url)
         if not response.ok:
-            error = (f'{message}\nResponse: {response.text}')
-            self._logger.error(error)
+            self._logger.error(f'{message}\nResponse: {response.text}')
         else:
             self._update()
         return response.ok
@@ -770,7 +769,7 @@ class User(Entity):
 
         """
         url = f'{self._okta.api}/users/{self.id}/lifecycle/reset_password??sendEmail=false'
-        return self._post_lifecycle(url, "Reseting user's password failed")
+        return self._post_lifecycle(url, "Resetting user's password failed")
 
     def set_temporary_password(self):
         """Sets a temporary password for the user.
@@ -806,7 +805,7 @@ class User(Entity):
 
         """
         url = f'{self._okta.api}/users/{self.id}/lifecycle/unsuspend'
-        return self._post_lifecycle(url, "Unsuspending user failed")
+        return self._post_lifecycle(url, "Un-suspending user failed")
 
     def update_password(self, old_password, new_password):
         """Changes the user's password.
@@ -850,7 +849,7 @@ class User(Entity):
         url = f'{self._okta.api}/users/{self.id}'
         response = self._okta.session.post(url, data=json.dumps(new_profile))
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
         return response.ok
 
     def update_security_question(self, password, question, answer):
@@ -1061,7 +1060,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield User(self._okta, data)
 
     @property
@@ -1073,7 +1072,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield self._okta.get_group_by_id(group.get('id', ''))
 
     @property
@@ -1085,7 +1084,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield GroupAssignment(self._okta, data)
 
     def get_group_assignment_by_group_name(self, name):
@@ -1109,7 +1108,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
             yield UserAssignment(self._okta, data)
 
     def get_user_assignment_by_email(self, email):
@@ -1122,7 +1121,7 @@ class Application(Entity):
             user_assignment (UserAssignment) : The matching user assignment if found else None.
 
         """
-        return next((user for user in self.user_assignments if user.email == email), None)
+        return next((user for user in self.user_assignments if user.email.lower() == email.lower()), None)
 
     def activate(self):
         """Activates the application.
@@ -1134,7 +1133,7 @@ class Application(Entity):
         if self.status == 'ACTIVE':
             return True
         url = self._data.get('_links', {}).get('activate').get('href')
-        response = self._okta.session.post(url)  # noqa
+        response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f'Response: {response.text}')
         else:
@@ -1151,7 +1150,7 @@ class Application(Entity):
         if self.status == 'INACTIVE':
             return True
         url = self._data.get('_links', {}).get('deactivate').get('href')
-        response = self._okta.session.post(url)  # noqa
+        response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f'Response: {response.text}')
         else:

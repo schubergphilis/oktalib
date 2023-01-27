@@ -27,7 +27,7 @@
 Main code for oktalib.
 
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 
 """
 
@@ -100,7 +100,7 @@ class Okta:
                           ApiLimitReached,
                           max_time=60)
     def _patched_request(self, method, url, **kwargs):
-        """Patch the orginal request method from requests.Sessions library.
+        """Patch the original request method from requests.Sessions library.
 
         Args:
             method (str): HTTP verb as string.
@@ -115,7 +115,7 @@ class Okta:
 
         """
         self._logger.debug(f'Using patched request for method {method}, url {url}, kwargs {kwargs}')
-        response = self.session.original_request(method, url, **kwargs)
+        response = self.session.original_request(method, url, **kwargs)  # noqa
         if response.status_code == 429:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
@@ -184,7 +184,7 @@ class Okta:
         """Retrieves the group (of any type) by id.
 
         Args:
-            id: The id of the group to retrieve
+            group_id: The id of the group to retrieve
 
         Returns:
             Group: The group if a match is found else None
