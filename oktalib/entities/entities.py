@@ -61,9 +61,6 @@ LOGGER.addHandler(logging.NullHandler())
 class Group(Entity):
     """Models the group object of okta."""
 
-    def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
-
     @property
     def url(self):
         """The url of the group.
@@ -157,27 +154,28 @@ class Group(Entity):
         return tuple(self._data.get('objectClass'))
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users of the group.
 
         Returns:
-            list: A list of User objects for the users of the group
+            generator: A generator of User objects for the users of the group
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            yield User(self._okta, data)
 
     @property
     def applications(self):
         """The applications of the group.
 
         Returns:
-            list: A list of Application objects for the applications of the group
+            generator: A generator of Application objects for the applications of the group
 
         """
         url = self._data.get('_links', {}).get('apps', {}).get('href')
-        return [Application(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            yield Application(self._okta, data)
 
     def delete(self):
         """Deletes the group from okta.
@@ -340,9 +338,6 @@ class GroupAssignment(Group):
 
 class User(Entity):
     """Models the user object of okta."""
-
-    def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
@@ -690,16 +685,16 @@ class User(Entity):
         return self._data.get('credentials')
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """Lists the groups the user is a member of.
 
         Returns:
-            list: A list of Group objects for which the user is member of
+            generator: A generator of Group objects for which the user is member of
 
         """
         url = f'{self._okta.api}/users/{self.id}/groups'
-        return [Group(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            yield Group(self._okta, data)
 
     def delete(self):
         """Deletes the user from okta.
@@ -937,9 +932,6 @@ class UserAssignment(User):
 class Application(Entity):
     """Models the apps in okta."""
 
-    def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
-
     @property
     def url(self):
         """The url of the application.
@@ -1061,43 +1053,40 @@ class Application(Entity):
         return self._data.get('settings', {}).get('signOn')
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users of the application.
 
         Returns:
-            list: A list of User objects for the users of the application
+            generator: A generator of User objects for the users of the application
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            yield User(self._okta, data)
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """The groups of the application.
 
         Returns:
-            list: A list of Group objects for the groups of the application
+            generator: A generator of Group objects for the groups of the application
 
         """
-        groups = []
         url = self._data.get('_links', {}).get('groups', {}).get('href')
         for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
-            groups.append(self._okta.get_group_by_id(group.get('id', '')))
-        return groups
+            yield self._okta.get_group_by_id(group.get('id', ''))
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def group_assignments(self):
         """The group assignments to the application.
 
         Returns:
-            list: A list of group assignments for application
+            generator: A generator of group assignments for application
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        return [GroupAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            yield GroupAssignment(self._okta, data)
 
     def get_group_assignment_by_group_name(self, name):
         """Retrieves a group assignment by a group name.
@@ -1112,16 +1101,16 @@ class Application(Entity):
         return next((group for group in self.group_assignments if group.name == name), None)
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def user_assignments(self):
         """The user assignments to the application.
 
         Returns:
-            list: A list of user assignments for application
+            generator: A generator of user assignments for application
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [UserAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
+            yield UserAssignment(self._okta, data)
 
     def get_user_assignment_by_email(self, email):
         """Retrieves a user assignment by a user email.
@@ -1135,7 +1124,6 @@ class Application(Entity):
         """
         return next((user for user in self.user_assignments if user.email == email), None)
 
-    @property
     def activate(self):
         """Activates the application.
 
@@ -1153,7 +1141,6 @@ class Application(Entity):
             self._update()
         return response.ok
 
-    @property
     def deactivate(self):
         """Deactivates the application.
 
@@ -1180,7 +1167,10 @@ class Application(Entity):
         """
         url = f'{self._okta.api}/internal/apps/{self.id}/types'
         response = self._okta.session.get(url)
-        return json.loads(response.text).get('SamlIamRole', [])
+        if not response.ok:
+            self._logger.error(f'Response: {response.text}')
+            return []
+        return response.json().get('SamlIamRole', [])
 
     def add_group_by_id(self, group_id):
         """Adds a group to the application.
@@ -1249,7 +1239,7 @@ class Application(Entity):
         url = f'{self._okta.api}/apps/{self.id}/groups/{group.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
-            self._logger.error(f'Adding group failed. Response: {response.text}')
+            self._logger.error(f'Removing group failed. Response: {response.text}')
         return response.ok
 
     def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
@@ -1268,5 +1258,5 @@ class Application(Entity):
         payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
-            self._logger.error(f'Assigning group to the application failed. Response: {response.text}')
+            self._logger.error(f'Assigning group to the saml user roles failed. Response: {response.text}')
         return response.ok

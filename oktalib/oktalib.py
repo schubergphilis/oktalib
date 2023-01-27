@@ -31,23 +31,20 @@ Main code for oktalib.
 
 """
 
-import logging
 import json
-
-from urllib.parse import urlparse, parse_qsl
+import logging
 
 import backoff
-
 from requests import Session
-from cachetools import cached, TTLCache
+
+from .entities import (Group,
+                       User,
+                       Application)
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
                                 ApiLimitReached,
                                 ServerError)
-from .entities import (Group,
-                       User,
-                       Application)
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -117,7 +114,7 @@ class Okta:
             Response: Response instance.
 
         """
-        self._logger.debug(f'Using patched request for method {method}, url {url}')
+        self._logger.debug(f'Using patched request for method {method}, url {url}, kwargs {kwargs}')
         response = self.session.original_request(method, url, **kwargs)
         if response.status_code == 429:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
@@ -125,16 +122,16 @@ class Okta:
         return response
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """The groups configured in okta.
 
         Returns:
-            list: The list of groups configured in okta
+            generator: The generator of groups configured in okta
 
         """
         url = f'{self.api}/groups'
-        return [Group(self, data) for data in self._get_paginated_url(url)]
+        for data in self._get_paginated_url(url):
+            yield Group(self, data)
 
     def create_group(self, name, description):
         """Creates a group in okta.
@@ -233,38 +230,24 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    @backoff.on_exception(backoff.expo,
-                          ApiLimitReached,
-                          max_time=60)
     def _get_paginated_url(self, url, result_limit=100):
-        results = []
-        params = {'limit': result_limit}
-        try:
-            response = self.session.get(url=url, params=params)
-            if not response.ok:
-                try:
-                    raise ServerError(response.json().get('errorSummary'))
-                except ValueError:
-                    raise ServerError(response.text) from None
-            results.extend(response.json())
+        response = self._validate_authenticated_response(url, {'limit': result_limit})
+        yield from response.json()
+        next_link = self._get_next_link(response)
+        while next_link:
+            response = self._validate_authenticated_response(url=next_link)
+            yield from response.json()
             next_link = self._get_next_link(response)
-            while next_link:
-                url, link_params = self._parse_next_url(next_link)
-                link_params.update(params)
-                response = self.session.get(url=url, params=link_params)
-                results.extend(response.json())
-                next_link = self._get_next_link(response)
-            return results
-        except ValueError:
-            self._logger.error(f'Error getting url: {url}')
-            return []
 
-    @staticmethod
-    def _parse_next_url(link):
-        parse_result = urlparse(link)
-        url = f'{parse_result.scheme}://{parse_result.netloc}{parse_result.path}'
-        params = dict(parse_qsl(parse_result.query))
-        return url, params
+    def _validate_authenticated_response(self, url, params=None):
+        response = self.session.get(url=url, params=params)
+        if not response.ok:
+            try:
+                error_message = response.json().get('errorSummary')
+            except (ValueError, AttributeError):
+                error_message = response.text
+            raise ServerError(error_message) from None
+        return response
 
     @staticmethod
     def _get_next_link(response):
@@ -278,16 +261,16 @@ class Okta:
         return False
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users configured in okta.
 
         Returns:
-            list: The list of users configured in okta
+            generator: The generator of users configured in okta
 
         """
         url = f'{self.api}/users'
-        return [User(self, data) for data in self._get_paginated_url(url)]
+        for data in self._get_paginated_url(url):
+            yield User(self, data)
 
     def create_user(self,  # pylint: disable=too-many-arguments
                     first_name,
@@ -375,16 +358,16 @@ class Okta:
         return [User(self, data) for data in response.json()]
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def applications(self):
         """The applications configured in okta.
 
         Returns:
-            list: The list of applications configured in okta
+            generator: The generator of applications configured in okta
 
         """
         url = f'{self.api}/apps'
-        return [Application(self, data) for data in self._get_paginated_url(url)]
+        for data in self._get_paginated_url(url):
+            yield Application(self, data)
 
     def get_application_by_id(self, id_):
         """Retrieves an application by id.
