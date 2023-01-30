@@ -163,3 +163,9 @@ History
 ------------------
 
 * Fixed bugs with api rate limiting courtesy of Yorick Hoorneman <yhoorneman@schubergphilis.com>
+
+
+2.0.0 (30-01-2023)
+------------------
+
+* Fixed a nasty bug with activate and deactivate of applications being exposed as properties with bad side effects on introspection. Made most entities return as generators.
