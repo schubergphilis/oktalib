@@ -29,14 +29,15 @@ oktalib package.
 Import all parts from oktalib here
 
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 """
 from ._version import __version__
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidUser,
                                 InvalidApplication,
-                                ApiLimitReached)
+                                ApiLimitReached,
+                                ServerError)
 
 from .oktalib import Okta
 
@@ -52,13 +53,11 @@ __status__ = '''Development'''  # "Prototype", "Development", "Production".
 # This is to 'use' the module(s), so lint doesn't complain
 assert __version__
 
-
-# assert exceptions
 assert AuthFailed
 assert InvalidGroup
 assert InvalidUser
 assert InvalidApplication
 assert ApiLimitReached
+assert ServerError
 
-# assert objects
 assert Okta

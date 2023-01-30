@@ -27,7 +27,7 @@
 Main code for entities.
 
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 
 """
 
@@ -60,9 +60,6 @@ LOGGER.addHandler(logging.NullHandler())
 
 class Group(Entity):
     """Models the group object of okta."""
-
-    def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
@@ -157,27 +154,28 @@ class Group(Entity):
         return tuple(self._data.get('objectClass'))
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users of the group.
 
         Returns:
-            list: A list of User objects for the users of the group
+            generator: A generator of User objects for the users of the group
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield User(self._okta, data)
 
     @property
     def applications(self):
         """The applications of the group.
 
         Returns:
-            list: A list of Application objects for the applications of the group
+            generator: A generator of Application objects for the applications of the group
 
         """
         url = self._data.get('_links', {}).get('apps', {}).get('href')
-        return [Application(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield Application(self._okta, data)
 
     def delete(self):
         """Deletes the group from okta.
@@ -338,11 +336,8 @@ class GroupAssignment(Group):
         return self._group_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-class User(Entity):  # pylint: disable=too-many-public-methods
+class User(Entity):
     """Models the user object of okta."""
-
-    def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
@@ -690,16 +685,16 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         return self._data.get('credentials')
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """Lists the groups the user is a member of.
 
         Returns:
-            list: A list of Group objects for which the user is member of
+            generator: A generator of Group objects for which the user is member of
 
         """
         url = f'{self._okta.api}/users/{self.id}/groups'
-        return [Group(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield Group(self._okta, data)
 
     def delete(self):
         """Deletes the user from okta.
@@ -721,8 +716,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
     def _post_lifecycle(self, url, message):
         response = self._okta.session.post(url)
         if not response.ok:
-            error = (f'{message}\nResponse: {response.text}')
-            self._logger.error(error)
+            self._logger.error(f'{message}\nResponse: {response.text}')
         else:
             self._update()
         return response.ok
@@ -775,7 +769,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         url = f'{self._okta.api}/users/{self.id}/lifecycle/reset_password??sendEmail=false'
-        return self._post_lifecycle(url, "Reseting user's password failed")
+        return self._post_lifecycle(url, "Resetting user's password failed")
 
     def set_temporary_password(self):
         """Sets a temporary password for the user.
@@ -811,7 +805,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
 
         """
         url = f'{self._okta.api}/users/{self.id}/lifecycle/unsuspend'
-        return self._post_lifecycle(url, "Unsuspending user failed")
+        return self._post_lifecycle(url, "Un-suspending user failed")
 
     def update_password(self, old_password, new_password):
         """Changes the user's password.
@@ -855,7 +849,7 @@ class User(Entity):  # pylint: disable=too-many-public-methods
         url = f'{self._okta.api}/users/{self.id}'
         response = self._okta.session.post(url, data=json.dumps(new_profile))
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
         return response.ok
 
     def update_security_question(self, password, question, answer):
@@ -934,11 +928,8 @@ class UserAssignment(User):
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-class Application(Entity):  # pylint: disable=too-many-public-methods
+class Application(Entity):
     """Models the apps in okta."""
-
-    def __init__(self, okta_instance, data):
-        Entity.__init__(self, okta_instance, data)
 
     @property
     def url(self):
@@ -1061,43 +1052,40 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         return self._data.get('settings', {}).get('signOn')
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users of the application.
 
         Returns:
-            list: A list of User objects for the users of the application
+            generator: A generator of User objects for the users of the application
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [User(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield User(self._okta, data)
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """The groups of the application.
 
         Returns:
-            list: A list of Group objects for the groups of the application
+            generator: A generator of Group objects for the groups of the application
 
         """
-        groups = []
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access
-            groups.append(self._okta.get_group_by_id(group.get('id', '')))
-        return groups
+        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield self._okta.get_group_by_id(group.get('id', ''))
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def group_assignments(self):
         """The group assignments to the application.
 
         Returns:
-            list: A list of group assignments for application
+            generator: A generator of group assignments for application
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        return [GroupAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield GroupAssignment(self._okta, data)
 
     def get_group_assignment_by_group_name(self, name):
         """Retrieves a group assignment by a group name.
@@ -1112,16 +1100,16 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         return next((group for group in self.group_assignments if group.name == name), None)
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def user_assignments(self):
         """The user assignments to the application.
 
         Returns:
-            list: A list of user assignments for application
+            generator: A generator of user assignments for application
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        return [UserAssignment(self._okta, data) for data in self._okta._get_paginated_url(url)]  # pylint: disable=protected-access
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield UserAssignment(self._okta, data)
 
     def get_user_assignment_by_email(self, email):
         """Retrieves a user assignment by a user email.
@@ -1133,9 +1121,8 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
             user_assignment (UserAssignment) : The matching user assignment if found else None.
 
         """
-        return next((user for user in self.user_assignments if user.email == email), None)
+        return next((user for user in self.user_assignments if user.email.lower() == email.lower()), None)
 
-    @property
     def activate(self):
         """Activates the application.
 
@@ -1146,14 +1133,13 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         if self.status == 'ACTIVE':
             return True
         url = self._data.get('_links', {}).get('activate').get('href')
-        response = self._okta.session.post(url)  # noqa
+        response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f'Response: {response.text}')
         else:
             self._update()
         return response.ok
 
-    @property
     def deactivate(self):
         """Deactivates the application.
 
@@ -1164,7 +1150,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         if self.status == 'INACTIVE':
             return True
         url = self._data.get('_links', {}).get('deactivate').get('href')
-        response = self._okta.session.post(url)  # noqa
+        response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f'Response: {response.text}')
         else:
@@ -1180,7 +1166,10 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         """
         url = f'{self._okta.api}/internal/apps/{self.id}/types'
         response = self._okta.session.get(url)
-        return json.loads(response.text).get('SamlIamRole', [])
+        if not response.ok:
+            self._logger.error(f'Response: {response.text}')
+            return []
+        return response.json().get('SamlIamRole', [])
 
     def add_group_by_id(self, group_id):
         """Adds a group to the application.
@@ -1249,7 +1238,7 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         url = f'{self._okta.api}/apps/{self.id}/groups/{group.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
-            self._logger.error(f'Adding group failed. Response: {response.text}')
+            self._logger.error(f'Removing group failed. Response: {response.text}')
         return response.ok
 
     def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
@@ -1268,5 +1257,5 @@ class Application(Entity):  # pylint: disable=too-many-public-methods
         payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
-            self._logger.error(f'Assigning group to the application failed. Response: {response.text}')
+            self._logger.error(f'Assigning group to the saml user roles failed. Response: {response.text}')
         return response.ok

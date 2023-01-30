@@ -27,22 +27,24 @@
 Main code for oktalib.
 
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 
 """
 
-import logging
 import json
+import logging
+
 import backoff
 from requests import Session
-from cachetools import cached, TTLCache
-from .oktalibexceptions import (AuthFailed,
-                                InvalidGroup,
-                                InvalidApplication,
-                                ApiLimitReached)
+
 from .entities import (Group,
                        User,
                        Application)
+from .oktalibexceptions import (AuthFailed,
+                                InvalidGroup,
+                                InvalidApplication,
+                                ApiLimitReached,
+                                ServerError)
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -98,7 +100,7 @@ class Okta:
                           ApiLimitReached,
                           max_time=60)
     def _patched_request(self, method, url, **kwargs):
-        """Patch the orginal request method from requests.Sessions library.
+        """Patch the original request method from requests.Sessions library.
 
         Args:
             method (str): HTTP verb as string.
@@ -112,24 +114,24 @@ class Okta:
             Response: Response instance.
 
         """
-        self._logger.debug(f'Using patched request for method {method}, url {url}')
-        response = self.session.original_request(method, url, **kwargs)
+        self._logger.debug(f'Using patched request for method {method}, url {url}, kwargs {kwargs}')
+        response = self.session.original_request(method, url, **kwargs)  # noqa
         if response.status_code == 429:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def groups(self):
         """The groups configured in okta.
 
         Returns:
-            list: The list of groups configured in okta
+            generator: The generator of groups configured in okta
 
         """
         url = f'{self.api}/groups'
-        return [Group(self, data) for data in self._get_paginated_url(url)]
+        for data in self._get_paginated_url(url):
+            yield Group(self, data)
 
     def create_group(self, name, description):
         """Creates a group in okta.
@@ -182,7 +184,7 @@ class Okta:
         """Retrieves the group (of any type) by id.
 
         Args:
-            id: The id of the group to retrieve
+            group_id: The id of the group to retrieve
 
         Returns:
             Group: The group if a match is found else None
@@ -228,49 +230,36 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    @backoff.on_exception(backoff.expo,
-                          ApiLimitReached,
-                          max_time=60)
     def _get_paginated_url(self, url, result_limit=100):
-        results = []
-        params = {'limit': result_limit}
-        try:
-            response = self.session.get(url=url, params=params)
-            results.extend(response.json())
-            next_link = self._get_next_link(response)
-            while next_link:
-                response = self.session.get(url=next_link, params=params)
-                results.extend(response.json())
-                next_link = self._get_next_link(response)
-            return results
-        except ValueError:
-            self._logger.error(f'Error getting url: {url}')
-            return []
+        response = self._validate_response(url, {'limit': result_limit})
+        yield from response.json()
+        next_link = response.links.get('next', {}).get('url')
+        while next_link:
+            response = self._validate_response(url=next_link)
+            yield from response.json()
+            next_link = response.links.get('next', {}).get('url')
 
-    @staticmethod
-    def _get_next_link(response):
-        links = response.headers.get('Link')
-        if links:
-            link_text = next((link for link in links.split(',')
-                              if 'next' in link), None)
-            if link_text:  # pylint: disable=no-else-return
-                link = link_text.split('>')[0].split('<')[1]
-                return link
-            else:
-                return False
-        return False
+    def _validate_response(self, url, params=None):
+        response = self.session.get(url=url, params=params)
+        if not response.ok:
+            try:
+                error_message = response.json().get('errorSummary')
+            except (ValueError, AttributeError):
+                error_message = response.text
+            raise ServerError(error_message) from None
+        return response
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def users(self):
         """The users configured in okta.
 
         Returns:
-            list: The list of users configured in okta
+            generator: The generator of users configured in okta
 
         """
         url = f'{self.api}/users'
-        return [User(self, data) for data in self._get_paginated_url(url)]
+        for data in self._get_paginated_url(url):
+            yield User(self, data)
 
     def create_user(self,  # pylint: disable=too-many-arguments
                     first_name,
@@ -358,16 +347,16 @@ class Okta:
         return [User(self, data) for data in response.json()]
 
     @property
-    @cached(cache=TTLCache(maxsize=9000, ttl=60))
     def applications(self):
         """The applications configured in okta.
 
         Returns:
-            list: The list of applications configured in okta
+            generator: The generator of applications configured in okta
 
         """
         url = f'{self.api}/apps'
-        return [Application(self, data) for data in self._get_paginated_url(url)]
+        for data in self._get_paginated_url(url):
+            yield Application(self, data)
 
     def get_application_by_id(self, id_):
         """Retrieves an application by id.

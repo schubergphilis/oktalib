@@ -52,7 +52,7 @@ def graph():
     success = execute_command(create_graph_command)
     if success:
         LOGGER.info('%s Successfully created graph images %s',
-                    emojize(':white_heavy_check_mark:'),
+                    emojize(':check_mark_button:'),
                     emojize(':thumbs_up:'))
     else:
         LOGGER.error('%s Errors in creation of graph images found! %s',

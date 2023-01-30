@@ -10,3 +10,6 @@ pep257:
 ignore-paths:
   - _CI
   - build
+
+pylint-django:
+    run: false

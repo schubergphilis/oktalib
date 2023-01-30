@@ -27,7 +27,7 @@
 Custom exception code for oktalib.
 
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 
 """
 
@@ -64,3 +64,7 @@ class ApiLimitReached(Exception):
 
 class UnableToUpdate(Exception):
     """Could not update use property."""
+
+
+class ServerError(Exception):
+    """A server has responded with an error code."""
