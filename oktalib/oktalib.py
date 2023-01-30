@@ -231,15 +231,15 @@ class Okta:
         return group.delete()
 
     def _get_paginated_url(self, url, result_limit=100):
-        response = self._validate_authenticated_response(url, {'limit': result_limit})
+        response = self._validate_response(url, {'limit': result_limit})
         yield from response.json()
-        next_link = self._get_next_link(response)
+        next_link = response.links.get('next', {}).get('url')
         while next_link:
-            response = self._validate_authenticated_response(url=next_link)
+            response = self._validate_response(url=next_link)
             yield from response.json()
-            next_link = self._get_next_link(response)
+            next_link = response.links.get('next', {}).get('url')
 
-    def _validate_authenticated_response(self, url, params=None):
+    def _validate_response(self, url, params=None):
         response = self.session.get(url=url, params=params)
         if not response.ok:
             try:
@@ -248,17 +248,6 @@ class Okta:
                 error_message = response.text
             raise ServerError(error_message) from None
         return response
-
-    @staticmethod
-    def _get_next_link(response):
-        links = response.headers.get('Link')
-        if links:
-            link_text = next((link for link in links.split(',')
-                              if 'next' in link), None)
-            if link_text:
-                link = link_text.split('>')[0].split('<')[1]
-                return link
-        return False
 
     @property
     def users(self):
