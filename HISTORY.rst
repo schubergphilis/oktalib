@@ -169,3 +169,9 @@ History
 ------------------
 
 * Fixed a nasty bug with activate and deactivate of applications being exposed as properties with bad side effects on introspection. Made most entities return as generators.
+
+
+2.0.1 (28-02-2023)
+------------------
+
+* Testing release.
