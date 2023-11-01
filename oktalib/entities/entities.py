@@ -410,7 +410,7 @@ class AdminRole(Entity):
         return self._data.get('assignmentType')
 
 
-class User(Entity):  # pylint: disable=too-many-public-methods
+class User(Entity):
     """Models the user object of okta."""
 
     @property
@@ -1002,7 +1002,7 @@ class UserAssignment(User):
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-class Application(Entity):  # pylint: disable=too-many-public-methods
+class Application(Entity):
     """Models the apps in okta."""
 
     @property
