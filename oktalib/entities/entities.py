@@ -759,6 +759,18 @@ class User(Entity):
         return self._data.get('credentials')
 
     @property
+    def roles(self):
+        """Lists the admin roles the user has.
+
+        Returns:
+            generator: A generator of roles objects for which the user is member of
+
+        """
+        url = f'{self._okta.api}/users/{self.id}/roles'
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield AdminRole(self._okta, data)
+
+    @property
     def groups(self):
         """Lists the groups the user is a member of.
 
