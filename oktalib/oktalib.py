@@ -39,7 +39,8 @@ from requests import Session
 
 from .entities import (Group,
                        User,
-                       Application)
+                       Application,
+                       AdminRole)
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
@@ -361,7 +362,7 @@ class Okta:
         if not response.ok:
             self._logger.error(response.json())
             return None
-        return response.json()
+        return [AdminRole(self, data) for data in response.json()]
 
     def assign_role_to_user_by_id(self, user_id, role_name):
         """Assigns an admin role to a user by id.
@@ -380,7 +381,7 @@ class Okta:
         if not response.ok:
             self._logger.error(response.json())
             return None
-        return response.json()
+        return AdminRole(self, response.json()) if response.ok else None
 
     def remove_role_from_user_by_id(self, user_id, role_id):
         """Remove an admin role from a user by id.
