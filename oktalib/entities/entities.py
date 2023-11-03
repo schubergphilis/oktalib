@@ -336,6 +336,80 @@ class GroupAssignment(Group):
         return self._group_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
+class AdminRole(Entity):
+    """Models the admin role object of okta."""
+
+    @property
+    def id(self):
+        """The id of the role.
+
+        Returns:
+            string: The id of the role
+
+        """
+        return self._data.get('id')
+
+    @property
+    def label(self):
+        """The label of the role.
+
+        Returns:
+            string: The label of the role
+
+        """
+        return self._data.get('label')
+
+    @property
+    def type(self):
+        """The type of the role.
+
+        Returns:
+            string: The name of the type of the role
+
+        """
+        return self._data.get('type')
+
+    @property
+    def status(self):
+        """The status of the role.
+
+        Returns:
+            string: The status of the role
+
+        """
+        return self._data.get('status')
+
+    @property
+    def created(self):
+        """The date and time when the role was created.
+
+        Returns:
+            datetime: The datetime object of when the role was created
+
+        """
+        return self._get_date_from_key('created')
+
+    @property
+    def last_updated(self):
+        """The date and time of the role when it was last updated.
+
+        Returns:
+            datetime: The datetime object of when the role was last updated
+
+        """
+        return self._get_date_from_key('lastUpdated')
+
+    @property
+    def assignment_type(self):
+        """The assignment type of the role.
+
+        Returns:
+            string: The assignment type the role
+
+        """
+        return self._data.get('assignmentType')
+
+
 class User(Entity):
     """Models the user object of okta."""
 
@@ -683,6 +757,18 @@ class User(Entity):
 
         """
         return self._data.get('credentials')
+
+    @property
+    def roles(self):
+        """Lists the admin roles the user has.
+
+        Returns:
+            generator: A generator of roles objects for which the user is member of
+
+        """
+        url = f'{self._okta.api}/users/{self.id}/roles'
+        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+            yield AdminRole(self._okta, data)
 
     @property
     def groups(self):

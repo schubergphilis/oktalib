@@ -39,7 +39,8 @@ from requests import Session
 
 from .entities import (Group,
                        User,
-                       Application)
+                       Application,
+                       AdminRole)
 from .oktalibexceptions import (AuthFailed,
                                 InvalidGroup,
                                 InvalidApplication,
@@ -345,6 +346,60 @@ class Okta:
         if not response.ok:
             self._logger.error(response.json())
         return [User(self, data) for data in response.json()]
+
+    def get_user_assigned_roles_by_id(self, user_id):
+        """Retrieves if any, admin roles assigned to the user by id.
+
+        Args:
+            id: The user ID to match the user with
+
+        Returns:
+            list: A list of the user's roles if found, None otherwise
+
+        """
+        url = f'{self.api}/users/{user_id}/roles'
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        return [AdminRole(self, data) for data in response.json()]
+
+    def assign_role_to_user_by_id(self, user_id, role_name):
+        """Assigns an admin role to a user by id.
+
+        Args:
+            user_id: The user ID to match the user with
+            role_name: The name of the role to assign
+
+        Returns:
+            User: The response, None otherwise
+
+        """
+        url = f'{self.api}/users/{user_id}/roles'
+        data = {"type": role_name}
+        response = self.session.post(url, json=data)
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        return AdminRole(self, response.json())
+
+    def remove_role_from_user_by_id(self, user_id, role_id):
+        """Remove an admin role from a user by id.
+
+        Args:
+            user_id: The user ID to match the user with
+            role_id: The id of the role to remove
+
+        Returns:
+            User: The response, None otherwise
+
+        """
+        url = f'{self.api}/users/{user_id}/roles/{role_id}'
+        response = self.session.delete(url)
+        if not response.ok:
+            self._logger.error(response.json())
+            return False
+        return True
 
     @property
     def applications(self):

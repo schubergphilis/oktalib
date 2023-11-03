@@ -31,7 +31,7 @@ Import all parts from entities here
 .. _Google Python Style Guide:
    https://google.github.io/styleguide/pyguide.html
 """
-from .entities import Application, Group, User
+from .entities import Application, Group, User, AdminRole
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -45,3 +45,4 @@ __status__ = '''Development'''  # "Prototype", "Development", "Production".
 assert Group
 assert User
 assert Application
+assert AdminRole
