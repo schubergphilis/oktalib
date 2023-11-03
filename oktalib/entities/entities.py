@@ -354,7 +354,7 @@ class AdminRole(Entity):
         """The label of the role.
 
         Returns:
-            dict: The label of the role
+            string: The label of the role
 
         """
         return self._data.get('label')
@@ -374,7 +374,7 @@ class AdminRole(Entity):
         """The status of the role.
 
         Returns:
-            dict: The status of the role
+            string: The status of the role
 
         """
         return self._data.get('status')

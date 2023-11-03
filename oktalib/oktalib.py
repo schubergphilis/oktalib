@@ -354,7 +354,7 @@ class Okta:
             id: The user ID to match the user with
 
         Returns:
-            User: The user roles if found, None otherwise
+            list: A list of the user's roles if found, None otherwise
 
         """
         url = f'{self.api}/users/{user_id}/roles'
@@ -368,7 +368,7 @@ class Okta:
         """Assigns an admin role to a user by id.
 
         Args:
-            id: The user ID to match the user with
+            user_id: The user ID to match the user with
             role_name: The name of the role to assign
 
         Returns:
@@ -381,7 +381,7 @@ class Okta:
         if not response.ok:
             self._logger.error(response.json())
             return None
-        return AdminRole(self, response.json()) if response.ok else None
+        return AdminRole(self, response.json())
 
     def remove_role_from_user_by_id(self, user_id, role_id):
         """Remove an admin role from a user by id.
