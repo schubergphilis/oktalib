@@ -33,7 +33,7 @@ Tests for `oktalib` module.
 
 """
 
-from betamax.fixtures import unittest
+import unittest
 
 __author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
 __docformat__ = '''google'''
@@ -46,7 +46,7 @@ __email__ = '''<ctyfoxylos@schubergphilis.com>'''
 __status__ = '''Development'''  # "Prototype", "Development", "Production".
 
 
-class TestOktalib(unittest.BetamaxTestCase):
+class TestOktalib(unittest.TestCase):
 
     def setUp(self):
         """
