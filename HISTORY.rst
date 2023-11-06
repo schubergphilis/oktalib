@@ -181,3 +181,9 @@ History
 ------------------
 
 * Test release.
+
+
+2.1.0 (06-11-2023)
+------------------
+
+* Add admin role support. Bump minimum python version to 3.9. Clean up and update structure.
