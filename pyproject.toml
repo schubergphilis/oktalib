@@ -1,0 +1,61 @@
+[project]
+name = "oktalib"
+version = "3.0.0"
+description = "A library to interface with Okta through it's restful api"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    {name = "oktalib", email = "ctyfoxylos@schubergphilis.com"},
+]
+requires-python = ">=3.12"
+dependencies = []
+classifiers = [
+    # Python versions supported by the package
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+]
+
+# click is a transient dependency, but broken beyond version 8.2.1
+# so this is needed until the following issue is fixed:
+# https://github.com/mkdocs/mkdocs/issues/4032
+[dependency-groups]
+dev = [
+    "click<=8.2.1",
+    "mkdocs==1.6.1",
+    "mkdocstrings[python]==0.30.1",
+    "mypy==1.18.2",
+    "ruff==0.13.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.15,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+# Recommended ignore list for preventing clashes between ruff lint and ruff format.
+ignore = [
+    # indentation-with-invalid-multiple
+    "E111",
+    # indentation-with-invalid-multiple-comment
+    "E114",
+    # over-indented
+    "E117",
+]
+
+[tool.mypy]
+files = ["src/"]
+disallow_untyped_defs = true
