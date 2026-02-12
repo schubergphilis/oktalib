@@ -1,0 +1,86 @@
+name: Release Orchestration
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release-please.outputs.releases_created }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: release-please
+        name: Release Please
+        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+        with:
+          # advanced configuration is needed as long as this issue is open:
+          # https://github.com/googleapis/release-please/issues/2561
+          # both below are the defaults, but good to make the relation explicit
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release
+    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-env
+        with:
+          enable-uv-cache: false # No caching to ensure correct dependencies for publishing
+          sync-uv: false
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish package
+        run: uv publish
+
+  publish-docs:
+    needs: release
+    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    name: Publish to GitHub Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-env
+        with:
+          enable-uv-cache: false # No caching to ensure correct dependencies for publishing
+          sync-uv: true
+
+      - name: Build docs
+        run: uv run mkdocs build
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

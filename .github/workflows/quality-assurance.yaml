@@ -1,0 +1,40 @@
+name: Quality Assurance CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  qa:
+    name: Quality Assurance CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-env
+        with:
+          enable-uv-cache: true
+          sync-uv: true
+
+      - name: Format code
+        run: uv run ruff format --diff
+
+      - name: Lint code
+        run: uv run ruff check
+
+      - name: Type check
+        run: uv run mypy
+
+      - name: Run tests
+        run: uv run python -m unittest
+
+      - name: Build package
+        run: uv build
+
+      - name: Build docs
+        run: uv run mkdocs build
