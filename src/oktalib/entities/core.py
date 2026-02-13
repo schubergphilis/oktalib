@@ -31,8 +31,13 @@ Main code for core.
 """
 
 import logging
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from dateutil.parser import parse
+
+if TYPE_CHECKING:
+    from oktalib.oktalib import Okta
 
 __author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
 __docformat__ = """google"""
@@ -53,20 +58,20 @@ LOGGER.addHandler(logging.NullHandler())
 class Entity:
     """The core object of okta."""
 
-    def __init__(self, okta_instance, data):
+    def __init__(self, okta_instance: "Okta", data: dict[str, Any] | Any) -> None:
         logger_name = f"{LOGGER_BASENAME}.{self.__class__.__name__}"
         self._logger = logging.getLogger(logger_name)
         self._okta = okta_instance
         self._data = self._parse_data(data)
 
-    def _parse_data(self, data):
+    def _parse_data(self, data: dict[str, Any] | Any) -> dict[str, Any]:
         if not isinstance(data, dict):
             self._logger.error(f"Invalid data received: {data}")
             data = {}
         return data
 
     @property
-    def url(self):
+    def url(self) -> str | None:
         """The url of the entity.
 
         Returns:
@@ -79,7 +84,7 @@ class Entity:
         return None
 
     @property
-    def id(self):  # pylint: disable=invalid-name
+    def id(self) -> str | None:  # pylint: disable=invalid-name
         """The id of the entity.
 
         Returns:
@@ -88,23 +93,23 @@ class Entity:
         """
         return self._data.get("id")
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.id)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """Override the default equals behavior."""
         if not isinstance(other, self.__class__):
             raise ValueError(f"Not a {self.__class__.__name__} object")
         return hash(self) == hash(other)
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         """Override the default unequal behavior."""
         if not isinstance(other, self.__class__):
             raise ValueError(f"Not a {self.__class__.__name__} object")
         return hash(self) != hash(other)
 
     @property
-    def created_at(self):
+    def created_at(self) -> datetime | None:
         """The date and time of the group's creation.
 
         Returns:
@@ -114,7 +119,7 @@ class Entity:
         return self._get_date_from_key("created")
 
     @property
-    def last_updated_at(self):
+    def last_updated_at(self) -> datetime | None:
         """The date and time of the entity's last update.
 
         Returns:
@@ -123,14 +128,14 @@ class Entity:
         """
         return self._get_date_from_key("lastUpdated")
 
-    def _get_date_from_key(self, name):
+    def _get_date_from_key(self, name: str) -> datetime | None:
         try:
             date_ = parse(self._data.get(name))
         except (ValueError, TypeError):
             date_ = None
         return date_
 
-    def _update(self):
+    def _update(self) -> bool:
         response = self._okta.session.get(self.url)
         if not response.ok:
             self._logger.error(
