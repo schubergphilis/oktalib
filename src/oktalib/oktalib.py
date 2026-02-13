@@ -272,7 +272,7 @@ class Okta:
             yield User(self, data)
 
     def create_user(
-        self,  # pylint: disable=too-many-arguments
+        self,
         first_name,
         last_name,
         email,

@@ -163,7 +163,7 @@ class Group(Entity):
 
         """
         url = self._data.get("_links", {}).get("users", {}).get("href")
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield User(self._okta, data)
 
     @property
@@ -176,7 +176,7 @@ class Group(Entity):
 
         """
         url = self._data.get("_links", {}).get("apps", {}).get("href")
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield Application(self._okta, data)
 
     def delete(self):
@@ -771,7 +771,7 @@ class User(Entity):
 
         """
         url = f"{self._okta.api}/users/{self.id}/roles"
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield AdminRole(self._okta, data)
 
     @property
@@ -783,7 +783,7 @@ class User(Entity):
 
         """
         url = f"{self._okta.api}/users/{self.id}/groups"
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield Group(self._okta, data)
 
     def delete(self):
@@ -1208,7 +1208,7 @@ class Application(Entity):
 
         """
         url = self._data.get("_links", {}).get("users", {}).get("href")
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield User(self._okta, data)
 
     @property
@@ -1220,7 +1220,7 @@ class Application(Entity):
 
         """
         url = self._data.get("_links", {}).get("groups", {}).get("href")
-        for group in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for group in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield self._okta.get_group_by_id(group.get("id", ""))
 
     @property
@@ -1232,7 +1232,7 @@ class Application(Entity):
 
         """
         url = self._data.get("_links", {}).get("groups", {}).get("href")
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield GroupAssignment(self._okta, data)
 
     def get_group_assignment_by_group_name(self, name):
@@ -1259,7 +1259,7 @@ class Application(Entity):
 
         """
         url = self._data.get("_links", {}).get("users", {}).get("href")
-        for data in self._okta._get_paginated_url(url):  # pylint: disable=protected-access # noqa
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield UserAssignment(self._okta, data)
 
     def get_user_assignment_by_email(self, email):

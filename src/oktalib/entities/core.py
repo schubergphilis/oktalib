@@ -84,7 +84,7 @@ class Entity:
         return None
 
     @property
-    def id(self) -> str | None:  # pylint: disable=invalid-name
+    def id(self) -> str | None:
         """The id of the entity.
 
         Returns:
