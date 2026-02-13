@@ -35,18 +35,18 @@ import logging
 
 from dateutil.parser import parse
 
-__author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
-__docformat__ = '''google'''
-__date__ = '''2018-01-08'''
-__copyright__ = '''Copyright 2018, Costas Tyfoxylos'''
+__author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
+__docformat__ = """google"""
+__date__ = """2018-01-08"""
+__copyright__ = """Copyright 2018, Costas Tyfoxylos"""
 __credits__ = ["Costas Tyfoxylos"]
-__license__ = '''MIT'''
-__maintainer__ = '''Costas Tyfoxylos'''
-__email__ = '''<ctyfoxylos@schubergphilis.com>'''
-__status__ = '''Development'''  # "Prototype", "Development", "Production".
+__license__ = """MIT"""
+__maintainer__ = """Costas Tyfoxylos"""
+__email__ = """<ctyfoxylos@schubergphilis.com>"""
+__status__ = """Development"""  # "Prototype", "Development", "Production".
 
 # This is the main prefix used for logging
-LOGGER_BASENAME = '''core'''
+LOGGER_BASENAME = """core"""
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
@@ -55,14 +55,14 @@ class Entity:
     """The core object of okta."""
 
     def __init__(self, okta_instance, data):
-        logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
+        logger_name = f"{LOGGER_BASENAME}.{self.__class__.__name__}"
         self._logger = logging.getLogger(logger_name)
         self._okta = okta_instance
         self._data = self._parse_data(data)
 
     def _parse_data(self, data):
         if not isinstance(data, dict):
-            self._logger.error(f'Invalid data received: {data}')
+            self._logger.error(f"Invalid data received: {data}")
             data = {}
         return data
 
@@ -87,7 +87,7 @@ class Entity:
             basestring: The internal id of the entity
 
         """
-        return self._data.get('id')
+        return self._data.get("id")
 
     def __hash__(self):
         return hash(self.id)
@@ -95,13 +95,13 @@ class Entity:
     def __eq__(self, other):
         """Override the default equals behavior."""
         if not isinstance(other, self.__class__):
-            raise ValueError(f'Not a {self.__class__.__name__} object')
+            raise ValueError(f"Not a {self.__class__.__name__} object")
         return hash(self) == hash(other)
 
     def __ne__(self, other):
         """Override the default unequal behavior."""
         if not isinstance(other, self.__class__):
-            raise ValueError(f'Not a {self.__class__.__name__} object')
+            raise ValueError(f"Not a {self.__class__.__name__} object")
         return hash(self) != hash(other)
 
     @property
@@ -112,7 +112,7 @@ class Entity:
             datetime: The datetime object of when the group was created
 
         """
-        return self._get_date_from_key('created')
+        return self._get_date_from_key("created")
 
     @property
     def last_updated_at(self):
@@ -122,7 +122,7 @@ class Entity:
             datetime: The datetime object of when the entity was last updated
 
         """
-        return self._get_date_from_key('lastUpdated')
+        return self._get_date_from_key("lastUpdated")
 
     def _get_date_from_key(self, name):
         try:
@@ -134,7 +134,9 @@ class Entity:
     def _update(self):
         response = self._okta.session.get(self.url)
         if not response.ok:
-            self._logger.error(f'Error getting entities data. Response: {response.text}')
+            self._logger.error(
+                f"Error getting entities data. Response: {response.text}"
+            )
             return False
         self._data = response.json()
         return True

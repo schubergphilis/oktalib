@@ -31,16 +31,17 @@ Import all parts from entities here
 .. _Google Python Style Guide:
    https://google.github.io/styleguide/pyguide.html
 """
+
 from .entities import Application, Group, User, AdminRole
 
-__author__ = '''Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'''
-__docformat__ = '''google'''
-__date__ = '''2018-01-08'''
-__copyright__ = '''Copyright 2018, Costas Tyfoxylos'''
-__license__ = '''MIT'''
-__maintainer__ = '''Costas Tyfoxylos'''
-__email__ = '''<ctyfoxylos@schubergphilis.com>'''
-__status__ = '''Development'''  # "Prototype", "Development", "Production".
+__author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
+__docformat__ = """google"""
+__date__ = """2018-01-08"""
+__copyright__ = """Copyright 2018, Costas Tyfoxylos"""
+__license__ = """MIT"""
+__maintainer__ = """Costas Tyfoxylos"""
+__email__ = """<ctyfoxylos@schubergphilis.com>"""
+__status__ = """Development"""  # "Prototype", "Development", "Production".
 
 assert Group
 assert User
