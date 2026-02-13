@@ -138,7 +138,8 @@ class Group(Entity):
         """The date and time of the group's last membership update.
 
         Returns:
-            datetime: The datetime object of when the group's memberships were last updated
+            datetime: The datetime object of when the group's memberships
+                were last updated
 
         """
         return self._get_date_from_key("lastMembershipUpdated")
@@ -170,7 +171,8 @@ class Group(Entity):
         """The applications of the group.
 
         Returns:
-            generator: A generator of Application objects for the applications of the group
+            generator: A generator of Application objects for the applications
+                of the group
 
         """
         url = self._data.get("_links", {}).get("apps", {}).get("href")
@@ -315,7 +317,8 @@ class GroupAssignment(Group):
         """The group data of the inherited group that the group assignment refers to.
 
         Returns:
-            group_data (dict): The group data of the parent group that the group assignment refers to.
+            group_data (dict): The group data of the parent group that the
+                group assignment refers to.
 
         """
         url = self._group_assignment_data.get("_links", {}).get("group", {}).get("href")
@@ -855,7 +858,10 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f"{self._okta.api}/users/{self.id}/lifecycle/reset_password??sendEmail=false"
+        url = (
+            f"{self._okta.api}/users/{self.id}/lifecycle/"
+            "reset_password??sendEmail=false"
+        )
         return self._post_lifecycle(url, "Resetting user's password failed")
 
     def set_temporary_password(self):
@@ -865,7 +871,10 @@ class User(Entity):
             string: Password on success, None otherwise
 
         """
-        url = f"{self._okta.api}/users/{self.id}/lifecycle/expire_password?tempPassword=true"
+        url = (
+            f"{self._okta.api}/users/{self.id}/lifecycle/"
+            "expire_password?tempPassword=true"
+        )
         response = self._okta.session.post(url)
         if not response.ok:
             error = f"Setting a temporary password failed\nResponse: {response.text}"
@@ -929,7 +938,8 @@ class User(Entity):
         """Update a user's profile in okta.
 
         Args:
-            new_profile: A object with attributes to change (example: {'profile': {'firstName': 'Test'}})
+            new_profile: A object with attributes to change
+                (example: {'profile': {'firstName': 'Test'}})
 
         Returns:
             Bool: True or False depending on success
@@ -1184,7 +1194,8 @@ class Application(Entity):
             name: The name of the group assignment to retrieve.
 
         Returns:
-            group_assignment (GroupAssignment) : The matching group assignment if found else None.
+            group_assignment (GroupAssignment): The matching group assignment
+                if found else None.
 
         """
         return next(
@@ -1210,7 +1221,8 @@ class Application(Entity):
             email: The email of the user assignment to retrieve.
 
         Returns:
-            user_assignment (UserAssignment) : The matching user assignment if found else None.
+            user_assignment (UserAssignment): The matching user assignment
+                if found else None.
 
         """
         return next(
@@ -1357,6 +1369,7 @@ class Application(Entity):
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
             self._logger.error(
-                f"Assigning group to the saml user roles failed. Response: {response.text}"
+                f"Assigning group to the saml user roles failed. "
+                f"Response: {response.text}"
             )
         return response.ok

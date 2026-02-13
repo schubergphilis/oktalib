@@ -72,8 +72,8 @@ class Entity:
         Returns:
              None in the core entity.
 
-        All objects inheriting from this would either expose this from their data or construct
-        and overwrite this.
+        All objects inheriting from this would either expose this from their
+        data or construct and overwrite this.
 
         """
         return None
