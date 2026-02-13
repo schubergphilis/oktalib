@@ -70,6 +70,34 @@ class Entity:
             data = {}
         return data
 
+    @staticmethod
+    def _missing_required_fields(requirements: dict[str, Any]) -> list[str]:
+        return [label for label, value in requirements.items() if not value]
+
+    @classmethod
+    def _validate_fields(
+        cls,
+        data: dict[str, Any],
+        required_fields: dict[str, tuple[str, ...]],
+        error_type: type[Exception],
+        entity_name: str | None = None,
+    ) -> None:
+        values: dict[str, Any] = {}
+        for label, path in required_fields.items():
+            current: Any = data
+            for key in path:
+                if not isinstance(current, dict):
+                    current = None
+                    break
+                current = current.get(key)
+            values[label] = current
+        missing = cls._missing_required_fields(values)
+        if missing:
+            name = entity_name or cls.__name__
+            raise error_type(
+                f"{name} missing required fields: {', '.join(missing)}"
+            )
+
     @property
     def url(self) -> str:
         """The url of the entity.

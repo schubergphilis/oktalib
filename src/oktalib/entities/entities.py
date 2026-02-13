@@ -21,7 +21,6 @@
 #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 #  DEALINGS IN THE SOFTWARE.
 #
-#  pylint: disable=too-many-lines
 """
 Main code for entities.
 
@@ -32,6 +31,9 @@ Main code for entities.
 
 import json
 import logging
+from collections.abc import Generator
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 from cachetools import TTLCache, cached
 
@@ -43,6 +45,9 @@ from oktalib.oktalibexceptions import (
 )
 
 from .core import Entity
+
+if TYPE_CHECKING:
+    from oktalib.oktalib import Okta
 
 __author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
 __docformat__ = """google"""
@@ -63,8 +68,22 @@ LOGGER.addHandler(logging.NullHandler())
 class Group(Entity):
     """Models the group object of okta."""
 
+    def __init__(self, okta_instance: "Okta", data: dict[str, Any]) -> None:
+        self._validate_fields(
+            data=data,
+            required_fields={"id": ("id",), "profile.name": ("profile", "name")},
+            error_type=InvalidGroup,
+            entity_name="Group",
+        )
+        super().__init__(okta_instance, data)
+
     @property
-    def url(self):
+    def id(self) -> str:
+        """The id of the group."""
+        return self._data["id"]
+
+    @property
+    def url(self) -> str:
         """The url of the group.
 
         Returns:
@@ -74,7 +93,7 @@ class Group(Entity):
         return f"{self._okta.api}/groups/{self.id}"
 
     @property
-    def type(self):
+    def type(self) -> str | None:
         """The type of the group.
 
         Returns:
@@ -84,7 +103,7 @@ class Group(Entity):
         return self._data.get("type")
 
     @property
-    def profile(self):
+    def profile(self) -> dict[str, Any] | None:
         """The profile of the group.
 
         Returns:
@@ -94,17 +113,17 @@ class Group(Entity):
         return self._data.get("profile")
 
     @property
-    def name(self):
+    def name(self) -> str:
         """The name of the group.
 
         Returns:
             string: The name of the group
 
         """
-        return self._data.get("profile", {}).get("name")
+        return self._data["profile"]["name"]
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str) -> None:
         url = f"{self._okta.api}/groups/{self.id}"
         payload = {"profile": {"name": value, "description": self.description}}
         response = self._okta.session.put(url, data=json.dumps(payload))
@@ -114,7 +133,7 @@ class Group(Entity):
             self._update()
 
     @property
-    def description(self):
+    def description(self) -> str | None:
         """The description of the group.
 
         Returns:
@@ -124,7 +143,7 @@ class Group(Entity):
         return self._data.get("profile", {}).get("description")
 
     @description.setter
-    def description(self, value):
+    def description(self, value: str) -> None:
         url = f"{self._okta.api}/groups/{self.id}"
         payload = {"profile": {"name": self.name, "description": value}}
         response = self._okta.session.put(url, data=json.dumps(payload))
@@ -134,7 +153,7 @@ class Group(Entity):
             self._update()
 
     @property
-    def last_membership_updated_at(self):
+    def last_membership_updated_at(self) -> datetime | None:
         """The date and time of the group's last membership update.
 
         Returns:
@@ -145,17 +164,20 @@ class Group(Entity):
         return self._get_date_from_key("lastMembershipUpdated")
 
     @property
-    def object_classes(self):
+    def object_classes(self) -> tuple[str, ...]:
         """The classes of the group.
 
         Returns:
             tuple: The tuple of the classes of the group
 
         """
-        return tuple(self._data.get("objectClass"))
+        value = self._data.get("objectClass")
+        if not isinstance(value, list):
+            return ()
+        return tuple(str(item) for item in value)
 
     @property
-    def users(self):
+    def users(self) -> Generator["User", None, None]:
         """The users of the group.
 
         Returns:
@@ -167,7 +189,7 @@ class Group(Entity):
             yield User(self._okta, data)
 
     @property
-    def applications(self):
+    def applications(self) -> Generator["Application", None, None]:
         """The applications of the group.
 
         Returns:
@@ -179,7 +201,7 @@ class Group(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield Application(self._okta, data)
 
-    def delete(self):
+    def delete(self) -> bool:
         """Deletes the group from okta.
 
         Returns:
@@ -190,7 +212,7 @@ class Group(Entity):
         response = self._okta.session.delete(url)
         return response.ok
 
-    def add_to_application_with_label(self, application_label):
+    def add_to_application_with_label(self, application_label: str) -> bool:
         """Adds the group to an application.
 
         Args:
@@ -205,7 +227,7 @@ class Group(Entity):
             raise InvalidApplication(application_label)
         return application.add_group_by_id(self.id)
 
-    def remove_from_application_with_label(self, application_label):
+    def remove_from_application_with_label(self, application_label: str) -> bool:
         """Removes the group from an application.
 
         Args:
@@ -220,7 +242,7 @@ class Group(Entity):
             raise InvalidApplication(application_label)
         return application.remove_group_by_id(self.id)
 
-    def add_user_by_login(self, login):
+    def add_user_by_login(self, login: str) -> bool:
         """Adds a user to the group.
 
         Args:
@@ -231,7 +253,11 @@ class Group(Entity):
 
         """
         user = next(
-            (user for user in self._okta.users if user.login.lower() == login.lower()),
+            (
+                user
+                for user in self._okta.users
+                if (user.login or "").lower() == login.lower()
+            ),
             None,
         )
         if not user:
@@ -242,7 +268,7 @@ class Group(Entity):
             self._logger.error(f"Adding user failed. Response: {response.text}")
         return response.ok
 
-    def remove_user_by_login(self, login):
+    def remove_user_by_login(self, login: str) -> bool:
         """Removes a user from the group.
 
         Args:
@@ -261,7 +287,7 @@ class Group(Entity):
             self._logger.error(f"Removing user failed. Response: {response.text}")
         return response.ok
 
-    def add_user_by_id(self, id_):
+    def add_user_by_id(self, id_: str) -> bool:
         """Adds a user to the group.
 
         Args:
@@ -277,7 +303,7 @@ class Group(Entity):
             self._logger.error(f"Adding user failed. Response: {response.text}")
         return response.ok
 
-    def remove_user_by_id(self, id_):
+    def remove_user_by_id(self, id_: str) -> bool:
         """Remove a user from the group.
 
         Args:
@@ -297,14 +323,14 @@ class Group(Entity):
 class GroupAssignment(Group):
     """Models the group assignment object of okta for apps."""
 
-    def __init__(self, okta_instance, data):
+    def __init__(self, okta_instance: "Okta", data: dict[str, Any]) -> None:
         self._okta = okta_instance
         self._group_assignment_data = data
         group_data = self._get_group_data()
         Group.__init__(self, okta_instance, group_data)
 
     @property
-    def priority(self):
+    def priority(self) -> int | None:
         """The priority of the group assignment.
 
         Returns:
@@ -313,7 +339,7 @@ class GroupAssignment(Group):
         """
         return self._group_assignment_data.get("priority")
 
-    def _get_group_data(self):
+    def _get_group_data(self) -> dict[str, Any]:
         """The group data of the inherited group that the group assignment refers to.
 
         Returns:
@@ -329,13 +355,13 @@ class GroupAssignment(Group):
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
-    def profile_role(self):
+    def profile_role(self) -> str | None:
         """Profile role."""
         return self._group_assignment_data.get("profile", {}).get("role")
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
-    def profile_saml_roles(self):
+    def profile_saml_roles(self) -> list[str]:
         """Profile saml roles."""
         return self._group_assignment_data.get("profile", {}).get("samlRoles", [])
 
@@ -344,7 +370,7 @@ class AdminRole(Entity):
     """Models the admin role object of okta."""
 
     @property
-    def id(self):
+    def id(self) -> str | None:
         """The id of the role.
 
         Returns:
@@ -354,7 +380,7 @@ class AdminRole(Entity):
         return self._data.get("id")
 
     @property
-    def label(self):
+    def label(self) -> str | None:
         """The label of the role.
 
         Returns:
@@ -364,7 +390,7 @@ class AdminRole(Entity):
         return self._data.get("label")
 
     @property
-    def type(self):
+    def type(self) -> str | None:
         """The type of the role.
 
         Returns:
@@ -374,7 +400,7 @@ class AdminRole(Entity):
         return self._data.get("type")
 
     @property
-    def status(self):
+    def status(self) -> str | None:
         """The status of the role.
 
         Returns:
@@ -384,7 +410,7 @@ class AdminRole(Entity):
         return self._data.get("status")
 
     @property
-    def created(self):
+    def created(self) -> datetime | None:
         """The date and time when the role was created.
 
         Returns:
@@ -394,7 +420,7 @@ class AdminRole(Entity):
         return self._get_date_from_key("created")
 
     @property
-    def last_updated(self):
+    def last_updated(self) -> datetime | None:
         """The date and time of the role when it was last updated.
 
         Returns:
@@ -404,7 +430,7 @@ class AdminRole(Entity):
         return self._get_date_from_key("lastUpdated")
 
     @property
-    def assignment_type(self):
+    def assignment_type(self) -> str | None:
         """The assignment type of the role.
 
         Returns:
@@ -418,17 +444,17 @@ class User(Entity):
     """Models the user object of okta."""
 
     @property
-    def url(self):
+    def url(self) -> str:
         """The url of the user.
 
         Returns:
             string: The url of the user
 
         """
-        return self._data.get("_links", {}).get("self", {}).get("href")
+        return self._data.get("_links", {}).get("self", {}).get("href") or ""
 
     @property
-    def status(self):
+    def status(self) -> str | None:
         """The status of the user.
 
         Returns:
@@ -438,7 +464,7 @@ class User(Entity):
         return self._data.get("status")
 
     @property
-    def activated_at(self):
+    def activated_at(self) -> datetime | None:
         """The date and time of the users's activation.
 
         Returns:
@@ -448,7 +474,7 @@ class User(Entity):
         return self._get_date_from_key("activated")
 
     @property
-    def status_changed_at(self):
+    def status_changed_at(self) -> datetime | None:
         """The date and time of the users's status change.
 
         Returns:
@@ -458,7 +484,7 @@ class User(Entity):
         return self._get_date_from_key("statusChanged")
 
     @property
-    def last_login_at(self):
+    def last_login_at(self) -> datetime | None:
         """The date and time of the users's last login.
 
         Returns:
@@ -468,7 +494,7 @@ class User(Entity):
         return self._get_date_from_key("lastLogin")
 
     @property
-    def password_changed_at(self):
+    def password_changed_at(self) -> datetime | None:
         """The date and time of the users's last password change.
 
         Returns:
@@ -478,7 +504,7 @@ class User(Entity):
         return self._get_date_from_key("passwordChanged")
 
     @property
-    def first_name(self):
+    def first_name(self) -> str | None:
         """The first name of the user.
 
         Returns:
@@ -488,12 +514,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("firstName")
 
     @first_name.setter
-    def first_name(self, value):
+    def first_name(self, value: str) -> None:
         """First name setter."""
         self._update_profile_attribute({"firstName": value})
 
     @property
-    def last_name(self):
+    def last_name(self) -> str | None:
         """The last name of the user.
 
         Returns:
@@ -503,12 +529,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("lastName")
 
     @last_name.setter
-    def last_name(self, value):
+    def last_name(self, value: str) -> None:
         """Last name setter."""
         self._update_profile_attribute({"lastName": value})
 
     @property
-    def manager(self):
+    def manager(self) -> str | None:
         """The manager of the user.
 
         Returns:
@@ -518,12 +544,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("manager")
 
     @manager.setter
-    def manager(self, value):
+    def manager(self, value: str) -> None:
         """Manager setter."""
         self._update_profile_attribute({"manager": value})
 
     @property
-    def display_name(self):
+    def display_name(self) -> str | None:
         """The display name of the user.
 
         Returns:
@@ -533,12 +559,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("displayName")
 
     @display_name.setter
-    def display_name(self, value):
+    def display_name(self, value: str) -> None:
         """Display name setter."""
         self._update_profile_attribute({"displayName": value})
 
     @property
-    def title(self):
+    def title(self) -> str | None:
         """The title of the user.
 
         Returns:
@@ -548,12 +574,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("title")
 
     @title.setter
-    def title(self, value):
+    def title(self, value: str) -> None:
         """Title setter."""
         self._update_profile_attribute({"title": value})
 
     @property
-    def locale(self):
+    def locale(self) -> str | None:
         """The locale of the user.
 
         Returns:
@@ -563,12 +589,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("locale")
 
     @locale.setter
-    def locale(self, value):
+    def locale(self, value: str) -> None:
         """Locale setter."""
         self._update_profile_attribute({"locale": value})
 
     @property
-    def employee_number(self):
+    def employee_number(self) -> str | None:
         """The employee number of the user.
 
         Returns:
@@ -578,12 +604,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("employeeNumber")
 
     @employee_number.setter
-    def employee_number(self, value):
+    def employee_number(self, value: str) -> None:
         """Employee number setter."""
         self._update_profile_attribute({"employeeNumber": value})
 
     @property
-    def zip_code(self):
+    def zip_code(self) -> str | None:
         """The zip code of the user.
 
         Returns:
@@ -593,12 +619,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("zipCode")
 
     @zip_code.setter
-    def zip_code(self, value):
+    def zip_code(self, value: str) -> None:
         """Zip number setter."""
         self._update_profile_attribute({"zipCode": value})
 
     @property
-    def city(self):
+    def city(self) -> str | None:
         """The city of the user.
 
         Returns:
@@ -608,12 +634,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("city")
 
     @city.setter
-    def city(self, value):
+    def city(self, value: str) -> None:
         """City setter."""
         self._update_profile_attribute({"city": value})
 
     @property
-    def street_address(self):
+    def street_address(self) -> str | None:
         """The street address of the user.
 
         Returns:
@@ -623,12 +649,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("streetAddress")
 
     @street_address.setter
-    def street_address(self, value):
+    def street_address(self, value: str) -> None:
         """Street address setter."""
         self._update_profile_attribute({"streetAddress": value})
 
     @property
-    def contry_code(self):
+    def contry_code(self) -> str | None:
         """The contry code of the user.
 
         Returns:
@@ -638,12 +664,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("countryCode")
 
     @contry_code.setter
-    def contry_code(self, value):
+    def contry_code(self, value: str) -> None:
         """Country code setter."""
         self._update_profile_attribute({"countryCode": value})
 
     @property
-    def organization(self):
+    def organization(self) -> str | None:
         """The organization of the user.
 
         Returns:
@@ -653,12 +679,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("organization")
 
     @organization.setter
-    def organization(self, value):
+    def organization(self, value: str) -> None:
         """Organization setter."""
         self._update_profile_attribute({"organization": value})
 
     @property
-    def department(self):
+    def department(self) -> str | None:
         """The department of the user.
 
         Returns:
@@ -668,12 +694,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("department")
 
     @department.setter
-    def department(self, value):
+    def department(self, value: str) -> None:
         """Department setter."""
         self._update_profile_attribute({"department": value})
 
     @property
-    def primary_phone(self):
+    def primary_phone(self) -> str | None:
         """The primary phone of the user.
 
         Returns:
@@ -683,12 +709,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("primaryPhone")
 
     @primary_phone.setter
-    def primary_phone(self, value):
+    def primary_phone(self, value: str) -> None:
         """Primary phone setter."""
         self._update_profile_attribute({"primaryPhone": value})
 
     @property
-    def mobile_phone(self):
+    def mobile_phone(self) -> str | None:
         """The mobile phone of the user.
 
         Returns:
@@ -698,12 +724,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("mobilePhone")
 
     @mobile_phone.setter
-    def mobile_phone(self, value):
+    def mobile_phone(self, value: str) -> None:
         """Mobile phone setter."""
         self._update_profile_attribute({"mobilePhone": value})
 
     @property
-    def email(self):
+    def email(self) -> str | None:
         """The email of the user.
 
         Returns:
@@ -713,12 +739,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("email")
 
     @email.setter
-    def email(self, value):
+    def email(self, value: str) -> None:
         """Email setter."""
         self._update_profile_attribute({"email": value})
 
     @property
-    def second_email(self):
+    def second_email(self) -> str | None:
         """The second email of the user.
 
         Returns:
@@ -728,12 +754,12 @@ class User(Entity):
         return self._data.get("profile", {}).get("secondEmail")
 
     @second_email.setter
-    def second_email(self, value):
+    def second_email(self, value: str) -> None:
         """Second email setter."""
         self._update_profile_attribute({"secondEmail": value})
 
     @property
-    def login(self):
+    def login(self) -> str | None:
         """The login of the user.
 
         Returns:
@@ -743,17 +769,17 @@ class User(Entity):
         return self._data.get("profile", {}).get("login")
 
     @login.setter
-    def login(self, value):
+    def login(self, value: str) -> None:
         """Login setter."""
         self._update_profile_attribute({"login": value})
 
-    def _update_profile_attribute(self, attribute):
+    def _update_profile_attribute(self, attribute: dict[str, Any]) -> None:
         if not self.update_profile({"profile": attribute}):
             raise UnableToUpdate(f"Failed to update with payload {attribute}")
         self._update()
 
     @property
-    def credentials(self):
+    def credentials(self) -> dict[str, Any] | None:
         """The credentials of the user.
 
         Returns:
@@ -763,7 +789,7 @@ class User(Entity):
         return self._data.get("credentials")
 
     @property
-    def roles(self):
+    def roles(self) -> Generator[AdminRole, None, None]:
         """Lists the admin roles the user has.
 
         Returns:
@@ -775,7 +801,7 @@ class User(Entity):
             yield AdminRole(self._okta, data)
 
     @property
-    def groups(self):
+    def groups(self) -> Generator[Group, None, None]:
         """Lists the groups the user is a member of.
 
         Returns:
@@ -786,7 +812,7 @@ class User(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield Group(self._okta, data)
 
-    def delete(self):
+    def delete(self) -> bool:
         """Deletes the user from okta.
 
         Returns:
@@ -803,7 +829,7 @@ class User(Entity):
                 self._logger.error(response.text)
         return response.ok
 
-    def _post_lifecycle(self, url, message):
+    def _post_lifecycle(self, url: str, message: str) -> bool:
         response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f"{message}\nResponse: {response.text}")
@@ -811,7 +837,7 @@ class User(Entity):
             self._update()
         return response.ok
 
-    def activate(self):
+    def activate(self) -> bool:
         """Activate the user.
 
         Returns:
@@ -821,7 +847,7 @@ class User(Entity):
         url = f"{self._okta.api}/users/{self.id}/lifecycle/activate?sendEmail=false"
         return self._post_lifecycle(url, "Activating user failed")
 
-    def deactivate(self):
+    def deactivate(self) -> bool:
         """Deactivate the user.
 
         Returns:
@@ -831,7 +857,7 @@ class User(Entity):
         url = f"{self._okta.api}/users/{self.id}/lifecycle/deactivate"
         return self._post_lifecycle(url, "Deactivating user failed")
 
-    def unlock(self):
+    def unlock(self) -> bool:
         """Unlocks the user.
 
         Returns:
@@ -841,7 +867,7 @@ class User(Entity):
         url = f"{self._okta.api}/users/{self.id}/lifecycle/unlock"
         return self._post_lifecycle(url, "Unlocking user failed")
 
-    def expire_password(self):
+    def expire_password(self) -> bool:
         """Expires the user's password.
 
         Returns:
@@ -851,7 +877,7 @@ class User(Entity):
         url = f"{self._okta.api}/users/{self.id}/lifecycle/expire_password"
         return self._post_lifecycle(url, "Expiring user's password failed")
 
-    def reset_password(self):
+    def reset_password(self) -> bool:
         """Resets the user's password.
 
         Returns:
@@ -864,7 +890,7 @@ class User(Entity):
         )
         return self._post_lifecycle(url, "Resetting user's password failed")
 
-    def set_temporary_password(self):
+    def set_temporary_password(self) -> str | None:
         """Sets a temporary password for the user.
 
         Returns:
@@ -883,7 +909,7 @@ class User(Entity):
             self._update()
         return response.json().get("tempPassword", None)
 
-    def suspend(self):
+    def suspend(self) -> bool:
         """Suspends the user.
 
         Returns:
@@ -893,7 +919,7 @@ class User(Entity):
         url = f"{self._okta.api}/users/{self.id}/lifecycle/suspend"
         return self._post_lifecycle(url, "Suspending user failed")
 
-    def unsuspend(self):
+    def unsuspend(self) -> bool:
         """Unsuspends the user.
 
         Returns:
@@ -903,7 +929,7 @@ class User(Entity):
         url = f"{self._okta.api}/users/{self.id}/lifecycle/unsuspend"
         return self._post_lifecycle(url, "Un-suspending user failed")
 
-    def update_password(self, old_password, new_password):
+    def update_password(self, old_password: str, new_password: str) -> bool:
         """Changes the user's password.
 
         Returns:
@@ -920,7 +946,7 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
-    def set_password(self, password):
+    def set_password(self, password: str) -> bool:
         """Set a password for the user.
 
         Returns:
@@ -934,7 +960,7 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
-    def update_profile(self, new_profile):
+    def update_profile(self, new_profile: dict[str, Any]) -> bool:
         """Update a user's profile in okta.
 
         Args:
@@ -951,7 +977,9 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
-    def update_security_question(self, password, question, answer):
+    def update_security_question(
+        self, password: str, question: str, answer: str
+    ) -> bool:
         """Changes the user's security question and answer.
 
         Returns:
@@ -972,13 +1000,15 @@ class User(Entity):
 class UserAssignment(User):
     """Models the user assignment object of okta for apps."""
 
-    def __init__(self, okta_instance, data):
+    def __init__(self, okta_instance: "Okta", data: dict[str, Any]) -> None:
         self._okta = okta_instance
         self._user_assignment_data = data
         user_data = self._get_user_data()
         User.__init__(self, okta_instance, user_data)
 
-    def _get_user_data(self):
+    # inherit from Entity not User, make a property .user that returns a User object for the user assignment
+
+    def _get_user_data(self) -> dict[str, Any]:
         """The parent user data that the user assignment refers to.
 
         Returns:
@@ -992,7 +1022,7 @@ class UserAssignment(User):
         return response.json()
 
     @property
-    def group(self):
+    def group(self) -> Group:
         """The group that the user assignment refers to.
 
         Returns:
@@ -1006,7 +1036,7 @@ class UserAssignment(User):
         return Group(self._okta, response.json())
 
     @property
-    def email(self):
+    def email(self) -> str | None:
         """The email of the user.
 
         Returns:
@@ -1016,11 +1046,11 @@ class UserAssignment(User):
         return self._user_assignment_data.get("profile", {}).get("email")
 
     @email.setter
-    def email(self, value):
+    def email(self, value: str) -> None:
         """Email setter - updates the application user profile email."""
         self._update_profile_attribute({"email": value})
 
-    def _update(self):
+    def _update(self) -> bool:
         """Refresh the assignment data from Okta."""
         url = self._user_assignment_data.get("_links", {}).get("self", {}).get("href")
         response = self._okta.session.get(url)
@@ -1032,7 +1062,7 @@ class UserAssignment(User):
         self._user_assignment_data = response.json()
         return True
 
-    def _update_profile_attribute(self, attribute):
+    def _update_profile_attribute(self, attribute: dict[str, Any]) -> None:
         """Update a single profile attribute for the application user assignment.
 
         Args:
@@ -1046,7 +1076,7 @@ class UserAssignment(User):
             raise UnableToUpdate(f"Failed to update with payload {attribute}")
         self._update()
 
-    def update_profile(self, new_profile):
+    def update_profile(self, new_profile: dict[str, Any]) -> bool:
         """Update the application user's profile.
 
         Args:
@@ -1065,13 +1095,13 @@ class UserAssignment(User):
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
-    def profile_role(self):
+    def profile_role(self) -> str | None:
         """Profile role."""
         return self._user_assignment_data.get("profile", {}).get("role")
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
-    def profile_saml_roles(self):
+    def profile_saml_roles(self) -> list[str]:
         """Profile saml roles."""
         return self._user_assignment_data.get("profile", {}).get("samlRoles", [])
 
@@ -1080,7 +1110,7 @@ class Application(Entity):
     """Models the apps in okta."""
 
     @property
-    def url(self):
+    def url(self) -> str:
         """The url of the application.
 
         Returns:
@@ -1090,7 +1120,7 @@ class Application(Entity):
         return f"{self._okta.api}/apps/{self.id}"
 
     @property
-    def name(self):
+    def name(self) -> str | None:
         """The name of the application.
 
         Returns:
@@ -1100,7 +1130,7 @@ class Application(Entity):
         return self._data.get("name")
 
     @property
-    def label(self):
+    def label(self) -> str | None:
         """The label of the application.
 
         Returns:
@@ -1110,7 +1140,7 @@ class Application(Entity):
         return self._data.get("label")
 
     @property
-    def status(self):
+    def status(self) -> str | None:
         """The status of the application.
 
         Returns:
@@ -1120,7 +1150,7 @@ class Application(Entity):
         return self._data.get("status")
 
     @property
-    def accessibility(self):
+    def accessibility(self) -> dict[str, Any] | None:
         """The accessibility of the application.
 
         Returns:
@@ -1130,7 +1160,7 @@ class Application(Entity):
         return self._data.get("accessibility")
 
     @property
-    def visibility(self):
+    def visibility(self) -> dict[str, Any] | None:
         """The visibility of the application.
 
         Returns:
@@ -1140,7 +1170,7 @@ class Application(Entity):
         return self._data.get("visibility")
 
     @property
-    def features(self):
+    def features(self) -> dict[str, Any] | None:
         """The features of the application.
 
         Returns:
@@ -1150,7 +1180,7 @@ class Application(Entity):
         return self._data.get("features")
 
     @property
-    def sign_on_mode(self):
+    def sign_on_mode(self) -> str | None:
         """The sign on mode of the application.
 
         Returns:
@@ -1160,7 +1190,7 @@ class Application(Entity):
         return self._data.get("sign_on_mode")
 
     @property
-    def credentials(self):
+    def credentials(self) -> dict[str, Any] | None:
         """The credentials of the application.
 
         Returns:
@@ -1170,7 +1200,7 @@ class Application(Entity):
         return self._data.get("credentials")
 
     @property
-    def settings(self):
+    def settings(self) -> dict[str, Any] | None:
         """The settings of the application.
 
         Returns:
@@ -1180,7 +1210,7 @@ class Application(Entity):
         return self._data.get("settings", {}).get("app")
 
     @property
-    def notification_settings(self):
+    def notification_settings(self) -> dict[str, Any] | None:
         """The notification settings of the application.
 
         Returns:
@@ -1190,7 +1220,7 @@ class Application(Entity):
         return self._data.get("settings", {}).get("notifications")
 
     @property
-    def sign_on_settings(self):
+    def sign_on_settings(self) -> dict[str, Any] | None:
         """The sign on settings of the application.
 
         Returns:
@@ -1200,7 +1230,7 @@ class Application(Entity):
         return self._data.get("settings", {}).get("signOn")
 
     @property
-    def users(self):
+    def users(self) -> Generator[User, None, None]:
         """The users of the application.
 
         Returns:
@@ -1212,7 +1242,7 @@ class Application(Entity):
             yield User(self._okta, data)
 
     @property
-    def groups(self):
+    def groups(self) -> Generator[Group | None, None, None]:
         """The groups of the application.
 
         Returns:
@@ -1224,7 +1254,7 @@ class Application(Entity):
             yield self._okta.get_group_by_id(group.get("id", ""))
 
     @property
-    def group_assignments(self):
+    def group_assignments(self) -> Generator[GroupAssignment, None, None]:
         """The group assignments to the application.
 
         Returns:
@@ -1235,7 +1265,9 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield GroupAssignment(self._okta, data)
 
-    def get_group_assignment_by_group_name(self, name):
+    def get_group_assignment_by_group_name(
+        self, name: str
+    ) -> GroupAssignment | None:
         """Retrieves a group assignment by a group name.
 
         Args:
@@ -1251,7 +1283,7 @@ class Application(Entity):
         )
 
     @property
-    def user_assignments(self):
+    def user_assignments(self) -> Generator[UserAssignment, None, None]:
         """The user assignments to the application.
 
         Returns:
@@ -1262,7 +1294,7 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield UserAssignment(self._okta, data)
 
-    def get_user_assignment_by_email(self, email):
+    def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
         """Retrieves a user assignment by a user email.
 
         Args:
@@ -1277,12 +1309,12 @@ class Application(Entity):
             (
                 user
                 for user in self.user_assignments
-                if user.email.lower() == email.lower()
+                if (user.email or "").lower() == email.lower()
             ),
             None,
         )
 
-    def activate(self):
+    def activate(self) -> bool:
         """Activates the application.
 
         Returns:
@@ -1299,7 +1331,7 @@ class Application(Entity):
             self._update()
         return response.ok
 
-    def deactivate(self):
+    def deactivate(self) -> bool:
         """Deactivates the application.
 
         Returns:
@@ -1316,7 +1348,7 @@ class Application(Entity):
             self._update()
         return response.ok
 
-    def get_associated_saml_roles(self):
+    def get_associated_saml_roles(self) -> list[str]:
         """Returns the Saml IAM Roles associated with the application.
 
         Returns:
@@ -1330,7 +1362,7 @@ class Application(Entity):
             return []
         return response.json().get("SamlIamRole", [])
 
-    def add_group_by_id(self, group_id):
+    def add_group_by_id(self, group_id: str) -> bool:
         """Adds a group to the application.
 
         Args:
@@ -1346,7 +1378,7 @@ class Application(Entity):
             self._logger.error(f"Adding group failed. Response: {response.text}")
         return response.ok
 
-    def add_group_by_name(self, group_name):
+    def add_group_by_name(self, group_name: str) -> bool:
         """Adds a group to the application.
 
         Args:
@@ -1365,7 +1397,7 @@ class Application(Entity):
             self._logger.error(f"Adding group failed. Response: {response.text}")
         return response.ok
 
-    def remove_group_by_id(self, group_id):
+    def remove_group_by_id(self, group_id: str) -> bool:
         """Removes a group from the application.
 
         Args:
@@ -1381,7 +1413,7 @@ class Application(Entity):
             self._logger.error(f"Removing group failed. Response: {response.text}")
         return response.ok
 
-    def remove_group_by_name(self, group_name):
+    def remove_group_by_name(self, group_name: str) -> bool:
         """Removes a group from the application.
 
         Args:
@@ -1400,7 +1432,9 @@ class Application(Entity):
             self._logger.error(f"Removing group failed. Response: {response.text}")
         return response.ok
 
-    def assign_group_to_saml_user_roles(self, group_id, role, saml_roles):
+    def assign_group_to_saml_user_roles(
+        self, group_id: str, role: str, saml_roles: list[str]
+    ) -> bool:
         """Assigns an okta group to an okta application with saml user roles.
 
         Args:
