@@ -98,8 +98,8 @@ class Okta:
             Response: Response instance.
 
         """
-        self.session.original_request = self.session.request
-        self.session.request = self._patched_request
+        self.session.original_request = self.session.request  # type: ignore[attr-defined]
+        self.session.request = self._patched_request  # type: ignore[assignment] 
 
     @backoff.on_exception(backoff.expo, ApiLimitReached, max_time=60)
     def _patched_request(self, method: str, url: str, **kwargs: Any) -> Response:
