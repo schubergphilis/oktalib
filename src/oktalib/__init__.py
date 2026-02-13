@@ -50,12 +50,12 @@ __maintainer__ = """Costas Tyfoxylos"""
 __email__ = """<ctyfoxylos@schubergphilis.com>"""
 __status__ = """Development"""  # "Prototype", "Development", "Production".
 
-# This is to 'use' the module(s), so lint doesn't complain
-assert AuthFailed
-assert InvalidGroup
-assert InvalidUser
-assert InvalidApplication
-assert ApiLimitReached
-assert ServerError
-
-assert Okta
+__all__ = [
+    'AuthFailed',
+    'InvalidGroup',
+    'InvalidUser',
+    'InvalidApplication',
+    'ApiLimitReached',
+    'ServerError',
+    'Okta',
+]

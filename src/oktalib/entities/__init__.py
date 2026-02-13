@@ -42,7 +42,4 @@ __maintainer__ = """Costas Tyfoxylos"""
 __email__ = """<ctyfoxylos@schubergphilis.com>"""
 __status__ = """Development"""  # "Prototype", "Development", "Production".
 
-assert Group
-assert User
-assert Application
-assert AdminRole
+__all__ = ['Group', 'User', 'Application', 'AdminRole']
