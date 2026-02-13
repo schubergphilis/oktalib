@@ -1,0 +1,14 @@
+{
+  "release-type": "python",
+  "packages": {
+    ".": {
+      "extra-files": [
+        {
+          "path": "uv.lock",
+          "type": "toml",
+          "jsonpath": "$.package[?(@.name.value=='oktalib')].version"
+        }
+      ]
+    }
+  }
+}

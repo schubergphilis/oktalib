@@ -1,0 +1,19 @@
+{
+  "template": "https://github.com/schubergphilis/paleofuturistic_python",
+  "commit": "16b72ae073597208b3520e1d18f82954481bbd9b",
+  "checkout": "latest",
+  "context": {
+    "cookiecutter": {
+      "project_name": "oktalib",
+      "project_slug": "oktalib",
+      "project_description": "A library to interface with Okta through it's restful api",
+      "full_name": "oktalib",
+      "email": "ctyfoxylos@schubergphilis.com",
+      "python_version": "3.12",
+      "include_apache_license": false,
+      "_template": "https://github.com/schubergphilis/paleofuturistic_python",
+      "_commit": "16b72ae073597208b3520e1d18f82954481bbd9b"
+    }
+  },
+  "directory": null
+}
