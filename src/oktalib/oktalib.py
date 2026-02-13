@@ -32,9 +32,11 @@ Main code for oktalib.
 
 import json
 import logging
+from collections.abc import Generator
+from typing import Any
 
 import backoff
-from requests import Session
+from requests import Response, Session
 
 from .entities import AdminRole, Application, Group, User
 from .oktalibexceptions import (
@@ -64,7 +66,7 @@ LOGGER.addHandler(logging.NullHandler())
 class Okta:
     """Models the api of okta."""
 
-    def __init__(self, host, token):
+    def __init__(self, host: str, token: str) -> None:
         logger_name = f"{LOGGER_BASENAME}.{self.__class__.__name__}"
         self._logger = logging.getLogger(logger_name)
         self.host = host
@@ -73,7 +75,7 @@ class Okta:
         self.session = self._setup_session()
         self._monkey_patch_session()
 
-    def _setup_session(self):
+    def _setup_session(self) -> Session:
         session = Session()
         session.get(self.host)
         session.headers.update(
@@ -89,7 +91,7 @@ class Okta:
             raise AuthFailed(response.content)
         return session
 
-    def _monkey_patch_session(self):
+    def _monkey_patch_session(self) -> None:
         """Gets original request method and overrides it with the patched one.
 
         Returns:
@@ -100,7 +102,7 @@ class Okta:
         self.session.request = self._patched_request
 
     @backoff.on_exception(backoff.expo, ApiLimitReached, max_time=60)
-    def _patched_request(self, method, url, **kwargs):
+    def _patched_request(self, method: str, url: str, **kwargs: Any) -> Response:
         """Patch the original request method from requests.Sessions library.
 
         Args:
@@ -125,7 +127,7 @@ class Okta:
         return response
 
     @property
-    def groups(self):
+    def groups(self) -> Generator[Group, None, None]:
         """The groups configured in okta.
 
         Returns:
@@ -136,7 +138,7 @@ class Okta:
         for data in self._get_paginated_url(url):
             yield Group(self, data)
 
-    def create_group(self, name, description):
+    def create_group(self, name: str, description: str) -> Group | None:
         """Creates a group in okta.
 
         Args:
@@ -154,7 +156,9 @@ class Okta:
             self._logger.error(response.json())
         return Group(self, response.json()) if response.ok else None
 
-    def get_group_type_by_name(self, name, group_type="OKTA_GROUP"):
+    def get_group_type_by_name(
+        self, name: str, group_type: str = "OKTA_GROUP"
+    ) -> Group | None:
         """Retrieves the group type of okta by name.
 
         Args:
@@ -175,7 +179,7 @@ class Okta:
         )
         return group
 
-    def get_group_by_name(self, name):
+    def get_group_by_name(self, name: str) -> Group | None:
         """Retrieves the first group (of any type) by name.
 
         Args:
@@ -190,7 +194,7 @@ class Okta:
             None,
         )
 
-    def get_group_by_id(self, group_id):
+    def get_group_by_id(self, group_id: str) -> Group | None:
         """Retrieves the group (of any type) by id.
 
         Args:
@@ -206,7 +210,7 @@ class Okta:
             self._logger.error(response.json())
         return Group(self, response.json()) if response.ok else None
 
-    def search_groups_by_name(self, name):
+    def search_groups_by_name(self, name: str) -> list[Group]:
         """Retrieves the groups (of any type) by name.
 
         Args:
@@ -222,7 +226,7 @@ class Okta:
             self._logger.error(response.json())
         return [Group(self, data) for data in response.json()] if response.ok else []
 
-    def delete_group(self, name):
+    def delete_group(self, name: str) -> bool:
         """Deletes a group from okta.
 
         Args:
@@ -240,7 +244,9 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    def _get_paginated_url(self, url, result_limit=100):
+    def _get_paginated_url(
+        self, url: str, result_limit: int = 100
+    ) -> Generator[dict[str, Any], None, None]:
         response = self._validate_response(url, {"limit": result_limit})
         yield from response.json()
         next_link = response.links.get("next", {}).get("url")
@@ -249,7 +255,7 @@ class Okta:
             yield from response.json()
             next_link = response.links.get("next", {}).get("url")
 
-    def _validate_response(self, url, params=None):
+    def _validate_response(self, url: str, params: dict[str, Any] | None = None) -> Response:
         response = self.session.get(url=url, params=params)
         if not response.ok:
             try:
@@ -260,7 +266,7 @@ class Okta:
         return response
 
     @property
-    def users(self):
+    def users(self) -> Generator[User, None, None]:
         """The users configured in okta.
 
         Returns:
@@ -273,13 +279,13 @@ class Okta:
 
     def create_user(
         self,
-        first_name,
-        last_name,
-        email,
-        login,
-        password=None,
-        enabled=True,
-    ):
+        first_name: str,
+        last_name: str,
+        email: str,
+        login: str,
+        password: str | None = None,
+        enabled: bool = True,
+    ) -> User | None:
         """Creates a user in okta.
 
         Args:
@@ -312,7 +318,7 @@ class Okta:
             self._logger.error(response.json())
         return User(self, response.json()) if response.ok else None
 
-    def get_user_by_login(self, login):
+    def get_user_by_login(self, login: str) -> User | None:
         """Retrieves a user by login.
 
         Args:
@@ -336,7 +342,7 @@ class Okta:
             None,
         )
 
-    def search_users(self, value):
+    def search_users(self, value: str) -> list[User]:
         """Retrieves a list of users by looking into name, last name and email.
 
         Args:
@@ -352,7 +358,7 @@ class Okta:
             self._logger.error(response.json())
         return [User(self, data) for data in response.json()]
 
-    def search_users_by_email(self, email):
+    def search_users_by_email(self, email: str) -> list[User]:
         """Retrieves a list of users by email.
 
         Args:
@@ -368,7 +374,7 @@ class Okta:
             self._logger.error(response.json())
         return [User(self, data) for data in response.json()]
 
-    def get_user_assigned_roles_by_id(self, user_id):
+    def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
         """Retrieves if any, admin roles assigned to the user by id.
 
         Args:
@@ -385,7 +391,7 @@ class Okta:
             return None
         return [AdminRole(self, data) for data in response.json()]
 
-    def assign_role_to_user_by_id(self, user_id, role_name):
+    def assign_role_to_user_by_id(self, user_id: str, role_name: str) -> AdminRole | None:
         """Assigns an admin role to a user by id.
 
         Args:
@@ -404,7 +410,7 @@ class Okta:
             return None
         return AdminRole(self, response.json())
 
-    def remove_role_from_user_by_id(self, user_id, role_id):
+    def remove_role_from_user_by_id(self, user_id: str, role_id: str) -> bool:
         """Remove an admin role from a user by id.
 
         Args:
@@ -423,7 +429,7 @@ class Okta:
         return True
 
     @property
-    def applications(self):
+    def applications(self) -> Generator[Application, None, None]:
         """The applications configured in okta.
 
         Returns:
@@ -434,7 +440,7 @@ class Okta:
         for data in self._get_paginated_url(url):
             yield Application(self, data)
 
-    def get_application_by_id(self, id_):
+    def get_application_by_id(self, id_: str) -> Application | None:
         """Retrieves an application by id.
 
         Args:
@@ -447,7 +453,7 @@ class Okta:
         app = next((app for app in self.applications if app.id == id_), None)
         return app
 
-    def get_application_by_label(self, label):
+    def get_application_by_label(self, label: str) -> Application | None:
         """Retrieves an application by label.
 
         Args:
@@ -463,7 +469,7 @@ class Okta:
         )
         return app
 
-    def assign_group_to_application(self, application_label, group_name):
+    def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
         """Assigns a group to an application.
 
         Args:
@@ -482,7 +488,7 @@ class Okta:
             raise InvalidGroup(group_name)
         return application.add_group_by_id(group.id)
 
-    def remove_group_from_application(self, application_label, group_name):
+    def remove_group_from_application(self, application_label: str, group_name: str) -> bool:
         """Removes a group from an application.
 
         Args:
