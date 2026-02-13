@@ -71,24 +71,24 @@ class Entity:
         return data
 
     @property
-    def url(self) -> str | None:
+    def url(self) -> str:
         """The url of the entity.
 
         Returns:
-             None in the core entity.
+            string: An empty string in the core entity.
 
         All objects inheriting from this would either expose this from their
         data or construct and overwrite this.
 
         """
-        return None
+        return ""
 
     @property
     def id(self) -> str | None:
         """The id of the entity.
 
         Returns:
-            basestring: The internal id of the entity
+            string: The internal id of the entity
 
         """
         return self._data.get("id")
