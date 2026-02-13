@@ -997,16 +997,12 @@ class User(Entity):
         return response.ok
 
 
-class UserAssignment(User):
+class UserAssignment(Entity):
     """Models the user assignment object of okta for apps."""
 
     def __init__(self, okta_instance: "Okta", data: dict[str, Any]) -> None:
-        self._okta = okta_instance
-        self._user_assignment_data = data
-        user_data = self._get_user_data()
-        User.__init__(self, okta_instance, user_data)
-
-    # inherit from Entity not User, make a property .user that returns a User object for the user assignment
+        super().__init__(okta_instance, data)
+        self._user_assignment_data = self._data
 
     def _get_user_data(self) -> dict[str, Any]:
         """The parent user data that the user assignment refers to.
@@ -1020,6 +1016,11 @@ class UserAssignment(User):
         if not response.ok:
             self._logger.error(response.text)
         return response.json()
+
+    @property
+    def user(self) -> User:
+        """The user that the user assignment refers to."""
+        return User(self._okta, self._get_user_data())
 
     @property
     def group(self) -> Group:
@@ -1062,20 +1063,6 @@ class UserAssignment(User):
         self._user_assignment_data = response.json()
         return True
 
-    def _update_profile_attribute(self, attribute: dict[str, Any]) -> None:
-        """Update a single profile attribute for the application user assignment.
-
-        Args:
-            attribute: Dictionary with the attribute to update
-
-        Raises:
-            UnableToUpdate: If the update fails
-
-        """
-        if not self.update_profile({"profile": attribute}):
-            raise UnableToUpdate(f"Failed to update with payload {attribute}")
-        self._update()
-
     def update_profile(self, new_profile: dict[str, Any]) -> bool:
         """Update the application user's profile.
 
@@ -1092,6 +1079,20 @@ class UserAssignment(User):
         if not response.ok:
             self._logger.error(response.text)
         return response.ok
+
+    def _update_profile_attribute(self, attribute: dict[str, Any]) -> None:
+        """Update a single profile attribute for the application user assignment.
+
+        Args:
+            attribute: Dictionary with the attribute to update
+
+        Raises:
+            UnableToUpdate: If the update fails
+
+        """
+        if not self.update_profile({"profile": attribute}):
+            raise UnableToUpdate(f"Failed to update with payload {attribute}")
+        self._update()
 
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
