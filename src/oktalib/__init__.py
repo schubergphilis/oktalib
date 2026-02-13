@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # File: __init__.py
 #
 # Copyright 2018 Costas Tyfoxylos
@@ -32,16 +31,15 @@ Import all parts from oktalib here
    https://google.github.io/styleguide/pyguide.html
 """
 
+from .oktalib import Okta
 from .oktalibexceptions import (
+    ApiLimitReached,
     AuthFailed,
+    InvalidApplication,
     InvalidGroup,
     InvalidUser,
-    InvalidApplication,
-    ApiLimitReached,
     ServerError,
 )
-
-from .oktalib import Okta
 
 __author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
 __docformat__ = """google"""

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # File: oktalib.py
 #
 # Copyright 2018 Costas Tyfoxylos
@@ -37,12 +36,12 @@ import logging
 import backoff
 from requests import Session
 
-from .entities import Group, User, Application, AdminRole
+from .entities import AdminRole, Application, Group, User
 from .oktalibexceptions import (
-    AuthFailed,
-    InvalidGroup,
-    InvalidApplication,
     ApiLimitReached,
+    AuthFailed,
+    InvalidApplication,
+    InvalidGroup,
     ServerError,
 )
 

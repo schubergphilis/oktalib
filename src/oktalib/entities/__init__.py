@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # File: __init__.py
 #
 # Copyright 2018 Costas Tyfoxylos
@@ -32,7 +31,7 @@ Import all parts from entities here
    https://google.github.io/styleguide/pyguide.html
 """
 
-from .entities import Application, Group, User, AdminRole
+from .entities import AdminRole, Application, Group, User
 
 __author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
 __docformat__ = """google"""

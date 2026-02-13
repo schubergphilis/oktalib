@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # File: entities.py
 #
 # Copyright 2018 Costas Tyfoxylos
@@ -34,14 +33,15 @@ Main code for entities.
 import json
 import logging
 
-from cachetools import cached, TTLCache
+from cachetools import TTLCache, cached
 
 from oktalib.oktalibexceptions import (
     InvalidApplication,
-    InvalidUser,
     InvalidGroup,
+    InvalidUser,
     UnableToUpdate,
 )
+
 from .core import Entity
 
 __author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
