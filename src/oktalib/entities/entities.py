@@ -1015,6 +1015,54 @@ class UserAssignment(User):
         """
         return self._user_assignment_data.get("profile", {}).get("email")
 
+    @email.setter
+    def email(self, value):
+        """Email setter - updates the application user profile email."""
+        self._update_profile_attribute({"email": value})
+
+    def _update(self):
+        """Refresh the assignment data from Okta."""
+        url = self._user_assignment_data.get("_links", {}).get("self", {}).get("href")
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(
+                f"Error getting assignment data. Response: {response.text}"
+            )
+            return False
+        self._user_assignment_data = response.json()
+        return True
+
+    def _update_profile_attribute(self, attribute):
+        """Update a single profile attribute for the application user assignment.
+
+        Args:
+            attribute: Dictionary with the attribute to update
+
+        Raises:
+            UnableToUpdate: If the update fails
+
+        """
+        if not self.update_profile({"profile": attribute}):
+            raise UnableToUpdate(f"Failed to update with payload {attribute}")
+        self._update()
+
+    def update_profile(self, new_profile):
+        """Update the application user's profile.
+
+        Args:
+            new_profile: A object with attributes to change
+                (example: {'profile': {'email': 'new@example.com'}})
+
+        Returns:
+            Bool: True or False depending on success
+
+        """
+        url = self._user_assignment_data.get("_links", {}).get("self", {}).get("href")
+        response = self._okta.session.post(url, data=json.dumps(new_profile))
+        if not response.ok:
+            self._logger.error(response.text)
+        return response.ok
+
     @property
     @cached(cache=TTLCache(maxsize=100, ttl=60))
     def profile_role(self):
