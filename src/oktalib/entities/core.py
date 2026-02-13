@@ -129,11 +129,13 @@ class Entity:
         return self._get_date_from_key("lastUpdated")
 
     def _get_date_from_key(self, name: str) -> datetime | None:
+        value = self._data.get(name)
+        if not isinstance(value, (str, bytes)):
+            return None
         try:
-            date_ = parse(self._data.get(name))
+            return parse(value)
         except (ValueError, TypeError):
-            date_ = None
-        return date_
+            return None
 
     def _update(self) -> bool:
         response = self._okta.session.get(self.url)
