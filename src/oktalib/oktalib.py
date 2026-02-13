@@ -120,7 +120,7 @@ class Okta:
         self._logger.debug(
             f"Using patched request for method {method}, url {url}, kwargs {kwargs}"
         )
-        response = self.session.original_request(method, url, **kwargs)  # noqa
+        response = self.session.original_request(method, url, **kwargs)  # type: ignore[attr-defined]
         if response.status_code == 429:
             self._logger.warning("Api is exhausted for endpoint, backing off.")
             raise ApiLimitReached
@@ -301,9 +301,9 @@ class Okta:
             User: The created user on success, None otherwise
 
         """
-        enabled = "true" if enabled else "false"
-        url = f"{self.api}/users?activate={enabled}"
-        payload = {
+        activate = "true" if enabled else "false"
+        url = f"{self.api}/users?activate={activate}"
+        payload: dict[str, Any] = {
             "profile": {
                 "firstName": first_name,
                 "lastName": last_name,
@@ -464,7 +464,11 @@ class Okta:
 
         """
         app = next(
-            (app for app in self.applications if app.label.lower() == label.lower()),
+            (
+                app
+                for app in self.applications
+                if (app.label or "").lower() == label.lower()
+            ),
             None,
         )
         return app
