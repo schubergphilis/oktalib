@@ -32,3 +32,9 @@ Prerequisite: [uv](https://docs.astral.sh/uv/)
 - Build (to validate it works): `uv build`
 - Review documentation updates: `uv run mkdocs serve`
 - Make a pull request.
+
+### Pipeline
+
+Relevant for the maintainers of the repository. 
+- Github action release (Release Please) is using a PAT which expires. More about this can be found at [paleofuturistic docs](https://schubergphilis.github.io/paleofuturistic_python/walkthrough/).
+- Github action publish uses OIDC credentials for PyPI, check in PyPI if this stops working.
