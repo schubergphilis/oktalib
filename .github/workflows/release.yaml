@@ -24,6 +24,7 @@ jobs:
           # both below are the defaults, but good to make the relation explicit
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
   publish:
     needs: release
