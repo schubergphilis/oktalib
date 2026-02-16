@@ -99,7 +99,7 @@ class Okta:
 
         """
         self.session.original_request = self.session.request  # type: ignore[attr-defined]
-        self.session.request = self._patched_request  # type: ignore[assignment] 
+        self.session.request = self._patched_request  # type: ignore[assignment]
 
     @backoff.on_exception(backoff.expo, ApiLimitReached, max_time=60)
     def _patched_request(self, method: str, url: str, **kwargs: Any) -> Response:
@@ -255,7 +255,9 @@ class Okta:
             yield from response.json()
             next_link = response.links.get("next", {}).get("url")
 
-    def _validate_response(self, url: str, params: dict[str, Any] | None = None) -> Response:
+    def _validate_response(
+        self, url: str, params: dict[str, Any] | None = None
+    ) -> Response:
         response = self.session.get(url=url, params=params)
         if not response.ok:
             try:
@@ -391,7 +393,9 @@ class Okta:
             return None
         return [AdminRole(self, data) for data in response.json()]
 
-    def assign_role_to_user_by_id(self, user_id: str, role_name: str) -> AdminRole | None:
+    def assign_role_to_user_by_id(
+        self, user_id: str, role_name: str
+    ) -> AdminRole | None:
         """Assigns an admin role to a user by id.
 
         Args:
@@ -473,7 +477,9 @@ class Okta:
         )
         return app
 
-    def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
+    def assign_group_to_application(
+        self, application_label: str, group_name: str
+    ) -> bool:
         """Assigns a group to an application.
 
         Args:
@@ -492,7 +498,9 @@ class Okta:
             raise InvalidGroup(group_name)
         return application.add_group_by_id(group.id)
 
-    def remove_group_from_application(self, application_label: str, group_name: str) -> bool:
+    def remove_group_from_application(
+        self, application_label: str, group_name: str
+    ) -> bool:
         """Removes a group from an application.
 
         Args:

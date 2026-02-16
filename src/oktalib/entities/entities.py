@@ -1266,9 +1266,7 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield GroupAssignment(self._okta, data)
 
-    def get_group_assignment_by_group_name(
-        self, name: str
-    ) -> GroupAssignment | None:
+    def get_group_assignment_by_group_name(self, name: str) -> GroupAssignment | None:
         """Retrieves a group assignment by a group name.
 
         Args:

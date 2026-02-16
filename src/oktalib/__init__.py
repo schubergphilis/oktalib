@@ -51,11 +51,11 @@ __email__ = """<ctyfoxylos@schubergphilis.com>"""
 __status__ = """Development"""  # "Prototype", "Development", "Production".
 
 __all__ = [
-    'AuthFailed',
-    'InvalidGroup',
-    'InvalidUser',
-    'InvalidApplication',
-    'ApiLimitReached',
-    'ServerError',
-    'Okta',
+    "AuthFailed",
+    "InvalidGroup",
+    "InvalidUser",
+    "InvalidApplication",
+    "ApiLimitReached",
+    "ServerError",
+    "Okta",
 ]

@@ -42,4 +42,4 @@ __maintainer__ = """Costas Tyfoxylos"""
 __email__ = """<ctyfoxylos@schubergphilis.com>"""
 __status__ = """Development"""  # "Prototype", "Development", "Production".
 
-__all__ = ['Group', 'User', 'Application', 'AdminRole']
+__all__ = ["Group", "User", "Application", "AdminRole"]

@@ -94,9 +94,7 @@ class Entity:
         missing = cls._missing_required_fields(values)
         if missing:
             name = entity_name or cls.__name__
-            raise error_type(
-                f"{name} missing required fields: {', '.join(missing)}"
-            )
+            raise error_type(f"{name} missing required fields: {', '.join(missing)}")
 
     @property
     def url(self) -> str:
