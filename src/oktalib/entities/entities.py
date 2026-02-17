@@ -49,18 +49,17 @@ from .core import Entity
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
 
-__author__ = """Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"""
-__docformat__ = """google"""
-__date__ = """2018-01-08"""
-__copyright__ = """Copyright 2018, Costas Tyfoxylos"""
-__credits__ = ["Costas Tyfoxylos"]
-__license__ = """MIT"""
-__maintainer__ = """Costas Tyfoxylos"""
-__email__ = """<ctyfoxylos@schubergphilis.com>"""
-__status__ = """Development"""  # "Prototype", "Development", "Production".
+__author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
+__docformat__ = 'google'
+__date__ = '2018-01-08'
+__copyright__ = 'Copyright 2018, Costas Tyfoxylos'
+__credits__ = ['Costas Tyfoxylos']
+__license__ = 'MIT'
+__maintainer__ = 'Costas Tyfoxylos'
+__email__ = '<ctyfoxylos@schubergphilis.com>'
+__status__ = 'Development'  # "Prototype", "Development", "Production".
 
-# This is the main prefix used for logging
-LOGGER_BASENAME = """entities"""
+LOGGER_BASENAME = 'entities'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
