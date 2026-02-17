@@ -1472,3 +1472,47 @@ class Application(Entity):
                 f'Response: {response.text}'
             )
         return response.ok
+
+
+class IDP(Entity):
+    """Models the identity provider object of okta."""
+
+    @property
+    def name(self) -> str:
+        """The name of the identity provider.
+
+        Returns:
+            str: The name of the identity provider
+
+        """
+        return self._data.get("name", "")
+    
+    @property
+    def status(self) -> str:
+        """The status of the identity provider.
+
+        Returns:
+            str: The status of the identity provider
+
+        """
+        return self._data.get("status", "")
+    
+    @property
+    def created(self) -> str:
+        """The creation date of the identity provider.
+
+        Returns:
+            str: The creation date of the identity provider
+
+        """
+        return self._data.get("created", "")
+
+    @property
+    def protocol(self) -> dict:
+        """The protocol of the identity provider.
+
+        Returns:
+            dict: The protocol of the identity provider
+
+        """
+        return self._data.get("protocol", {})

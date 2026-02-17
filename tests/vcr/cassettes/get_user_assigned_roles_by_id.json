@@ -1,0 +1,242 @@
+{
+    "http_interactions": [
+        {
+            "request": {
+                "body": {
+                    "encoding": "utf-8",
+                    "string": ""
+                },
+                "headers": {
+                    "User-Agent": [
+                        "python-requests/2.32.5"
+                    ],
+                    "Accept-Encoding": [
+                        "gzip, deflate"
+                    ],
+                    "accept": [
+                        "application/json"
+                    ],
+                    "Connection": [
+                        "keep-alive"
+                    ],
+                    "content-type": [
+                        "application/json"
+                    ],
+                    "authorization": [
+                        "<REDACTED>"
+                    ],
+                    "Cookie": [
+                        "<REDACTED>"
+                    ]
+                },
+                "method": "GET",
+                "uri": "https://schubergphilis.oktapreview.com/api/v1/users?filter=profile.login+eq+%22yhoorneman@dev.schubergphilis.com%22"
+            },
+            "response": {
+                "body": {
+                    "encoding": "utf-8",
+                    "base64_string": "H4sIAAAAAAAAA4VUa0/bMBT9K1G+jlA7aaDJl63r0JjGGIOwiSGETOI0lzp2ZjvpQtX/vuu05TGhTapU99zj+zjnutcrHwo/9Qlpk0Vds7Cgi1/27uSYVIf+nm8ss63B+HSWffp+hEiuObPcXQkJPQxIGNAoI5M0SvCzTwj5iSSWW+j+T9tkn1VMzrcZQxoQGtBJRmkaJ2lIdhkFM/ZEzUEOhcODofBBRqM0CtPx+DntsikeS4dxQDFlnNEkHcdpTHfEhhmzVLp4UTwOSBIQLE5SkqRxuCPbvuF+ulVK2X6SLH9DMzZX923UfXNKrff8RqsSxMBzzZ6yGs/+sVJa8ppJVOUBmpkqHEopTc4+IIQBNucaoaxSNTPeObMCytIJDbZH/CKvoKmUCM7hfoFwAaYRrN+mv1Ia8oX3vIpE4EXU2chzJYujmoHwU9kKgXm4yTU0FpST9AsYgydvpsFCzoR3JFFrjp3t+RasG+ufHKHwkiNxeXt5gZfE1qu+2gnwruDdvsmr9o7reVOBALOfqxq5vG6E6jk/bWuMDQZH0WSYtQPXFkIfLzIEStCPym5GR7DRUDPdn1VKug4c4jRtNC+55jJ3YMVEGSw5dwrW6g592tHfRNQ7GMeTg5CMKUYHkaYCGG79tW9q26RXTzO80v+NeyWaczstCs2NeyzvFQc5Zx2XLffCQ5c2V620ut/6f3qCkNJzJuGBbS1AowdpvLNBGyTg2ji//GcavlIfVw/fZMGlBSaw+grH3+w2njGo0fuO6/72V8vNptbKfzr7PypmPTBer1rtlazDjbLcw41p8dB7O+bb7Y53UDiPVv7mUfhfP2dT7FVu1n34tcaqtwLkYujGcFG67wr9cE5Y25h0NPprErWwDB3rgC/dVoxYA6OOjlrDtRm9+ue0Xq9v/gBT9S5ZvgQAAA=="
+                },
+                "headers": {
+                    "Date": [
+                        "Mon, 16 Feb 2026 14:54:18 GMT"
+                    ],
+                    "Content-Type": [
+                        "application/json"
+                    ],
+                    "Transfer-Encoding": [
+                        "chunked"
+                    ],
+                    "Connection": [
+                        "keep-alive"
+                    ],
+                    "Server": [
+                        "nginx"
+                    ],
+                    "Vary": [
+                        "Accept-Encoding"
+                    ],
+                    "x-okta-request-id": [
+                        "f3bf8e930356d1f8ceb698148af789c2"
+                    ],
+                    "accept-ch": [
+                        "Sec-CH-UA-Platform-Version"
+                    ],
+                    "x-xss-protection": [
+                        "0"
+                    ],
+                    "p3p": [
+                        "CP=\"HONK\""
+                    ],
+                    "set-cookie": [
+                        "sid=\"\";Version=1;Path=/;Max-Age=0",
+                        "xids=\"\";Version=1;Path=/;Max-Age=0",
+                        "autolaunch_triggered=\"\"; Expires=Thu, 01 Jan 1970 00:00:10 GMT; Path=/",
+                        "activate_ca_modal_triggered=\"\"; Expires=Thu, 01 Jan 1970 00:00:10 GMT; Path=/",
+                        "JSESSIONID=AED308031D2934E5DE4017D6DD0D9C58; Path=/; Secure; HttpOnly"
+                    ],
+                    "content-security-policy": [
+                        "frame-ancestors 'self'"
+                    ],
+                    "x-rate-limit-limit": [
+                        "600"
+                    ],
+                    "x-rate-limit-remaining": [
+                        "599"
+                    ],
+                    "x-rate-limit-reset": [
+                        "1771253677"
+                    ],
+                    "cache-control": [
+                        "no-cache, no-store"
+                    ],
+                    "pragma": [
+                        "no-cache"
+                    ],
+                    "expires": [
+                        "0"
+                    ],
+                    "referrer-policy": [
+                        "strict-origin-when-cross-origin"
+                    ],
+                    "link": [
+                        "<https://schubergphilis.oktapreview.com/api/v1/users?limit=200&filter=profile.login+eq+%22yhoorneman%40dev.schubergphilis.com%22>; rel=\"self\""
+                    ],
+                    "x-content-type-options": [
+                        "nosniff"
+                    ],
+                    "Strict-Transport-Security": [
+                        "max-age=315360000; includeSubDomains"
+                    ],
+                    "Content-Encoding": [
+                        "gzip"
+                    ]
+                },
+                "status": {
+                    "code": 200,
+                    "message": "OK"
+                },
+                "url": "https://schubergphilis.oktapreview.com/api/v1/users?filter=profile.login+eq+%22yhoorneman@dev.schubergphilis.com%22"
+            },
+            "recorded_at": "2026-02-16T14:54:18"
+        },
+        {
+            "request": {
+                "body": {
+                    "encoding": "utf-8",
+                    "string": ""
+                },
+                "headers": {
+                    "User-Agent": [
+                        "python-requests/2.32.5"
+                    ],
+                    "Accept-Encoding": [
+                        "gzip, deflate"
+                    ],
+                    "accept": [
+                        "application/json"
+                    ],
+                    "Connection": [
+                        "keep-alive"
+                    ],
+                    "content-type": [
+                        "application/json"
+                    ],
+                    "authorization": [
+                        "<REDACTED>"
+                    ],
+                    "Cookie": [
+                        "JSESSIONID=AED308031D2934E5DE4017D6DD0D9C58; DT=DI1STkAi4R4TbegWRe1W5qb4w"
+                    ]
+                },
+                "method": "GET",
+                "uri": "https://schubergphilis.oktapreview.com/api/v1/users/00u9kmma2d1kqtbLH0h7/roles"
+            },
+            "response": {
+                "body": {
+                    "encoding": "utf-8",
+                    "base64_string": "H4sIAAAAAAAAA7WQUU/CMBSF/4rpM7CWIbi9LbooAZXA5oPGkI5dt7Kt69o7DCH8dzvhzRBfNOnTOSf3a763AxEp8YnmzCsqmezTsJ7lczam+YT0SMkTKG29ahXoqyCthBQGNcda2xb3CroyXoTLdXD3OH2yoUGOrbFxcBtNX0KbbDRwhI4ypGzSp8M+cyN647uefz0ZUEpfv0kGY5X+PuTGiExWIDE64eNVuLQH1qWQheUeyGkB9msHkmv4sOAcURnfccwmbxPQmcpFKcygLpArDTsBn4NNXTlcCWfHnNaANg6lrVVS8WHKigaT+UOn5Hg89s7KMs0lVxIyGQTNdibVfynz+tQ+N2LUH418Nr6o7NLwh7L75XO8+Ftnma5b1UnLtjIRKJVeNOFunp6lvX8B/znK0mkCAAA="
+                },
+                "headers": {
+                    "Date": [
+                        "Mon, 16 Feb 2026 14:54:18 GMT"
+                    ],
+                    "Content-Type": [
+                        "application/json"
+                    ],
+                    "Transfer-Encoding": [
+                        "chunked"
+                    ],
+                    "Connection": [
+                        "keep-alive"
+                    ],
+                    "Server": [
+                        "nginx"
+                    ],
+                    "Vary": [
+                        "Accept-Encoding"
+                    ],
+                    "x-okta-request-id": [
+                        "6ae03f74f365833b975d62057068ec6f"
+                    ],
+                    "accept-ch": [
+                        "Sec-CH-UA-Platform-Version"
+                    ],
+                    "x-xss-protection": [
+                        "0"
+                    ],
+                    "p3p": [
+                        "CP=\"HONK\""
+                    ],
+                    "set-cookie": [
+                        "sid=\"\";Version=1;Path=/;Max-Age=0",
+                        "xids=\"\";Version=1;Path=/;Max-Age=0",
+                        "autolaunch_triggered=\"\"; Expires=Thu, 01 Jan 1970 00:00:10 GMT; Path=/",
+                        "activate_ca_modal_triggered=\"\"; Expires=Thu, 01 Jan 1970 00:00:10 GMT; Path=/",
+                        "JSESSIONID=9B75E5BBE8C390423BAAF354AD078668; Path=/; Secure; HttpOnly"
+                    ],
+                    "content-security-policy": [
+                        "default-src 'self' schubergphilis.oktapreview.com *.oktacdn.com; connect-src 'self' schubergphilis.oktapreview.com schubergphilis-admin.oktapreview.com *.oktacdn.com *.mixpanel.com *.mapbox.com schubergphilis.kerberos.oktapreview.com schubergphilis.mtls.oktapreview.com *.authenticatorlocalprod.com:8769 http://localhost:8769 http://127.0.0.1:8769 *.authenticatorlocalprod.com:65111 http://localhost:65111 http://127.0.0.1:65111 *.authenticatorlocalprod.com:65121 http://localhost:65121 http://127.0.0.1:65121 *.authenticatorlocalprod.com:65131 http://localhost:65131 http://127.0.0.1:65131 *.authenticatorlocalprod.com:65141 http://localhost:65141 http://127.0.0.1:65141 *.authenticatorlocalprod.com:65151 http://localhost:65151 http://127.0.0.1:65151 https://oinmanager.okta.com data: *.ingest.sentry.io; script-src 'unsafe-inline' 'self' 'report-sample' schubergphilis.oktapreview.com *.oktacdn.com; style-src 'unsafe-inline' 'self' 'report-sample' schubergphilis.oktapreview.com *.oktacdn.com; frame-src 'self' schubergphilis.oktapreview.com schubergphilis-admin.oktapreview.com login.okta.com *.vidyard.com com-okta-authenticator: api-5e44d125.duosecurity.com; img-src 'self' schubergphilis.oktapreview.com *.oktacdn.com *.tiles.mapbox.com *.mapbox.com *.vidyard.com data: blob:; font-src 'self' schubergphilis.oktapreview.com data: *.oktacdn.com fonts.gstatic.com; frame-ancestors 'self'"
+                    ],
+                    "x-rate-limit-limit": [
+                        "600"
+                    ],
+                    "x-rate-limit-remaining": [
+                        "598"
+                    ],
+                    "x-rate-limit-reset": [
+                        "1771253677"
+                    ],
+                    "cache-control": [
+                        "no-cache, no-store"
+                    ],
+                    "pragma": [
+                        "no-cache"
+                    ],
+                    "expires": [
+                        "0"
+                    ],
+                    "referrer-policy": [
+                        "strict-origin-when-cross-origin"
+                    ],
+                    "x-content-type-options": [
+                        "nosniff"
+                    ],
+                    "Strict-Transport-Security": [
+                        "max-age=315360000; includeSubDomains"
+                    ],
+                    "Content-Encoding": [
+                        "gzip"
+                    ]
+                },
+                "status": {
+                    "code": 200,
+                    "message": "OK"
+                },
+                "url": "https://schubergphilis.oktapreview.com/api/v1/users/00u9kmma2d1kqtbLH0h7/roles"
+            },
+            "recorded_at": "2026-02-16T14:54:18"
+        }
+    ],
+    "recorded_with": "betamax/0.9.0"
+}
