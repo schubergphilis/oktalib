@@ -59,12 +59,28 @@ class Entity:
     """The core object of okta."""
 
     def __init__(self, okta_instance: "Okta", data: dict[str, Any] | Any) -> None:
+        """Initialize an Entity instance.
+
+        Args:
+            okta_instance: The Okta API client instance
+            data: The entity data from the API response
+
+        """
         logger_name = f"{LOGGER_BASENAME}.{self.__class__.__name__}"
         self._logger = logging.getLogger(logger_name)
         self._okta = okta_instance
         self._data = self._parse_data(data)
 
     def _parse_data(self, data: dict[str, Any] | Any) -> dict[str, Any]:
+        """Parse and validate entity data from API response.
+
+        Args:
+            data: The raw data from the API, expected to be a dictionary
+
+        Returns:
+            dict: The validated data dictionary, or empty dict if invalid
+
+        """
         if not isinstance(data, dict):
             self._logger.error(f"Invalid data received: {data}")
             data = {}
@@ -72,6 +88,15 @@ class Entity:
 
     @staticmethod
     def _missing_required_fields(requirements: dict[str, Any]) -> list[str]:
+        """Identify which required fields are missing or empty.
+
+        Args:
+            requirements: Dictionary mapping field labels to their values
+
+        Returns:
+            list: List of field labels that have falsy values
+
+        """
         return [label for label, value in requirements.items() if not value]
 
     def _validate_fields(
@@ -81,6 +106,18 @@ class Entity:
         error_type: type[Exception],
         entity_name: str | None = None,
     ) -> None:
+        """Validate that required fields exist in the data with non-empty values.
+
+        Args:
+            data: The data dictionary to validate
+            required_fields: Mapping of field labels to their path tuples in the data
+            error_type: The exception type to raise if validation fails
+            entity_name: Optional name to use in error message (defaults to class name)
+
+        Raises:
+            error_type: If any required fields are missing or empty
+
+        """
         values: dict[str, Any] = {}
         for label, path in required_fields.items():
             current: Any = data
@@ -119,6 +156,12 @@ class Entity:
         return self._data.get("id")
 
     def __hash__(self) -> int:
+        """Generate hash based on entity ID.
+
+        Returns:
+            int: Hash of the entity's ID
+
+        """
         return hash(self.id)
 
     def __eq__(self, other: object) -> bool:
@@ -154,6 +197,15 @@ class Entity:
         return self._get_date_from_key("lastUpdated")
 
     def _get_date_from_key(self, name: str) -> datetime | None:
+        """Extract and parse a datetime value from entity data.
+
+        Args:
+            name: The key name in the data dictionary
+
+        Returns:
+            datetime or None: Parsed datetime object, or None if parsing fails
+
+        """
         value = self._data.get(name)
         if not isinstance(value, (str, bytes)):
             return None
@@ -163,6 +215,12 @@ class Entity:
             return None
 
     def _update(self) -> bool:
+        """Refresh entity data from the API.
+
+        Returns:
+            bool: True if update succeeded, False otherwise
+
+        """
         response = self._okta.session.get(self.url)
         if not response.ok:
             self._logger.error(

@@ -67,6 +67,13 @@ class Okta:
     """Models the api of okta."""
 
     def __init__(self, host: str, token: str) -> None:
+        """Initializes the Okta object.
+        
+        Args:
+            host: The host of the okta instance, e.g. https://dev.oktapreview.com
+            token: The API token to use for authentication
+
+        """
         logger_name = f"{LOGGER_BASENAME}.{self.__class__.__name__}"
         self._logger = logging.getLogger(logger_name)
         self.host = host
@@ -76,6 +83,12 @@ class Okta:
         self._monkey_patch_session()
 
     def _setup_session(self) -> Session:
+        """Sets up the session for the Okta object.
+        
+        Returns:
+            Session: The session object with the correct headers and authentication.
+
+        """
         session = Session()
         session.get(self.host)
         session.headers.update(
@@ -120,7 +133,9 @@ class Okta:
         self._logger.debug(
             f"Using patched request for method {method}, url {url}, kwargs {kwargs}"
         )
-        response = self.session.original_request(method, url, **kwargs)  # type: ignore[attr-defined]
+        response = self.session.original_request(
+            method, url, **kwargs
+        )  # type: ignore[attr-defined]
         if response.status_code == 429:
             self._logger.warning("Api is exhausted for endpoint, backing off.")
             raise ApiLimitReached
@@ -247,6 +262,16 @@ class Okta:
     def _get_paginated_url(
         self, url: str, result_limit: int = 100
     ) -> Generator[dict[str, Any], None, None]:
+        """Gets the paginated data from a url.
+
+        Args:
+            url: The url to get the data from
+            result_limit: The number of results to get per page, defaults to 100
+
+        Returns:
+            generator: A generator of the data from the url
+        
+        """
         response = self._validate_response(url, {"limit": result_limit})
         yield from response.json()
         next_link = response.links.get("next", {}).get("url")
@@ -258,6 +283,19 @@ class Okta:
     def _validate_response(
         self, url: str, params: dict[str, Any] | None = None
     ) -> Response:
+        """Validate API response and raise appropriate exceptions on error.
+
+        Args:
+            url: The API endpoint URL to request
+            params: Optional query parameters for the request
+
+        Returns:
+            Response: The validated HTTP response object
+
+        Raises:
+            ServerError: If the response indicates an error (not ok status)
+
+        """
         response = self.session.get(url=url, params=params)
         if not response.ok:
             try:

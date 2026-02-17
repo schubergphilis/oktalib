@@ -773,6 +773,15 @@ class User(Entity):
         self._update_profile_attribute({"login": value})
 
     def _update_profile_attribute(self, attribute: dict[str, Any]) -> None:
+        """Update a user profile attribute and refresh entity data.
+
+        Args:
+            attribute: Dictionary containing the profile attribute to update
+
+        Raises:
+            UnableToUpdate: If the profile update fails
+
+        """
         if not self.update_profile({"profile": attribute}):
             raise UnableToUpdate(f"Failed to update with payload {attribute}")
         self._update()
@@ -829,6 +838,16 @@ class User(Entity):
         return response.ok
 
     def _post_lifecycle(self, url: str, message: str) -> bool:
+        """Execute a lifecycle state change via POST request.
+
+        Args:
+            url: The lifecycle endpoint URL
+            message: Error message to log if the request fails
+
+        Returns:
+            bool: True if the lifecycle change succeeded, False otherwise
+
+        """
         response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f"{message}\nResponse: {response.text}")
