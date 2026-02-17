@@ -74,9 +74,8 @@ class Entity:
     def _missing_required_fields(requirements: dict[str, Any]) -> list[str]:
         return [label for label, value in requirements.items() if not value]
 
-    @classmethod
     def _validate_fields(
-        cls,
+        self,
         data: dict[str, Any],
         required_fields: dict[str, tuple[str, ...]],
         error_type: type[Exception],
@@ -91,9 +90,9 @@ class Entity:
                     break
                 current = current.get(key)
             values[label] = current
-        missing = cls._missing_required_fields(values)
+        missing = self._missing_required_fields(values)
         if missing:
-            name = entity_name or cls.__name__
+            name = entity_name or self.__class__.__name__
             raise error_type(f"{name} missing required fields: {', '.join(missing)}")
 
     @property
