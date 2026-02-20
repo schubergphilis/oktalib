@@ -67,3 +67,7 @@ class UnableToUpdate(Exception):
 
 class ServerError(Exception):
     """A server has responded with an error code."""
+
+
+class InvalidIDPKey(Exception):
+    """The IDP key provided is invalid."""
