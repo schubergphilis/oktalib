@@ -38,7 +38,7 @@ from typing import Any
 import backoff
 from requests import Response, Session
 
-from oktalib.entities.entities import SAMLMetadata
+from oktalib.entities.entities import IDP, IDPKey, SAMLMetadata
 
 from .entities import AdminRole, Application, Group, User
 from .oktalibexceptions import (
@@ -46,6 +46,7 @@ from .oktalibexceptions import (
     AuthFailed,
     InvalidApplication,
     InvalidGroup,
+    InvalidIDPKey,
     ServerError,
 )
 
@@ -142,6 +143,277 @@ class Okta:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
+
+    @property
+    def idps(self) -> Generator[IDP, None, None]:
+        """The identity providers configured in okta.
+
+        Returns:
+            generator: The generator of identity providers configured in okta
+
+        """
+        url = f'{self.api}/idps'
+        for data in self._get_paginated_url(url):
+            yield IDP(self, data)
+
+    def get_idp_by_name(self, name: str) -> IDP | None:
+        """Retrieves the first identity provider by name.
+
+        Args:
+            name: The name of the identity provider to retrieve
+
+        Returns:
+            IDP: The identity provider if a match is found else None
+
+        """
+        return next(
+            (idp for idp in self.idps if idp.name == name),
+            None,
+        )
+
+    def get_idp_keys(self) -> Generator[IDPKey, None, None]:
+        """Retrieves the identity provider by id.
+
+        Args:
+            idp_id: The id of the identity provider to retrieve
+
+        Returns:
+            generator: The generator of IDPKey instances
+
+        """
+        url = f"{self.api}/idps/credentials/keys"
+        for data in self._get_paginated_url(url):
+            yield IDPKey(self, data)
+
+    def get_idp_key_by_kid(self, kid: str) -> IDPKey | None:
+        """Retrieves the identity provider by key ID.
+
+        Args:
+            kid: The key ID of the identity provider to retrieve
+
+        Returns:
+            IDPKey: The identity provider key if a match is found else None
+
+        """
+        url = f"{self.api}/idps/credentials/keys/{kid}"
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return IDPKey(self, response.json()) if response.ok else None
+
+    def delete_idp_key(self, kid: str) -> bool:
+        """Deletes an IDP key from okta.
+
+        Args:
+            kid: The key ID of the IDP key to delete
+
+        Returns:
+            bool: True on success, False otherwise
+
+        Raises:
+            InvalidIDPKey: The IDP key provided as argument does not exist.
+
+        """
+        idp_key = self.get_idp_key_by_kid(kid)
+        if not idp_key:
+            raise InvalidIDPKey(kid)
+        return idp_key.delete()
+
+    def create_saml_idp(
+        self,
+        name: str,
+        okta_idp_issuer_url: str,
+        okta_idp_sso_url: str,
+        users_regex_filter: str = "",
+        kid: str | None = None,
+        idp_username: str = "idpuser.subjectNameId",
+        trust_claims: bool = True,
+        provisioning_action: str = "DISABLED",
+        provisioning_profile_master: bool = False,
+        account_link_action: str = "AUTO",
+        account_link_group_filter: list | None = None,
+        account_link_exclude_users: list | None = None,
+        account_link_exclude_admins: bool = False,
+        account_matching: str = "USERNAME",
+        maxClockSkew: int = 120000,
+    ) -> IDP | None:
+        """Creates an identity provider in okta.
+
+        Args:
+            name: The name of the identity provider to create
+            okta_idp_issuer_url: The issuer URL of the identity provider to
+                create
+            okta_idp_sso_url: The SSO URL of the identity provider to create
+            users_regex_filter: The regex filter for users that are allowed
+                to use the identity provider
+            kid: The key ID of the signing key to use for the identity
+                provider to create (if not provided, no signing key will be
+                used)
+            idp_username: The template for the username to use for the
+                identity provider to create (default is
+                "idpuser.subjectNameId")
+            trust_claims: Whether to trust claims from this identity
+                provider (default is True)
+            provisioning_action: The provisioning action for this identity
+                provider (default is "DISABLED", other options are "AUTO"
+                and "IMPORT")
+            provisioning_profile_master: Whether this identity provider is
+                the profile master (default is False)
+            account_link_action: The account link action for this identity
+                provider (default is "AUTO", other options are "AUTO",
+                "AUTO_GROUPS", "IMPORT", "IMPORT_GROUPS", "DISABLED")
+            account_matching: The account matching type for this identity
+                provider (default is "USERNAME", other options are
+                "USERNAME_OR_EMAIL")
+            account_link_group_filter: Only users in the specified groups
+                will be included for account linking.
+            account_link_exclude_users: Any user specified will be excluded
+                from account linking.
+            account_link_exclude_admins: Users with any admin roles or
+                privileges will be excluded from account linking.
+            maxClockSkew: The maximum allowed clock skew in milliseconds
+                (default is 120000)
+        Returns:
+            IDP: The created identity provider on success, None otherwise
+
+        """
+        # flow
+        # get metadata from saml app on the IDP tenant
+        # get_keystore_key_by_cert -- if any key in the keystore has a
+        # property x5c with the same value as the x509 value from the
+        # metadata
+        # if key not found, create new key with the x509 value from the
+        # metadata
+        # create saml idp with issuer and sso from saml app (metadata) and
+        # kid from before.
+        # name, Trust claims from this identity provider, idp_username,
+        # If no match is found -> create new user || redirect to okta sign-in page
+        # should be settable:
+        # SAML Protocol Settings
+        # IdP Issuer URI
+        # IdP Single Sign-On URL
+        # IdP Signature Certificate
+
+        account_link_filter = {
+            **(
+                {"groups": {"include": account_link_group_filter}}
+                if account_link_group_filter
+                else {}
+            ),
+            **(
+                {
+                    "users": {
+                        **(
+                            {"exclude": account_link_exclude_users}
+                            if account_link_exclude_users
+                            else {}
+                        ),
+                        **(
+                            {"excludeAdmins": True}
+                            if account_link_exclude_admins
+                            else {}
+                        ),
+                    }
+                }
+                if account_link_exclude_users or account_link_exclude_admins
+                else {}
+            ),
+        }
+
+        url = f"{self.api}/idps"
+        payload: dict[str, Any] = {
+            "type": "SAML2",
+            "name": name,
+            "protocol": {
+                "type": "SAML2",
+                "endpoints": {
+                    "sso": {
+                        "url": okta_idp_sso_url,
+                        "binding": "HTTP-POST",
+                        "destination": okta_idp_issuer_url,
+                    },
+                    "slo": {
+                        "url": f"{okta_idp_issuer_url}/slo",
+                        "binding": "HTTP-POST",
+                    },
+                    "acs": {"binding": "HTTP-POST", "type": "INSTANCE"},
+                },
+                "settings": {"participateSlo": True},
+                "algorithms": {
+                    "request": {
+                        "signature": {"algorithm": "SHA-256", "scope": "REQUEST"}
+                    },
+                    "response": {"signature": {"algorithm": "SHA-256", "scope": "ANY"}},
+                },
+                "credentials": {
+                    "trust": {
+                        "issuer": okta_idp_issuer_url,
+                        "audience": "",
+                        "kid": kid,
+                        "additionalKids": ["additional-key-id"],
+                    }
+                },
+            },
+            "policy": {
+                "provisioning": {
+                    "action": provisioning_action,
+                    "profileMaster": provisioning_profile_master,
+                    "groups": {"action": "NONE"},
+                    "conditions": {
+                        "deprovisioned": {"action": "NONE"},
+                        "suspended": {"action": "NONE"},
+                    },
+                },
+                "accountLink": {
+                    "filter": account_link_filter,
+                    "action": account_link_action,
+                },
+                "subject": {
+                    "userNameTemplate": {"template": idp_username},
+                    "format": ["urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"],
+                    "filter": users_regex_filter,
+                    "matchType": account_matching,
+                },
+                "trustClaims": trust_claims,
+                "maxClockSkew": maxClockSkew,
+            },
+        }
+        response = self.session.post(url=url, json=payload)
+        if not response.ok:
+            self._logger.error(response.json())
+        return IDP(self, response.json()) if response.ok else None
+
+    def get_idp_by_id(self, idp_id: str) -> IDP | None:
+        """Retrieves the identity provider by id.
+
+        Args:
+            idp_id: The id of the identity provider to retrieve
+
+        Returns:
+            IDP: The identity provider if a match is found else None
+
+        """
+        url = f'{self.api}/idps/{idp_id}'
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return IDP(self, response.json()) if response.ok else None
+
+    def search_idps_by_name(self, name: str) -> list[IDP]:
+        """Retrieves the identity providers (of any type) by name.
+
+        Args:
+            name: The name of the identity providers to retrieve
+
+        Returns:
+            list: A list of identity providers if a match is found else an empty list
+
+        """
+        url = f'{self.api}/idps?q={name}'
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.json())
+        return [IDP(self, data) for data in response.json()] if response.ok else []
 
     @property
     def groups(self) -> Generator[Group, None, None]:
