@@ -38,8 +38,6 @@ from typing import Any
 import backoff
 from requests import Response, Session
 
-from oktalib.entities.entities import IDP
-
 from .entities import AdminRole, Application, Group, User
 from .oktalibexceptions import (
     ApiLimitReached,
@@ -142,102 +140,6 @@ class Okta:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
-
-    @property
-    def idps(self) -> Generator[IDP, None, None]:
-        """The identity providers configured in okta.
-
-        Returns:
-            generator: The generator of identity providers configured in okta
-
-        """
-        url = f"{self.api}/idps"
-        for data in self._get_paginated_url(url):
-            yield IDP(self, data)
-
-    def create_idp(
-        self,
-        issuer_mode: str,
-        name: str,
-        type: str,
-        provisioning: str,
-        account_link: str,
-        status: str
-    ) -> IDP | None:
-        """Creates an identity provider in okta.
-
-        Args:
-            issuer_mode: The issuer mode of the identity provider
-            name: The name of the identity provider
-            type: The type of the identity provider
-            provisioning: The provisioning settings of the identity provider
-            account_link: The account link settings of the identity provider
-            status: The status of the identity provider
-            enabled: A flag whether the identity provider should be enabled or not
-                Defaults to True
-
-        Returns:
-            IDP: The created identity provider on success, None otherwise
-
-            last_name: The last name of the user
-            email: The email of the user
-            login: The login of the user
-            password: The password of the user
-            enabled: A flag whether the user should be enabled or not
-                Defaults to True
-
-        Returns:
-            User: The created user on success, None otherwise
-
-        """
-        activate = "true" if enabled else "false"
-        url = f"{self.api}/users?activate={activate}"
-        payload: dict[str, Any] = {
-            "profile": {
-                "firstName": first_name,
-                "lastName": last_name,
-                "email": email,
-                "login": login,
-            }
-        }
-        if password:
-            payload.update({"credentials": {"password": {"value": password}}})
-        response = self.session.post(url=url, data=json.dumps(payload))
-        if not response.ok:
-            self._logger.error(response.json())
-        return User(self, response.json()) if response.ok else None
-
-    def get_idp_by_id(self, idp_id: str) -> IDP | None:
-        """Retrieves the identity provider by id.
-
-        Args:
-            idp_id: The id of the identity provider to retrieve
-
-        Returns:
-            IDP: The identity provider if a match is found else None
-
-        """
-        url = f"{self.api}/idps/{idp_id}"
-        response = self.session.get(url)
-        if not response.ok:
-            self._logger.error(response.json())
-        return IDP(self, response.json()) if response.ok else None
-
-    def search_idps_by_name(self, name: str) -> list[IDP]:
-        """Retrieves the identity providers (of any type) by name.
-
-        Args:
-            name: The name of the identity providers to retrieve
-
-        Returns:
-            list: A list of identity providers if a match is found else an empty list
-
-        """
-        url = f"{self.api}/idps?q={name}"
-        response = self.session.get(url)
-        if not response.ok:
-            self._logger.error(response.json())
-        return [IDP(self, data) for data in response.json()] if response.ok else []
 
     @property
     def groups(self) -> Generator[Group, None, None]:
