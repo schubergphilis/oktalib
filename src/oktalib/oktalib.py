@@ -133,8 +133,9 @@ class Okta:
         self._logger.debug(
             f'Using patched request for method {method}, url {url}, kwargs {kwargs}'
         )
-        # type: ignore[attr-defined]
-        response = self.session.original_request(method, url, **kwargs)
+        response = self.session.original_request(  # type: ignore[attr-defined]
+            method, url, **kwargs
+        )
         if response.status_code == 429:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
