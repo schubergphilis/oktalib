@@ -47,18 +47,18 @@ from .oktalibexceptions import (
     ServerError,
 )
 
-__author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
-__docformat__ = 'google'
-__date__ = '2018-01-08'
-__copyright__ = 'Copyright 2018, Costas Tyfoxylos'
-__credits__ = ['Costas Tyfoxylos']
-__license__ = 'MIT'
-__maintainer__ = 'Costas Tyfoxylos'
-__email__ = '<ctyfoxylos@schubergphilis.com>'
-__status__ = 'Development'  # "Prototype", "Development", "Production".
+__author__ = "Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"
+__docformat__ = "google"
+__date__ = "2018-01-08"
+__copyright__ = "Copyright 2018, Costas Tyfoxylos"
+__credits__ = ["Costas Tyfoxylos"]
+__license__ = "MIT"
+__maintainer__ = "Costas Tyfoxylos"
+__email__ = "<ctyfoxylos@schubergphilis.com>"
+__status__ = "Development"  # "Prototype", "Development", "Production".
 
 # This is the main prefix used for logging
-LOGGER_BASENAME = 'oktalib'
+LOGGER_BASENAME = "oktalib"
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
@@ -68,7 +68,7 @@ class Okta:
 
     def __init__(self, host: str, token: str) -> None:
         """Initializes the Okta object.
-        
+
         Args:
             host: The host of the okta instance, e.g. https://dev.oktapreview.com
             token: The API token to use for authentication
@@ -84,7 +84,7 @@ class Okta:
 
     def _setup_session(self) -> Session:
         """Sets up the session for the Okta object.
-        
+
         Returns:
             Session: The session object with the correct headers and authentication.
 
@@ -133,9 +133,8 @@ class Okta:
         self._logger.debug(
             f"Using patched request for method {method}, url {url}, kwargs {kwargs}"
         )
-        response = self.session.original_request(
-            method, url, **kwargs
-        )  # type: ignore[attr-defined]
+        # type: ignore[attr-defined]
+        response = self.session.original_request(method, url, **kwargs)
         if response.status_code == 429:
             self._logger.warning("Api is exhausted for endpoint, backing off.")
             raise ApiLimitReached
@@ -270,7 +269,7 @@ class Okta:
 
         Returns:
             generator: A generator of the data from the url
-        
+
         """
         response = self._validate_response(url, {"limit": result_limit})
         yield from response.json()
