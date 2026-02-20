@@ -38,6 +38,8 @@ from typing import Any
 import backoff
 from requests import Response, Session
 
+from oktalib.entities.entities import SAMLMetadata
+
 from .entities import AdminRole, Application, Group, User
 from .oktalibexceptions import (
     ApiLimitReached,
@@ -514,6 +516,45 @@ class Okta:
             None,
         )
         return app
+
+    def get_application_by_sign_on_mode(self, sign_on_mode: str) -> Application | None:
+        """Retrieves an application by sign-on mode.
+
+        Args:
+            sign_on_mode: The sign-on mode of the application to retrieve
+
+        Returns:
+            Application Object
+
+        """
+        app = next(
+            (
+                app
+                for app in self.applications
+                if (app.sign_on_mode or "").lower() == sign_on_mode.lower()
+            ),
+            None,
+        )
+        return app
+
+    def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
+        """Retrieves an application's SAML metadata by id.
+
+        Args:
+            id_: The id of the application to retrieve
+            kid: The key ID to match the SAML metadata with
+
+        Returns:
+            SAMLMetadata: The application's SAML metadata if found, None otherwise
+
+        """
+        url = f"{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}"
+        headers = {"Accept": "text/xml"}
+        response = self.session.get(url, headers=headers)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return SAMLMetadata(response.text)
 
     def assign_group_to_application(
         self, application_label: str, group_name: str
