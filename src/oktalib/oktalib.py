@@ -47,18 +47,18 @@ from .oktalibexceptions import (
     ServerError,
 )
 
-__author__ = "Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"
-__docformat__ = "google"
-__date__ = "2018-01-08"
-__copyright__ = "Copyright 2018, Costas Tyfoxylos"
-__credits__ = ["Costas Tyfoxylos"]
-__license__ = "MIT"
-__maintainer__ = "Costas Tyfoxylos"
-__email__ = "<ctyfoxylos@schubergphilis.com>"
-__status__ = "Development"  # "Prototype", "Development", "Production".
+__author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
+__docformat__ = 'google'
+__date__ = '2018-01-08'
+__copyright__ = 'Copyright 2018, Costas Tyfoxylos'
+__credits__ = ['Costas Tyfoxylos']
+__license__ = 'MIT'
+__maintainer__ = 'Costas Tyfoxylos'
+__email__ = '<ctyfoxylos@schubergphilis.com>'
+__status__ = 'Development'  # "Prototype", "Development", "Production".
 
 # This is the main prefix used for logging
-LOGGER_BASENAME = "oktalib"
+LOGGER_BASENAME = 'oktalib'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
@@ -74,10 +74,10 @@ class Okta:
             token: The API token to use for authentication
 
         """
-        logger_name = f"{LOGGER_BASENAME}.{self.__class__.__name__}"
+        logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
         self.host = host
-        self.api = f"{host}/api/v1"
+        self.api = f'{host}/api/v1'
         self.token = token
         self.session = self._setup_session()
         self._monkey_patch_session()
@@ -93,12 +93,12 @@ class Okta:
         session.get(self.host)
         session.headers.update(
             {
-                "accept": "application/json",
-                "content-type": "application/json",
-                "authorization": f"SSWS {self.token}",
+                'accept': 'application/json',
+                'content-type': 'application/json',
+                'authorization': f'SSWS {self.token}',
             }
         )
-        url = f"{self.api}/users/me/"
+        url = f'{self.api}/users/me/'
         response = session.get(url)
         if not response.ok:
             raise AuthFailed(response.content)
@@ -131,12 +131,12 @@ class Okta:
 
         """
         self._logger.debug(
-            f"Using patched request for method {method}, url {url}, kwargs {kwargs}"
+            f'Using patched request for method {method}, url {url}, kwargs {kwargs}'
         )
         # type: ignore[attr-defined]
         response = self.session.original_request(method, url, **kwargs)
         if response.status_code == 429:
-            self._logger.warning("Api is exhausted for endpoint, backing off.")
+            self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
 
@@ -148,7 +148,7 @@ class Okta:
             generator: The generator of groups configured in okta
 
         """
-        url = f"{self.api}/groups"
+        url = f'{self.api}/groups'
         for data in self._get_paginated_url(url):
             yield Group(self, data)
 
@@ -163,15 +163,15 @@ class Okta:
             The created group object on success, None otherwise
 
         """
-        url = f"{self.api}/groups"
-        payload = {"profile": {"name": name, "description": description}}
+        url = f'{self.api}/groups'
+        payload = {'profile': {'name': name, 'description': description}}
         response = self.session.post(url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
         return Group(self, response.json()) if response.ok else None
 
     def get_group_type_by_name(
-        self, name: str, group_type: str = "OKTA_GROUP"
+        self, name: str, group_type: str = 'OKTA_GROUP'
     ) -> Group | None:
         """Retrieves the group type of okta by name.
 
@@ -218,7 +218,7 @@ class Okta:
             Group: The group if a match is found else None
 
         """
-        url = f"{self.api}/groups/{group_id}"
+        url = f'{self.api}/groups/{group_id}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -234,7 +234,7 @@ class Okta:
             list: A list of groups if a match is found else an empty list
 
         """
-        url = f"{self.api}/groups?q={name}"
+        url = f'{self.api}/groups?q={name}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -271,13 +271,13 @@ class Okta:
             generator: A generator of the data from the url
 
         """
-        response = self._validate_response(url, {"limit": result_limit})
+        response = self._validate_response(url, {'limit': result_limit})
         yield from response.json()
-        next_link = response.links.get("next", {}).get("url")
+        next_link = response.links.get('next', {}).get('url')
         while next_link:
             response = self._validate_response(url=next_link)
             yield from response.json()
-            next_link = response.links.get("next", {}).get("url")
+            next_link = response.links.get('next', {}).get('url')
 
     def _validate_response(
         self, url: str, params: dict[str, Any] | None = None
@@ -298,7 +298,7 @@ class Okta:
         response = self.session.get(url=url, params=params)
         if not response.ok:
             try:
-                error_message = response.json().get("errorSummary")
+                error_message = response.json().get('errorSummary')
             except (ValueError, AttributeError):
                 error_message = response.text
             raise ServerError(error_message) from None
@@ -312,7 +312,7 @@ class Okta:
             generator: The generator of users configured in okta
 
         """
-        url = f"{self.api}/users"
+        url = f'{self.api}/users'
         for data in self._get_paginated_url(url):
             yield User(self, data)
 
@@ -340,18 +340,18 @@ class Okta:
             User: The created user on success, None otherwise
 
         """
-        activate = "true" if enabled else "false"
-        url = f"{self.api}/users?activate={activate}"
+        activate = 'true' if enabled else 'false'
+        url = f'{self.api}/users?activate={activate}'
         payload: dict[str, Any] = {
-            "profile": {
-                "firstName": first_name,
-                "lastName": last_name,
-                "email": email,
-                "login": login,
+            'profile': {
+                'firstName': first_name,
+                'lastName': last_name,
+                'email': email,
+                'login': login,
             }
         }
         if password:
-            payload.update({"credentials": {"password": {"value": password}}})
+            payload.update({'credentials': {'password': {'value': password}}})
         response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
@@ -376,7 +376,7 @@ class Okta:
             (
                 User(self, data)
                 for data in response.json()
-                if data.get("profile", {}).get("login", "") == login
+                if data.get('profile', {}).get('login', '') == login
             ),
             None,
         )
@@ -391,7 +391,7 @@ class Okta:
             list: The users if found, empty list otherwise
 
         """
-        url = f"{self.api}/users?q={value}"
+        url = f'{self.api}/users?q={value}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -423,7 +423,7 @@ class Okta:
             list: A list of the user's roles if found, None otherwise
 
         """
-        url = f"{self.api}/users/{user_id}/roles"
+        url = f'{self.api}/users/{user_id}/roles'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -443,8 +443,8 @@ class Okta:
             User: The response, None otherwise
 
         """
-        url = f"{self.api}/users/{user_id}/roles"
-        data = {"type": role_name}
+        url = f'{self.api}/users/{user_id}/roles'
+        data = {'type': role_name}
         response = self.session.post(url, json=data)
         if not response.ok:
             self._logger.error(response.json())
@@ -462,7 +462,7 @@ class Okta:
             User: The response, None otherwise
 
         """
-        url = f"{self.api}/users/{user_id}/roles/{role_id}"
+        url = f'{self.api}/users/{user_id}/roles/{role_id}'
         response = self.session.delete(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -477,7 +477,7 @@ class Okta:
             generator: The generator of applications configured in okta
 
         """
-        url = f"{self.api}/apps"
+        url = f'{self.api}/apps'
         for data in self._get_paginated_url(url):
             yield Application(self, data)
 
@@ -508,7 +508,7 @@ class Okta:
             (
                 app
                 for app in self.applications
-                if (app.label or "").lower() == label.lower()
+                if (app.label or '').lower() == label.lower()
             ),
             None,
         )

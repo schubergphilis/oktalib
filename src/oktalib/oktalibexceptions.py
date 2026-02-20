@@ -30,15 +30,15 @@ Custom exception code for oktalib.
 
 """
 
-__author__ = "Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>"
-__docformat__ = "google"
-__date__ = "2018-01-08"
-__copyright__ = "Copyright 2018, Costas Tyfoxylos"
-__credits__ = ["Costas Tyfoxylos"]
-__license__ = "MIT"
-__maintainer__ = "Costas Tyfoxylos"
-__email__ = "<ctyfoxylos@schubergphilis.com>"
-__status__ = "Development"  # "Prototype", "Development", "Production".
+__author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
+__docformat__ = 'google'
+__date__ = '2018-01-08'
+__copyright__ = 'Copyright 2018, Costas Tyfoxylos'
+__credits__ = ['Costas Tyfoxylos']
+__license__ = 'MIT'
+__maintainer__ = 'Costas Tyfoxylos'
+__email__ = '<ctyfoxylos@schubergphilis.com>'
+__status__ = 'Development'  # "Prototype", "Development", "Production".
 
 
 class AuthFailed(Exception):
