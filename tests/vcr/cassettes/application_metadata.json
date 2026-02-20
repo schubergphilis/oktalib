@@ -1,0 +1,113 @@
+{
+    "http_interactions": [
+        {
+            "request": {
+                "body": {
+                    "encoding": "utf-8",
+                    "string": ""
+                },
+                "headers": {
+                    "User-Agent": [
+                        "python-requests/2.32.5"
+                    ],
+                    "Accept-Encoding": [
+                        "gzip, deflate"
+                    ],
+                    "Accept": [
+                        "text/xml"
+                    ],
+                    "Connection": [
+                        "keep-alive"
+                    ],
+                    "content-type": [
+                        "application/json"
+                    ],
+                    "authorization": [
+                        "<REDACTED>"
+                    ],
+                    "Cookie": [
+                        "<REDACTED>"
+                    ]
+                },
+                "method": "GET",
+                "uri": "<OKTA_HOST>/api/v1/apps/0oa8wjn4dqEcMiAkg416/sso/saml/metadata?kid=7at6cw_4I0mZp8zsfUHxauBecxPeBsOk9mIpLTXbvtQ"
+            },
+            "response": {
+                "body": {
+                    "encoding": "ISO-8859-1",
+                    "string": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><md:EntityDescriptor entityID=\"http://www.okta.com/exk8wjn4cMyWlXxIM416\" xmlns:md=\"urn:oasis:names:tc:SAML:2.0:metadata\"><md:IDPSSODescriptor WantAuthnRequestsSigned=\"false\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\"><md:KeyDescriptor use=\"signing\"><ds:KeyInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"><ds:X509Data><ds:X509Certificate>MIIDljCCAn6gAwIBAgIGAXVqKdiXMA0GCSqGSIb3DQEBCwUAMIGLMQswCQYDVQQGEwJVUzETMBEG\nA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEU\nMBIGA1UECwwLU1NPUHJvdmlkZXIxDDAKBgNVBAMMA3BvcjEcMBoGCSqGSIb3DQEJARYNaW5mb0Bv\na3RhLmNvbTAeFw0yMDEwMjcxMzA0MjhaFw0zMDEwMjcxMzA1MjhaMIGLMQswCQYDVQQGEwJVUzET\nMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0\nYTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxDDAKBgNVBAMMA3BvcjEcMBoGCSqGSIb3DQEJARYNaW5m\nb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAI15lqsNULJY/bUGPXdH\nSqek6ENEvqsf/zT6S4CrOqWoth40Ra+nxXwkcJ2CexkJ0rdk8f9E5SvP/VqxRvaAemQobArXJYEB\niT4O2HwURNXvjmUzSLNxEzc28PfNIUH1lql2rzCnDY4ORz8Aq1uPOb+Xg4/HLSP29W5/K4bAGpl2\nwKrSq2b1/zr5PBDWNL+4f6UaF6Y/R0R17osxT3ay/ijTuv/Sh8k90bX0YpanHCSoiAeFkLDfyCHy\nY+yYGpd35VN43zDxBgNC4BrQA3RKhdTDPfbV0vxCXTqurFVuwDaU79Xj8LX3HibbwzdnusF4TUox\nc7VdlZb+uT/sdVvLi8UCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAYABlct2jrUfjWpfQPBUSh/Iz\njDNgY+2VXtmS8V2pnlqDIUMqSjBofPV2LLQB07nbP+MpeALy9xXRBlCDYPDoi0py+MSvH4g561JN\nApRbewWCrEZWj4ruBPILMyh7U/f5sagMY9gP1DEQPYGwuzbcd1PRcgFxNPq3I/psA7D95vj2yDCl\nmSQrUKJHbHYAvTh26o5YljI/uoVW5losOrCpPrgnr0ftLLi0aLy7n4AGG8STh+9RAbDb+EAZMxfu\nReD5CFIMBEf0QM6G5PgYuRFtfNA9LxOBNAjmc/w1tKaQW2GC5+Ezj1A46OQ+EJFS7jLHweM0JmlF\nCWg1kFXn6WCWBQ==</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor><md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat><md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat><md:SingleSignOnService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" Location=\"<OKTA_HOST>/app/some_sbpokta_1/exk8wjn4cMyWlXxIM416/sso/saml\"/><md:SingleSignOnService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\" Location=\"<OKTA_HOST>/app/some_sbpokta_1/exk8wjn4cMyWlXxIM416/sso/saml\"/></md:IDPSSODescriptor></md:EntityDescriptor>"
+                },
+                "headers": {
+                    "Date": [
+                        "Wed, 18 Feb 2026 15:54:37 GMT"
+                    ],
+                    "Content-Type": [
+                        "text/xml;charset=ISO-8859-1"
+                    ],
+                    "Connection": [
+                        "keep-alive"
+                    ],
+                    "Server": [
+                        "nginx"
+                    ],
+                    "x-okta-request-id": [
+                        "a25d162b2e34f9a1d60b4bd68235b319"
+                    ],
+                    "accept-ch": [
+                        "Sec-CH-UA-Platform-Version"
+                    ],
+                    "x-xss-protection": [
+                        "0"
+                    ],
+                    "p3p": [
+                        "CP=\"HONK\""
+                    ],
+                    "set-cookie": [
+                        "sid=\"\";Version=1;Path=/;Max-Age=0",
+                        "xids=\"\";Version=1;Path=/;Max-Age=0",
+                        "autolaunch_triggered=\"\"; Expires=Thu, 01 Jan 1970 00:00:10 GMT; Path=/",
+                        "activate_ca_modal_triggered=\"\"; Expires=Thu, 01 Jan 1970 00:00:10 GMT; Path=/",
+                        "JSESSIONID=F98DFA3E4F480BC223871EAEEF97F33B; Path=/; Secure; HttpOnly"
+                    ],
+                    "content-security-policy": [
+                        "default-src 'self' <OKTA_HOST_BARE> *.oktacdn.com; connect-src 'self' <OKTA_HOST_BARE> <OKTA_HOST_BARE>-admin.okta.com *.oktacdn.com *.mixpanel.com *.mapbox.com <OKTA_HOST_BARE>.kerberos.okta.com <OKTA_HOST_BARE>.mtls.okta.com *.authenticatorlocalprod.com:8769 http://localhost:8769 http://127.0.0.1:8769 *.authenticatorlocalprod.com:65111 http://localhost:65111 http://127.0.0.1:65111 *.authenticatorlocalprod.com:65121 http://localhost:65121 http://127.0.0.1:65121 *.authenticatorlocalprod.com:65131 http://localhost:65131 http://127.0.0.1:65131 *.authenticatorlocalprod.com:65141 http://localhost:65141 http://127.0.0.1:65141 *.authenticatorlocalprod.com:65151 http://localhost:65151 http://127.0.0.1:65151 https://oinmanager.okta.com data: *.ingest.sentry.io; script-src 'unsafe-inline' 'self' 'report-sample' <OKTA_HOST_BARE> *.oktacdn.com; style-src 'unsafe-inline' 'self' 'report-sample' <OKTA_HOST_BARE> *.oktacdn.com; frame-src 'self' <OKTA_HOST_BARE> <OKTA_HOST_BARE>-admin.okta.com login.okta.com com-okta-authenticator:; img-src 'self' <OKTA_HOST_BARE> *.oktacdn.com *.tiles.mapbox.com *.mapbox.com data: blob:; font-src 'self' <OKTA_HOST_BARE> data: *.oktacdn.com fonts.gstatic.com; frame-ancestors 'self'"
+                    ],
+                    "x-rate-limit-limit": [
+                        "100"
+                    ],
+                    "x-rate-limit-remaining": [
+                        "99"
+                    ],
+                    "x-rate-limit-reset": [
+                        "1771430137"
+                    ],
+                    "cache-control": [
+                        "no-cache, no-store"
+                    ],
+                    "pragma": [
+                        "no-cache"
+                    ],
+                    "expires": [
+                        "0"
+                    ],
+                    "referrer-policy": [
+                        "strict-origin-when-cross-origin"
+                    ],
+                    "x-content-type-options": [
+                        "nosniff"
+                    ],
+                    "Strict-Transport-Security": [
+                        "max-age=315360000; includeSubDomains"
+                    ]
+                },
+                "status": {
+                    "code": 200,
+                    "message": "OK"
+                },
+                "url": "<OKTA_HOST>/api/v1/apps/0oa8wjn4dqEcMiAkg416/sso/saml/metadata?kid=7at6cw_4I0mZp8zsfUHxauBecxPeBsOk9mIpLTXbvtQ"
+            },
+            "recorded_at": "2026-02-18T15:54:37"
+        }
+    ],
+    "recorded_with": "betamax/0.9.0"
+}
