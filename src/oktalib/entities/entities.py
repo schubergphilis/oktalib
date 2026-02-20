@@ -31,7 +31,9 @@ Main code for entities.
 
 import json
 import logging
+import xml.etree.ElementTree as ET
 from collections.abc import Generator
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -62,6 +64,115 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 LOGGER_BASENAME = 'entities'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
+
+
+@dataclass
+class SingleSignOnService:
+    """Models a SAML Single Sign-On Service with both POST and Redirect URLs."""
+
+    http_post: str | None = None
+    http_redirect: str | None = None
+
+
+class SAMLMetadata:
+    """Models SAML metadata for an Identity Provider.
+
+    Parses SAML metadata XML and provides structured access to the data.
+    """
+
+    # XML namespaces
+    NAMESPACES = {
+        "md": "urn:oasis:names:tc:SAML:2.0:metadata",
+        "ds": "http://www.w3.org/2000/09/xmldsig#",
+    }
+
+    def __init__(self, xml_data: str) -> None:
+        """Initialize SAMLMetadata with raw XML string.
+
+        Args:
+            xml_data: Raw SAML metadata XML string
+        """
+        self._data = xml_data
+        self._root = ET.fromstring(xml_data)
+        self._logger = logging.getLogger(f"{LOGGER_BASENAME}.SAMLMetadata")
+
+    @property
+    def entity_id(self) -> str:
+        """The entity ID from the EntityDescriptor.
+
+        Returns:
+            str: The entity ID
+        """
+        return self._root.get("entityID", "")
+
+    @property
+    def want_authn_requests_signed(self) -> bool:
+        """Whether authentication requests should be signed.
+
+        Returns:
+            bool: True if requests should be signed, False otherwise
+        """
+        idp_descriptor = self._root.find("md:IDPSSODescriptor", self.NAMESPACES)
+        if idp_descriptor is not None:
+            value = idp_descriptor.get("WantAuthnRequestsSigned", "false")
+            return value.lower() == "true"
+        return False
+
+    @property
+    def protocol_support_enumeration(self) -> str | None:
+        """The protocol support enumeration.
+
+        Returns:
+            str | None: The protocol support string
+        """
+        idp_descriptor = self._root.find("md:IDPSSODescriptor", self.NAMESPACES)
+        if idp_descriptor is not None:
+            return idp_descriptor.get("protocolSupportEnumeration")
+        return None
+
+    @property
+    def x509_certificate(self) -> str | None:
+        """The X.509 certificate for signing.
+
+        Returns:
+            str | None: The X.509 certificate string
+        """
+        cert_path = './/md:KeyDescriptor[@use="signing"]//ds:X509Certificate'
+        cert_elem = self._root.find(cert_path, self.NAMESPACES)
+        if cert_elem is not None and cert_elem.text:
+            return cert_elem.text.strip()
+        return None
+
+    @property
+    def name_id_formats(self) -> list[str]:
+        """The supported NameID formats.
+
+        Returns:
+            list[str]: List of NameID format URNs
+        """
+        formats = []
+        for format_elem in self._root.findall(".//md:NameIDFormat", self.NAMESPACES):
+            if format_elem.text:
+                formats.append(format_elem.text.strip())
+        return formats
+
+    @property
+    def single_sign_on_services(self) -> SingleSignOnService:
+        """Returns a SingleSignOnService with both HTTP-POST and
+        HTTP-Redirect URLs if present.
+        """
+        sso_services = {
+            sso.get("Binding", ""): sso.get("Location", "")
+            for sso in self._root.findall(".//md:SingleSignOnService", self.NAMESPACES)
+        }
+        return SingleSignOnService(
+            http_post=sso_services.get(
+                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+            ),
+            http_redirect=sso_services.get(
+                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+            ),
+        )
 
 
 class Group(Entity):
@@ -367,16 +478,6 @@ class GroupAssignment(Group):
 
 class AdminRole(Entity):
     """Models the admin role object of okta."""
-
-    @property
-    def id(self) -> str | None:
-        """The id of the role.
-
-        Returns:
-            string: The id of the role
-
-        """
-        return self._data.get('id')
 
     @property
     def label(self) -> str | None:
@@ -1206,17 +1307,17 @@ class Application(Entity):
             basestring: The sign on mode of the application
 
         """
-        return self._data.get('sign_on_mode')
+        return self._data.get("signOnMode")
 
     @property
-    def credentials(self) -> dict[str, Any] | None:
+    def credentials(self) -> dict[str, Any]:
         """The credentials of the application.
 
         Returns:
             dictionary: The credentials of the application
 
         """
-        return self._data.get('credentials')
+        return self._data.get("credentials", {})
 
     @property
     def settings(self) -> dict[str, Any] | None:
@@ -1259,6 +1360,30 @@ class Application(Entity):
         url = self._data.get('_links', {}).get('users', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield User(self._okta, data)
+
+    @property
+    def metadata_url(self) -> str | None:
+        """The metadata URL of the application.
+
+        Returns:
+            str | None: The metadata URL of the application
+
+        """
+        return self._data.get("_links", {}).get("metadata", {}).get("href")
+
+    def metadata(self) -> SAMLMetadata | None:
+        """The metadata of the application.
+
+        Returns:
+            SAMLMetadata | None: The metadata of the application
+
+        """
+        if not self.metadata_url:
+            self._logger.info("This application does not have a metadata URL.")
+            return None
+        return self._okta.get_application_metadata(
+            self.id, self.credentials.get("signing", {}).get("kid")
+        )
 
     @property
     def groups(self) -> Generator[Group | None, None, None]:
