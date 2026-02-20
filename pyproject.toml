@@ -107,3 +107,8 @@ no-docstring-rgx = "^test_"
 [tool.pylint.'TYPECHECK']
 # Allow accessing protected members within the same package
 ignored-classes = ["Okta"]
+# betamax/adapter.py:105 - since betamax isn't actively maintained, it uses datetime.utcnow() which is deprecated in Python 3.11+. Suppress the warning for now.
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:datetime.datetime.utcnow\\(\\) is deprecated:DeprecationWarning:betamax.adapter",
+]
