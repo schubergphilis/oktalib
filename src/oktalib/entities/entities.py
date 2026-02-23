@@ -1111,6 +1111,77 @@ class UserAssignment(Entity):
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
+class ApplicationFederatedClaim(Entity):
+    """Models the application federated claim object of okta."""
+
+    def __init__(
+        self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        """Initialize ApplicationFederatedClaim with app context.
+
+        Args:
+            okta_instance: The Okta instance
+            app_data: Dictionary containing application data from API
+            data: Dictionary containing federated claim data from API
+
+        """
+        super().__init__(okta_instance, data)
+        self._app_data = app_data
+
+    @property
+    def name(self) -> str:
+        """The name of the application federated claim.
+
+        Returns:
+            string: The name of the application federated claim
+
+        """
+        return self._data.get('name', '')
+
+    @property
+    def expression(self) -> str:
+        """The expression of the application federated claim.
+
+        Returns:
+            string: The expression of the application federated claim
+
+        """
+        return self._data.get('expression', '')
+
+    @property
+    def created(self) -> datetime | None:
+        """The date and time when the application federated claim was created.
+
+        Returns:
+            datetime: The datetime object of when the claim was created
+
+        """
+        return self._get_date_from_key('created')
+
+    @property
+    def last_updated(self) -> datetime | None:
+        """The date and time of the application federated claim when it was last updated.
+
+        Returns:
+            datetime: The datetime object of when the claim was last updated
+
+        """
+        return self._get_date_from_key('lastUpdated')
+
+    def delete(self) -> bool:
+        """Deletes the application federated claim from okta.
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
+        url = f'{self._okta.api}/apps/{self._app_data.get("id")}/federated-claims/{self.id}'
+        response = self._okta.session.delete(url)
+        if not response.ok:
+            self._logger.error(f'Deleting federated claim failed. Response: {response.text}')
+        return response.ok
+
+
 class Application(Entity):
     """Models the apps in okta."""
 
@@ -1450,4 +1521,71 @@ class Application(Entity):
             self._logger.error(
                 f'Assigning group to the saml user roles failed. Response: {response.text}'
             )
+        return response.ok
+
+    def federated_claims(self) -> Generator[ApplicationFederatedClaim, None, None]:
+        """The federated claims of the application.
+
+        Returns:
+            generator: A generator of ApplicationFederatedClaim objects for the
+                federated claims of the application
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/federated-claims'
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+            yield ApplicationFederatedClaim(self._okta, self._data, data)
+
+    def get_federated_claim_by_name(self, name: str) -> ApplicationFederatedClaim | None:
+        """Retrieves a federated claim by its name.
+
+        Args:
+            name: The name of the federated claim to retrieve.
+
+        Returns:
+            ApplicationFederatedClaim | None: The matching federated claim if found else None.
+
+        """
+        return next((claim for claim in self.federated_claims() if claim.name == name), None)
+
+    def create_federated_claim(
+        self, name: str, expression: str
+    ) -> ApplicationFederatedClaim | None:
+        """Creates a federated claim for the application.
+
+        Args:
+            name: The name of the federated claim
+            expression: The expression of the federated claim
+
+        Returns:
+            ApplicationFederatedClaim | None: The created federated claim or None if creation failed
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/federated-claims'
+        payload = {'name': name, 'expression': expression}
+        response = self._okta.session.post(url, json=payload)
+        if not response.ok:
+            self._logger.error(f'Creating federated claim failed. Response: {response.text}')
+            return None
+        return ApplicationFederatedClaim(self._okta, self._data, response.json())
+
+    def replace_federated_claim(self, claim_id: str, name: str, expression: str) -> bool:
+        """Replaces a federated claim in tokens from federation protocols.
+
+        Replaces a claim that will be included in tokens produced by federation
+        protocols (for example: OIDC id_tokens or SAML Assertions).
+
+        Args:
+            claim_id: The id of the federated claim to replace
+            name: The name of the federated claim to replace
+            expression: The expression of the federated claim to replace
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/federated-claims/{claim_id}'
+        payload = {'name': name, 'expression': expression}
+        response = self._okta.session.put(url, json=payload)
+        if not response.ok:
+            self._logger.error(f'Replacing federated claim failed. Response: {response.text}')
         return response.ok
