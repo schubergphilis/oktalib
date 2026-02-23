@@ -1,6 +1,11 @@
+"""Smoke tests for oktalib."""
+
 from unittest import TestCase
 
 
 class TestSmoke(TestCase):
+    """Basic smoke tests to verify the test infrastructure."""
+
     def test_sanity(self):
-        self.assertTrue(True)
+        """Verify that tests can run successfully."""
+        assert True
