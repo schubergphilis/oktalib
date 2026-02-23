@@ -67,6 +67,9 @@ ignore = [
     "E117",
 ]
 
+[tool.ruff]
+line-length = 100
+
 [tool.ruff.format]
 quote-style = "single"
 
@@ -80,6 +83,9 @@ disable = [
     "logging-format-interpolation",
     "logging-fstring-interpolation"
 ]
+
+[tool.pylint.'FORMAT']
+max-line-length = 100
 
 [tool.pylint.'DESIGN']
 # API wrapper classes naturally have many methods and arguments

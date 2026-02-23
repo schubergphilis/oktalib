@@ -223,9 +223,7 @@ class Entity:
         """
         response = self._okta.session.get(self.url)
         if not response.ok:
-            self._logger.error(
-                f'Error getting entities data. Response: {response.text}'
-            )
+            self._logger.error(f'Error getting entities data. Response: {response.text}')
             return False
         self._data = response.json()
         return True
