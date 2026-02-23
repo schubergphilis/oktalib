@@ -21,6 +21,7 @@ REQUEST_HEADERS_TO_REMOVE = [
     'Connection',
     'Accept',
     'Accept-Encoding',
+    'Cookie',
 ]
 RESPONSE_HEADERS_TO_REMOVE = [
     'Date',
@@ -28,12 +29,17 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'Set-Cookie',
     'Cache-Control',
     'Strict-Transport-Security',
+    'Content-Security-Policy',
     'X-Content-Type-Options',
     'X-Frame-Options',
     'Access-Control-Allow-Origin',
     'Access-Control-Allow-Headers',
     'Access-Control-Allow-Methods',
     'Access-Control-Max-Age',
+    'X-Okta-Request-Id',
+    'X-Rate-Limit-Limit',
+    'X-Rate-Limit-Remaining',
+    'X-Rate-Limit-Reset',
 ]
 
 
@@ -67,15 +73,21 @@ def configure_betamax(integration: str, token: str, base_url: str | None = None)
             cassette: Cassette,  # noqa: ARG001
         ) -> None:
             # pylint: disable='unused-argument'
-            # request headers
-            req_headers = interaction.data['request']['headers']
-            for h in REQUEST_HEADERS_TO_REMOVE:
-                req_headers.pop(h, None)
+            # Create lowercase sets for case-insensitive comparison
+            req_headers_lower = {h.lower() for h in REQUEST_HEADERS_TO_REMOVE}
+            resp_headers_lower = {h.lower() for h in RESPONSE_HEADERS_TO_REMOVE}
 
-            # response headers
+            # request headers - remove case-insensitively
+            req_headers = interaction.data['request']['headers']
+            headers_to_remove = [key for key in req_headers if key.lower() in req_headers_lower]
+            for key in headers_to_remove:
+                req_headers.pop(key)
+
+            # response headers - remove case-insensitively
             resp_headers = interaction.data['response']['headers']
-            for h in RESPONSE_HEADERS_TO_REMOVE:
-                resp_headers.pop(h, None)
+            headers_to_remove = [key for key in resp_headers if key.lower() in resp_headers_lower]
+            for key in headers_to_remove:
+                resp_headers.pop(key)
 
         config.before_record(callback=strip_sensitive_headers)
 
@@ -162,7 +174,7 @@ def okta_service() -> Okta:
             return session
 
         Okta._setup_session = _get_authenticated_session
-    configure_betamax(integration='okta', token=token)
+    configure_betamax(integration='okta', token=token, base_url=host)
     return Okta(host=host, token=token)
 
 
