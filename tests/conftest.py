@@ -43,12 +43,11 @@ RESPONSE_HEADERS_TO_REMOVE = [
 ]
 
 
-def configure_betamax(integration: str, token: str, base_url: str | None = None) -> None:
-    """Configures betamax for a given integration.
+def configure_betamax(token: str, base_url: str | None = None) -> None:
+    """Configures betamax for oktalib testing.
 
     Args:
-        integration: The integration name.
-        token: The token to authenticate with.
+        token: The Okta API token to authenticate with.
         base_url: The base URL to redact if provided.
 
     Returns:
@@ -56,10 +55,10 @@ def configure_betamax(integration: str, token: str, base_url: str | None = None)
 
     """
     with Betamax.configure() as config:
-        local_path = f'tests/integrations/cassettes/{integration}'
+        cassette_dir = 'tests/cassettes'
         # make directory if it does not exist.
-        Path(local_path).mkdir(parents=True, exist_ok=True)
-        config.cassette_library_dir = local_path
+        Path(cassette_dir).mkdir(parents=True, exist_ok=True)
+        config.cassette_library_dir = cassette_dir
         config.default_cassette_options['record_mode'] = 'once'
 
         # Redact token
