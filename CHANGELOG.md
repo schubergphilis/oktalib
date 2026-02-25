@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0](https://github.com/schubergphilis/oktalib/compare/v3.0.0...v3.1.0) (2026-02-25)
+
+
+### Features
+
+* adding type hints for entities & addition of _missing_required_fields and _validate_fields in entity that is implemented for groups to satisfy the static checks. ([180fec0](https://github.com/schubergphilis/oktalib/commit/180fec06a5aada2204cb07c7274417ec2bc6d6ca))
+* integrate paleofuturistic framework and improve CI/CD, typing, and docs ([7b0852c](https://github.com/schubergphilis/oktalib/commit/7b0852ca95cf569cb8ecb479045ecd53da8d7883))
+
+
+### Bug Fixes
+
+* avoids passing None or other non-text values into dateutil.parser.parse which mypy warns about ([ce6f426](https://github.com/schubergphilis/oktalib/commit/ce6f426284d44b476ab9603899b688d2b7fd8bbc))
+* more type hints in core.py ([95ec701](https://github.com/schubergphilis/oktalib/commit/95ec7010ba5e959d78e4b0df80a209a140bcbd9f))
+* mypy errors ([d6f5939](https://github.com/schubergphilis/oktalib/commit/d6f5939c9e14f26d12221511535f00f5fab991cb))
+* the dynamic assignment on session is fine at run time but not for mypy since it doesn't adhere to the stub ([5756c96](https://github.com/schubergphilis/oktalib/commit/5756c967e277bd1d80adee43b6ba41a7d9c472d2))
+* update _validate_fields method to use instance reference instead of class reference ([b084a6e](https://github.com/schubergphilis/oktalib/commit/b084a6e19ffa3bc2bd080313bbf267b4f1d2699b))
+
 ## [3.0.0] - 2026-02-12
 
 * Migrated to Paleofuturistic Python template
