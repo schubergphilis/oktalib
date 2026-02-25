@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# File: __init__.py
+# File: oktalibexceptions.py
 #
 # Copyright 2018 Costas Tyfoxylos
 #
@@ -23,15 +23,47 @@
 #
 
 """
+Custom exception code for oktalib.
+
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
+
 """
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
-__date__ = '2018-05-25'
+__date__ = '2018-01-08'
 __copyright__ = 'Copyright 2018, Costas Tyfoxylos'
+__credits__ = ['Costas Tyfoxylos']
 __license__ = 'MIT'
 __maintainer__ = 'Costas Tyfoxylos'
 __email__ = '<ctyfoxylos@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
+
+
+class AuthFailed(Exception):
+    """The authentication was not possible. Invalid token maybe."""
+
+
+class InvalidGroup(Exception):
+    """The group provided is invalid."""
+
+
+class InvalidUser(Exception):
+    """The user provided is invalid."""
+
+
+class InvalidApplication(Exception):
+    """The application provided is invalid."""
+
+
+class ApiLimitReached(Exception):
+    """The api limits are close to being reached."""
+
+
+class UnableToUpdate(Exception):
+    """Could not update use property."""
+
+
+class ServerError(Exception):
+    """A server has responded with an error code."""

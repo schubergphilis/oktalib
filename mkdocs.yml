@@ -1,0 +1,50 @@
+site_name: oktalib
+site_author: oktalib
+site_description: A library to interface with Okta through it's restful api
+
+theme:
+  name: mkdocs
+  color_mode: auto
+  user_color_mode_toggle: true
+  locale: en
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Usage: usage.md
+  - API Reference: api.md
+  - Contributing: contributing.md
+
+watch:
+  - src
+
+plugins:
+- mkdocstrings:
+    handlers:
+      python:
+        inventories:
+        - url: https://docs.python.org/3/objects.inv
+          domains: [std, py]
+        - https://typing-extensions.readthedocs.io/en/latest/objects.inv
+        paths: [src]
+        options:
+          backlinks: tree
+          docstring_options:
+            ignore_init_summary: true
+          docstring_style: numpy
+          docstring_section_style: list
+          heading_level: 4
+          inherited_members: true
+          merge_init_into_class: true
+          parameter_headings: true
+          separate_signature: true
+          show_bases: true
+          show_inheritance_diagram: true
+          show_root_heading: true
+          show_root_full_path: false
+          show_source: false
+          show_signature_annotations: true
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          signature_crossrefs: true
+          summary: true

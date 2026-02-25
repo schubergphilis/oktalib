@@ -23,15 +23,39 @@
 #
 
 """
+oktalib package.
+
+Import all parts from oktalib here
+
 .. _Google Python Style Guide:
-   http://google.github.io/styleguide/pyguide.html
+   https://google.github.io/styleguide/pyguide.html
 """
+
+from .oktalib import Okta
+from .oktalibexceptions import (
+    ApiLimitReached,
+    AuthFailed,
+    InvalidApplication,
+    InvalidGroup,
+    InvalidUser,
+    ServerError,
+)
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
-__date__ = '2018-05-25'
+__date__ = '2018-01-08'
 __copyright__ = 'Copyright 2018, Costas Tyfoxylos'
 __license__ = 'MIT'
 __maintainer__ = 'Costas Tyfoxylos'
 __email__ = '<ctyfoxylos@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
+
+__all__ = [
+    'AuthFailed',
+    'InvalidGroup',
+    'InvalidUser',
+    'InvalidApplication',
+    'ApiLimitReached',
+    'ServerError',
+    'Okta',
+]
