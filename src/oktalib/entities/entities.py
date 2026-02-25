@@ -1798,6 +1798,16 @@ class IDP(Entity):
     """Models the identity provider object of okta."""
 
     @property
+    def url(self) -> str:
+        """The url of the identity provider.
+
+        Returns:
+            string: The url of the identity provider
+
+        """
+        return f'{self._okta.api}/idps/{self.id}'
+
+    @property
     def name(self) -> str:
         """The name of the identity provider.
 
