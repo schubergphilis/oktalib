@@ -20,7 +20,6 @@ If you want to contribute to oktalib or run it from source, follow the developme
 
 ### Prerequisites
 
-- Python >= 3.12
 - [uv](https://docs.astral.sh/uv/) - Modern Python package manager
 
 ### Setup Development Environment
