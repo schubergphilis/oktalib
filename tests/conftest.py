@@ -1,4 +1,4 @@
-"""Integrations reusable test fixtures."""
+"""Reusable test fixtures for oktalib testing."""
 
 import json
 import os
@@ -95,8 +95,8 @@ def extract_pytest_path(pytest_path: str) -> tuple[str, str]:
     """Extracts the filename (without .py) and test function name from a pytest node id.
 
     Example:
-        >>> extract_pytest_path('tests/integrations/okta/test_test.py::test_example_api_call')
-        ("test_test", "test_example_api_call")
+        >>> extract_pytest_path('tests/test_oktalib.py::test_example_api_call')
+        ("test_oktalib", "test_example_api_call")
     """
     if '::' in pytest_path:
         file_path, test_name = pytest_path.split('::', 1)
@@ -166,7 +166,7 @@ def okta_service() -> Okta:
             return session
 
         Okta._setup_session = _get_authenticated_session
-    configure_betamax(integration='okta', token=token, base_url=host)
+    configure_betamax(token=token, base_url=host)
     return Okta(host=host, token=token)
 
 
