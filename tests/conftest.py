@@ -164,13 +164,6 @@ def okta_service() -> Okta:
             # pylint: disable='unused-argument'
             """Create an authenticated session without actual authentication."""
             session = Session()
-            session.headers.update(
-                {
-                    'accept': 'application/json',
-                    'content-type': 'application/json',
-                    'authorization': f'SSWS {token}',
-                }
-            )
             return session
 
         Okta._setup_session = _get_authenticated_session
