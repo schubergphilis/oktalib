@@ -37,7 +37,7 @@ If you want to contribute to oktalib or run it from source, follow the developme
 
 3. Verify the setup:
    ```bash
-   uv run python -m unittest
+   uv run pytest
    ```
 
 ### Development Workflow
@@ -59,10 +59,16 @@ uv run mypy
 **Testing:**
 ```bash
 # Run all tests
-uv run python -m unittest
+uv run pytest
+
+# Run specific test file
+uv run pytest tests/test_oktalib.py
 
 # Run specific test
-uv run python -m unittest tests.test_oktalib.TestSmoke.test_sanity
+uv run pytest tests/test_oktalib.py::test_sanity
+
+# Run tests with verbose output
+uv run pytest -v
 ```
 
 **Build:**

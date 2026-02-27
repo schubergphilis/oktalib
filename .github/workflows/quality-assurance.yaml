@@ -30,6 +30,9 @@ jobs:
       - name: Type check
         run: uv run mypy
 
+      - name: Pylint code
+        run: uv run pylint src tests
+
       - name: Run tests
         run: uv run pytest
 
