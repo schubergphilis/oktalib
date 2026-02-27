@@ -132,9 +132,7 @@ class Okta:
             Response: Response instance.
 
         """
-        self._logger.debug(
-            f'Using patched request for method {method}, url {url}, kwargs {kwargs}'
-        )
+        self._logger.debug(f'Using patched request for method {method}, url {url}, kwargs {kwargs}')
         response = self.session.original_request(  # type: ignore[attr-defined]
             method, url, **kwargs
         )
@@ -173,9 +171,7 @@ class Okta:
             self._logger.error(response.json())
         return Group(self, response.json()) if response.ok else None
 
-    def get_group_type_by_name(
-        self, name: str, group_type: str = 'OKTA_GROUP'
-    ) -> Group | None:
+    def get_group_type_by_name(self, name: str, group_type: str = 'OKTA_GROUP') -> Group | None:
         """Retrieves the group type of okta by name.
 
         Args:
@@ -187,11 +183,7 @@ class Okta:
 
         """
         group = next(
-            (
-                group
-                for group in self.search_groups_by_name(name)
-                if group.type == group_type
-            ),
+            (group for group in self.search_groups_by_name(name) if group.type == group_type),
             None,
         )
         return group
@@ -282,9 +274,7 @@ class Okta:
             yield from response.json()
             next_link = response.links.get('next', {}).get('url')
 
-    def _validate_response(
-        self, url: str, params: dict[str, Any] | None = None
-    ) -> Response:
+    def _validate_response(self, url: str, params: dict[str, Any] | None = None) -> Response:
         """Validate API response and raise appropriate exceptions on error.
 
         Args:
@@ -433,9 +423,7 @@ class Okta:
             return None
         return [AdminRole(self, data) for data in response.json()]
 
-    def assign_role_to_user_by_id(
-        self, user_id: str, role_name: str
-    ) -> AdminRole | None:
+    def assign_role_to_user_by_id(self, user_id: str, role_name: str) -> AdminRole | None:
         """Assigns an admin role to a user by id.
 
         Args:
@@ -508,11 +496,7 @@ class Okta:
 
         """
         app = next(
-            (
-                app
-                for app in self.applications
-                if (app.label or '').lower() == label.lower()
-            ),
+            (app for app in self.applications if (app.label or '').lower() == label.lower()),
             None,
         )
         return app
@@ -556,9 +540,7 @@ class Okta:
             return None
         return SAMLMetadata(response.text)
 
-    def assign_group_to_application(
-        self, application_label: str, group_name: str
-    ) -> bool:
+    def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
         """Assigns a group to an application.
 
         Args:
@@ -577,9 +559,7 @@ class Okta:
             raise InvalidGroup(group_name)
         return application.add_group_by_id(group.id)
 
-    def remove_group_from_application(
-        self, application_label: str, group_name: str
-    ) -> bool:
+    def remove_group_from_application(self, application_label: str, group_name: str) -> bool:
         """Removes a group from an application.
 
         Args:

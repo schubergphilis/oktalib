@@ -363,11 +363,7 @@ class Group(Entity):
 
         """
         user = next(
-            (
-                user
-                for user in self._okta.users
-                if (user.login or '').lower() == login.lower()
-            ),
+            (user for user in self._okta.users if (user.login or '').lower() == login.lower()),
             None,
         )
         if not user:
@@ -1003,10 +999,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = (
-            f'{self._okta.api}/users/{self.id}/lifecycle/'
-            'reset_password??sendEmail=false'
-        )
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/reset_password??sendEmail=false'
         return self._post_lifecycle(url, "Resetting user's password failed")
 
     def set_temporary_password(self) -> str | None:
@@ -1016,10 +1009,7 @@ class User(Entity):
             string: Password on success, None otherwise
 
         """
-        url = (
-            f'{self._okta.api}/users/{self.id}/lifecycle/'
-            'expire_password?tempPassword=true'
-        )
+        url = f'{self._okta.api}/users/{self.id}/lifecycle/expire_password?tempPassword=true'
         response = self._okta.session.post(url)
         if not response.ok:
             error = f'Setting a temporary password failed\nResponse: {response.text}'
@@ -1096,9 +1086,7 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
-    def update_security_question(
-        self, password: str, question: str, answer: str
-    ) -> bool:
+    def update_security_question(self, password: str, question: str, answer: str) -> bool:
         """Changes the user's security question and answer.
 
         Returns:
@@ -1175,9 +1163,7 @@ class UserAssignment(Entity):
         url = self._user_assignment_data.get('_links', {}).get('self', {}).get('href')
         response = self._okta.session.get(url)
         if not response.ok:
-            self._logger.error(
-                f'Error getting assignment data. Response: {response.text}'
-            )
+            self._logger.error(f'Error getting assignment data. Response: {response.text}')
             return False
         self._user_assignment_data = response.json()
         return True
@@ -1420,9 +1406,7 @@ class Application(Entity):
                 if found else None.
 
         """
-        return next(
-            (group for group in self.group_assignments if group.name == name), None
-        )
+        return next((group for group in self.group_assignments if group.name == name), None)
 
     @property
     def user_assignments(self) -> Generator[UserAssignment, None, None]:
@@ -1448,11 +1432,7 @@ class Application(Entity):
 
         """
         return next(
-            (
-                user
-                for user in self.user_assignments
-                if (user.email or '').lower() == email.lower()
-            ),
+            (user for user in self.user_assignments if (user.email or '').lower() == email.lower()),
             None,
         )
 
@@ -1593,7 +1573,6 @@ class Application(Entity):
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
             self._logger.error(
-                f'Assigning group to the saml user roles failed. '
-                f'Response: {response.text}'
+                f'Assigning group to the saml user roles failed. Response: {response.text}'
             )
         return response.ok
