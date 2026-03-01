@@ -35,6 +35,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from cachetools import TTLCache, cached
@@ -64,6 +65,20 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 LOGGER_BASENAME = 'entities'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
+
+
+class ApplicationType(Enum):
+    """Enumeration of Okta application sign-on modes."""
+
+    SAML_2_0 = 'SAML_2_0'
+    OPENID_CONNECT = 'OPENID_CONNECT'
+    WS_FEDERATION = 'WS_FEDERATION'
+    SECURE_PASSWORD_STORE = 'SECURE_PASSWORD_STORE'
+    AUTO_LOGIN = 'AUTO_LOGIN'
+    BROWSER_PLUGIN = 'BROWSER_PLUGIN'
+    BASIC_AUTH = 'BASIC_AUTH'
+    BOOKMARK = 'BOOKMARK'
+    UNKNOWN = 'UNKNOWN'
 
 
 @dataclass
@@ -1286,14 +1301,14 @@ class Application(Entity):
         return self._data.get('features')
 
     @property
-    def sign_on_mode(self) -> str | None:
+    def sign_on_mode(self) -> str:
         """The sign on mode of the application.
 
         Returns:
             basestring: The sign on mode of the application
 
         """
-        return self._data.get("signOnMode")
+        return self._data.get('signOnMode', '')
 
     @property
     def credentials(self) -> dict[str, Any]:
@@ -1303,7 +1318,7 @@ class Application(Entity):
             dictionary: The credentials of the application
 
         """
-        return self._data.get("credentials", {})
+        return self._data.get('credentials', {})
 
     @property
     def settings(self) -> dict[str, Any] | None:
@@ -1326,16 +1341,6 @@ class Application(Entity):
         return self._data.get('settings', {}).get('notifications')
 
     @property
-    def sign_on_settings(self) -> dict[str, Any] | None:
-        """The sign on settings of the application.
-
-        Returns:
-            dictionary: The sign on settings of the application
-
-        """
-        return self._data.get('settings', {}).get('signOn')
-
-    @property
     def users(self) -> Generator[User, None, None]:
         """The users of the application.
 
@@ -1346,30 +1351,6 @@ class Application(Entity):
         url = self._data.get('_links', {}).get('users', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield User(self._okta, data)
-
-    @property
-    def metadata_url(self) -> str | None:
-        """The metadata URL of the application.
-
-        Returns:
-            str | None: The metadata URL of the application
-
-        """
-        return self._data.get("_links", {}).get("metadata", {}).get("href")
-
-    def metadata(self) -> SAMLMetadata | None:
-        """The metadata of the application.
-
-        Returns:
-            SAMLMetadata | None: The metadata of the application
-
-        """
-        if not self.metadata_url:
-            self._logger.info("This application does not have a metadata URL.")
-            return None
-        return self._okta.get_application_metadata(
-            self.id, self.credentials.get("signing", {}).get("kid")
-        )
 
     @property
     def groups(self) -> Generator[Group | None, None, None]:
@@ -1470,20 +1451,6 @@ class Application(Entity):
             self._update()
         return response.ok
 
-    def get_associated_saml_roles(self) -> list[str]:
-        """Returns the Saml IAM Roles associated with the application.
-
-        Returns:
-            list: List of saml iam roles
-
-        """
-        url = f'{self._okta.api}/internal/apps/{self.id}/types'
-        response = self._okta.session.get(url)
-        if not response.ok:
-            self._logger.error(f'Response: {response.text}')
-            return []
-        return response.json().get('SamlIamRole', [])
-
     def add_group_by_id(self, group_id: str) -> bool:
         """Adds a group to the application.
 
@@ -1554,6 +1521,40 @@ class Application(Entity):
             self._logger.error(f'Removing group failed. Response: {response.text}')
         return response.ok
 
+
+class SAMLApplication(Application):
+    """Models the SAML apps in okta."""
+
+    @property
+    def sso_url(self) -> str | None:
+        """The SSO URL of the application.
+
+        Returns:
+            string: The SSO URL of the application
+
+        """
+        return self.settings.get('ssoUrl') if self.settings else None
+
+    @property
+    def sign_on_settings(self) -> dict[str, Any] | None:
+        """The sign on settings of the application.
+
+        Returns:
+            dictionary: The sign on settings of the application
+
+        """
+        return self._data.get('settings', {}).get('signOn')
+
+    @property
+    def audience(self) -> str | None:
+        """The audience of the application.
+
+        Returns:
+            string: The audience of the application
+
+        """
+        return self.settings.get('audience') if self.settings else None
+
     def assign_group_to_saml_user_roles(
         self, group_id: str, role: str, saml_roles: list[str]
     ) -> bool:
@@ -1576,3 +1577,41 @@ class Application(Entity):
                 f'Assigning group to the saml user roles failed. Response: {response.text}'
             )
         return response.ok
+
+    def get_associated_saml_roles(self) -> list[str]:
+        """Returns the Saml IAM Roles associated with the application.
+
+        Returns:
+            list: List of saml iam roles
+
+        """
+        url = f'{self._okta.api}/internal/apps/{self.id}/types'
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(f'Response: {response.text}')
+            return []
+        return response.json().get('SamlIamRole', [])
+
+    @property
+    def metadata_url(self) -> str | None:
+        """The metadata URL of the application.
+
+        Returns:
+            str | None: The metadata URL of the application
+
+        """
+        return self._data.get('_links', {}).get('metadata', {}).get('href')
+
+    def metadata(self) -> SAMLMetadata | None:
+        """The metadata of the application.
+
+        Returns:
+            SAMLMetadata | None: The metadata of the application
+
+        """
+        if not self.metadata_url:
+            self._logger.info('This application does not have a metadata URL.')
+            return None
+        return self._okta.get_application_metadata(
+            self.id, self.credentials.get('signing', {}).get('kid')
+        )

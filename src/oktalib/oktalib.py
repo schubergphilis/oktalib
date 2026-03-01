@@ -460,17 +460,55 @@ class Okta:
             return False
         return True
 
+    def _create_application_from_data(self, data: dict[str, Any]) -> Application:
+        """Create an Application instance based on the application type.
+
+        Uses pattern matching to determine the application type from sign-on mode
+        and returns the appropriate Application subclass.
+
+        Args:
+            data: The application data from the Okta API
+
+        Returns:
+            Application: An Application or subclass instance (e.g., SAMLApplication)
+
+        """
+        sign_on_mode = (data.get('signOnMode') or '').upper()
+
+        try:
+            app_type = ApplicationType(sign_on_mode)
+        except ValueError:
+            app_type = ApplicationType.UNKNOWN
+
+        match app_type:
+            case ApplicationType.SAML_2_0:
+                return SAMLApplication(self, data)
+            case (
+                ApplicationType.OPENID_CONNECT
+                | ApplicationType.WS_FEDERATION
+                | ApplicationType.SECURE_PASSWORD_STORE
+                | ApplicationType.AUTO_LOGIN
+                | ApplicationType.BROWSER_PLUGIN
+                | ApplicationType.BASIC_AUTH
+                | ApplicationType.BOOKMARK
+                | ApplicationType.UNKNOWN
+                | _
+            ):
+                return Application(self, data)
+
     @property
     def applications(self) -> Generator[Application, None, None]:
         """The applications configured in okta.
 
         Returns:
-            generator: The generator of applications configured in okta
+            generator: The generator of applications configured in okta.
+                       Returns Application subclasses based on sign-on mode
+                       (e.g., SAMLApplication for SAML apps).
 
         """
         url = f'{self.api}/apps'
         for data in self._get_paginated_url(url):
-            yield Application(self, data)
+            yield self._create_application_from_data(data)
 
     def get_application_by_id(self, id_: str) -> Application | None:
         """Retrieves an application by id.
@@ -479,11 +517,14 @@ class Okta:
             id_: The id of the application to retrieve
 
         Returns:
-            Application Object
+            Application Object or subclass (e.g., SAMLApplication for SAML apps)
 
         """
-        app = next((app for app in self.applications if app.id == id_), None)
-        return app
+        url = f'{self.api}/apps/{id_}'
+        response = self.session.get(url)
+        if not response.ok:
+            return None
+        return self._create_application_from_data(response.json())
 
     def get_application_by_label(self, label: str) -> Application | None:
         """Retrieves an application by label.
@@ -492,7 +533,7 @@ class Okta:
             label: The label of the application to retrieve
 
         Returns:
-            Application Object
+            Application Object or subclass (e.g., SAMLApplication for SAML apps)
 
         """
         app = next(
@@ -515,7 +556,7 @@ class Okta:
             (
                 app
                 for app in self.applications
-                if (app.sign_on_mode or "").lower() == sign_on_mode.lower()
+                if app.sign_on_mode.lower() == sign_on_mode.lower()
             ),
             None,
         )
