@@ -153,7 +153,7 @@ class Entity:
             string: The internal id of the entity
 
         """
-        return self._data.get("id", "")
+        return self._data.get('id', '')
 
     def __hash__(self) -> int:
         """Generate hash based on entity ID.
