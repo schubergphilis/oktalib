@@ -1615,3 +1615,163 @@ class SAMLApplication(Application):
         return self._okta.get_application_metadata(
             self.id, self.credentials.get('signing', {}).get('kid')
         )
+
+
+class APIServiceApp(Application):
+    """Models the API Service apps in okta."""
+
+    @property
+    def api_endpoint(self) -> str | None:
+        """The API endpoint of the application.
+
+        Returns:
+            string: The API endpoint of the application
+
+        """
+        return self.settings.get('apiEndpoint') if self.settings else None
+
+    @property
+    def client_authentication(self) -> str:
+        """The client authentication method of the application.
+
+        Returns:
+            string: The client authentication method of the application
+
+        """
+        return self.credentials.get('oauthClient', {}).get('token_endpoint_auth_method', '')
+
+    @property
+    def jwks_uri(self) -> str | None:
+        """The JWKS URI of the application.
+
+        Returns:
+            string: The JWKS URI of the application
+
+        """
+        return self.credentials.get('oauthClient', {}).get('jwks_uri')
+    
+    @property
+    def jwks(self) -> dict[str, Any] | None:
+        """The JWKS of the application.
+
+        Returns:
+            dictionary: The JWKS of the application
+
+        """
+        return self.credentials.get('oauthClient', {}).get('jwks')
+
+    @property
+    def is_public_keys_enabled(self) -> bool:
+        """Indicates whether public keys are enabled for the application.
+
+        Returns:
+            bool: True if public keys are enabled, False otherwise
+
+        """
+        return bool(self.jwks_uri or self.jwks)
+
+        # then add the JSON web key via -
+        # url = "https://{youroktadomain}/api/v1/apps/" + app_id + "/credentials/jwks"
+        # more info:
+        # https://developer.okta.com/docs/api/openapi/okta-management/management/tags/applicationssopublickeys/other/addjwk
+        # and then set the Client authentication to public/private_key
+
+    def add_public_keys_by_public_url(self, jwks_uri: str) -> bool:
+        """Adds public keys to the application using a JWKS URI.
+
+        Args:
+            jwks_uri: The JWKS URI to fetch keys from dynamically
+
+        Returns:
+            bool: True on success, False otherwise
+        """
+        credentials = {
+            'credentials': {
+                'oauthClient': {
+                    'jwks_uri': jwks_uri,
+                }
+            }
+        }
+        payload = {**self._data, **credentials}
+        url = f'{self._okta.api}/apps/{self.id}'
+        response = self._okta.session.post(url, json=payload)
+        if not response.ok:
+            self._logger.error(f'Adding public keys with JWKS URI failed. Response: {response.text}')
+        else:
+            self._update()
+        return response.ok
+    
+    def add_public_keys_by_jwks(self, jwks: dict[str, Any]) -> bool:
+        """Adds public keys to the application using a JWKS.
+
+        Args:
+            jwks: The JWKS containing the public keys
+
+        Returns:
+            bool: True on success, False otherwise
+        """
+        url = f'{self._okta.api}/apps/{self.id}/credentials/jwks'
+        response = self._okta.session.post(url, json=jwks)
+        if not response.ok:
+            self._logger.error(f'Adding public keys with JWKS failed. Response: {response.text}')
+        else:
+            self._update()
+        return response.ok
+
+    def _enable_public_key_authentication(self):
+        credentials = {
+            'credentials': {
+                'oauthClient': {
+                    'token_endpoint_auth_method': 'private_key_jwt',
+                }
+            }
+        }
+        payload = {**self._data, **credentials}
+        url = f'{self._okta.api}/apps/{self.id}'
+        response = self._okta.session.post(url, json=payload)
+        if not response.ok:
+            self._logger.error(f'Enabling public key authentication failed. Response: {response.text}')
+        else:
+            self._update()
+        return response.ok
+
+    # ? maybe set_client_authentication_to_public_key / enable_public_key_authentication
+    def enable_public_key_authentication(
+        self, jwks_uri: str | None = None, jwks: dict[str, Any] | None = None
+    ) -> bool:
+        """Enables public key authentication for the application.
+
+        Args:
+            jwks_uri: The JWKS URI to fetch keys from dynamically (optional)
+            jwks: The JWKS containing the public keys (optional)
+
+        Returns:
+            bool: True on success, False otherwise
+        """
+        if not any([jwks_uri, jwks]):
+            self._logger.error('Either jwks_uri or jwks must be provided to enable public key authentication.')
+            return False
+        
+        # match which call should be made, set_public_keys_url or add_public_keys, based on the presence of jwks_uri or jwks in the current app settings and the provided parameters
+        if jwks_uri:
+            self.add_public_keys_by_public_url(jwks_uri)
+        elif jwks:
+            self.add_public_keys_by_jwks(jwks)
+        return self._enable_public_key_authentication()
+
+
+
+
+# property - client_authentication - Client secret / 'Public key/Private key'
+# setter - client_authentication
+
+# property - public_keys - 
+#                   save keys in Okta -> add key           
+#                   Use a URL to fetch keys dynamically
+
+# when used?
+# create an api service app using public/private key authentication
+#   ? check required params 
+#   first create normal app, then add public key, then set client authentication to public key
+
+# setting authentication to public/private key authentication, check if public key exists error

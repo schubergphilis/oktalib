@@ -33,14 +33,14 @@ Main code for oktalib.
 import json
 import logging
 from collections.abc import Generator
-from typing import Any
+from typing import Any, Literal
 
 import backoff
 from requests import Response, Session
 
 from oktalib.entities.entities import SAMLMetadata
 
-from .entities import AdminRole, Application, Group, User
+from .entities import AdminRole, Application, ApplicationType, Group, SAMLApplication, User
 from .oktalibexceptions import (
     ApiLimitReached,
     AuthFailed,
@@ -460,6 +460,172 @@ class Okta:
             return False
         return True
 
+    def _get_api_services_app_payload(
+        self,
+        label: str,
+        auth_method: Literal['client_secret', 'private_key_jwt'],
+        # kid: str | None,
+        jwks_uri: str | None,
+        jwks: dict[str, Any] | None,
+        auto_key_rotation: bool,
+        pkce_required: bool,
+        grant_types: list[str] | None,
+        response_types: list[str] | None,
+        issuer_mode: str,
+        client_uri: str | None,
+        logo_uri: str | None,
+        redirect_uris: list[str] | None,
+        dpop_bound_access_tokens: bool,
+        consent_method: str,
+    ) -> dict[str, Any]:
+        """Gets the payload for creating an API Services application.
+
+        Args:
+            label: The application label/name
+            auth_method: Authentication method ('client_secret' or 'private_key_jwt')
+            # kid: Key ID for private_key_jwt
+            jwks_uri: URL to JSON Web Key Set
+            jwks: Inline JSON Web Key Set
+            auto_key_rotation: Enable automatic key rotation
+            pkce_required: Require PKCE for token exchange
+            grant_types: OAuth grant types
+            response_types: OAuth response types
+            issuer_mode: Token issuer mode ('ORG_URL' or 'DYNAMIC')
+            client_uri: Client application URI
+            logo_uri: Client application logo URI
+            redirect_uris: OAuth redirect URIs
+            dpop_bound_access_tokens: Enable DPoP bound access tokens
+            consent_method: Consent method
+
+        Returns:
+            dict: The payload for creating an API Services application
+
+        """
+        # Build credentials section
+        credentials: dict[str, Any] = {}
+        if auth_method == 'client_secret':
+            credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
+        else:  # private_key_jwt
+            credentials = {
+                'signing': {'kid': 'kid'},
+                'oauthClient': {
+                    'autoKeyRotation': auto_key_rotation,
+                    'token_endpoint_auth_method': 'private_key_jwt',
+                    'pkce_required': pkce_required,
+                    'client_secret': None,
+                },
+            }
+
+        # Build settings.oauthClient section
+        oauth_client: dict[str, Any] = {
+            'application_type': 'service',
+            'consent_method': consent_method,
+            'grant_types': grant_types or ['client_credentials'],
+            'response_types': response_types or ['token'],
+            'dpop_bound_access_tokens': dpop_bound_access_tokens,
+        }
+
+        # Add optional fields if provided
+        if client_uri is not None:
+            oauth_client['client_uri'] = client_uri
+        if logo_uri is not None:
+            oauth_client['logo_uri'] = logo_uri
+        if redirect_uris is not None:
+            oauth_client['redirect_uris'] = redirect_uris
+        if jwks_uri is not None:
+            oauth_client['jwks_uri'] = jwks_uri
+        if jwks is not None:
+            oauth_client['jwks'] = jwks
+        if issuer_mode:
+            oauth_client['issuer_mode'] = issuer_mode
+
+        payload = {
+            'credentials': credentials,
+            'label': label,
+            'name': 'oidc_client',
+            'signOnMode': 'OPENID_CONNECT',
+            'settings': {'oauthClient': oauth_client},
+        }
+        return payload
+
+    def create_application_api_services(
+        self,
+        label: str,
+        *,
+        auth_method: Literal['client_secret', 'private_key_jwt'] = 'client_secret',
+        # kid: str | None = None,
+        jwks_uri: str | None = None,
+        jwks: dict[str, Any] | None = None,
+        auto_key_rotation: bool = True,
+        pkce_required: bool = False,
+        grant_types: list[str] | None = None,
+        response_types: list[str] | None = None,
+        issuer_mode: str = 'ORG_URL',
+        client_uri: str | None = None,
+        logo_uri: str | None = None,
+        redirect_uris: list[str] | None = None,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> Application | None:
+        """Creates an API Services application in okta.
+
+        Args:
+            label: The application label/name (required)
+            auth_method: Authentication method - 'client_secret' (default) or
+                'private_key_jwt'. For private_key_jwt, kid and either jwks_uri or
+                jwks are required.
+            # kid: Key ID for private_key_jwt authentication
+            jwks_uri: URL to JSON Web Key Set for private_key_jwt
+            jwks: Inline JSON Web Key Set for private_key_jwt
+            auto_key_rotation: Enable automatic key rotation (default: True)
+            pkce_required: Require PKCE for token exchange (default: False)
+            grant_types: OAuth grant types (default: ['client_credentials'])
+            response_types: OAuth response types (default: ['token'])
+            issuer_mode: Token issuer mode - 'ORG_URL' (default) or 'DYNAMIC'
+            client_uri: Client application URI
+            logo_uri: Client application logo URI
+            redirect_uris: OAuth redirect URIs
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            Application: The created application on success, None otherwise
+
+        """
+        url = f'{self.api}/apps'
+        payload = self._get_api_services_app_payload(
+            label=label,
+            auth_method=auth_method,
+            # kid=kid,
+            jwks_uri=jwks_uri,
+            jwks=jwks,
+            auto_key_rotation=auto_key_rotation,
+            pkce_required=pkce_required,
+            grant_types=grant_types,
+            response_types=response_types,
+            issuer_mode=issuer_mode,
+            client_uri=client_uri,
+            logo_uri=logo_uri,
+            redirect_uris=redirect_uris,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        response = self.session.post(url, json=payload)
+        # create default app -> then if jwks_uri or jwks provided, enable public_keys
+                          #  -> then if auth_method is private_key_jwt, set auth_method to private_key_jwt
+
+        # possibly, we first need to create the default app
+        # then add the JSON web key via -
+        # url = "https://{youroktadomain}/api/v1/apps/" + app_id + "/credentials/jwks"
+        # more info:
+        # https://developer.okta.com/docs/api/openapi/okta-management/management/tags/applicationssopublickeys/other/addjwk
+        # and then set the Client authentication to public/private_key
+
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        return self._create_application_from_data(response.json())
+
     def _create_application_from_data(self, data: dict[str, Any]) -> Application:
         """Create an Application instance based on the application type.
 
@@ -573,8 +739,8 @@ class Okta:
             SAMLMetadata: The application's SAML metadata if found, None otherwise
 
         """
-        url = f"{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}"
-        headers = {"Accept": "text/xml"}
+        url = f'{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}'
+        headers = {'Accept': 'text/xml'}
         response = self.session.get(url, headers=headers)
         if not response.ok:
             self._logger.error(response.text)
