@@ -97,8 +97,8 @@ class SAMLMetadata:
 
     # XML namespaces
     NAMESPACES = {
-        "md": "urn:oasis:names:tc:SAML:2.0:metadata",
-        "ds": "http://www.w3.org/2000/09/xmldsig#",
+        'md': 'urn:oasis:names:tc:SAML:2.0:metadata',
+        'ds': 'http://www.w3.org/2000/09/xmldsig#',
     }
 
     def __init__(self, xml_data: str) -> None:
@@ -109,7 +109,7 @@ class SAMLMetadata:
         """
         self._data = xml_data
         self._root = ET.fromstring(xml_data)
-        self._logger = logging.getLogger(f"{LOGGER_BASENAME}.SAMLMetadata")
+        self._logger = logging.getLogger(f'{LOGGER_BASENAME}.SAMLMetadata')
 
     @property
     def entity_id(self) -> str:
@@ -118,7 +118,7 @@ class SAMLMetadata:
         Returns:
             str: The entity ID
         """
-        return self._root.get("entityID", "")
+        return self._root.get('entityID', '')
 
     @property
     def want_authn_requests_signed(self) -> bool:
@@ -127,10 +127,10 @@ class SAMLMetadata:
         Returns:
             bool: True if requests should be signed, False otherwise
         """
-        idp_descriptor = self._root.find("md:IDPSSODescriptor", self.NAMESPACES)
+        idp_descriptor = self._root.find('md:IDPSSODescriptor', self.NAMESPACES)
         if idp_descriptor is not None:
-            value = idp_descriptor.get("WantAuthnRequestsSigned", "false")
-            return value.lower() == "true"
+            value = idp_descriptor.get('WantAuthnRequestsSigned', 'false')
+            return value.lower() == 'true'
         return False
 
     @property
@@ -140,9 +140,9 @@ class SAMLMetadata:
         Returns:
             str | None: The protocol support string
         """
-        idp_descriptor = self._root.find("md:IDPSSODescriptor", self.NAMESPACES)
+        idp_descriptor = self._root.find('md:IDPSSODescriptor', self.NAMESPACES)
         if idp_descriptor is not None:
-            return idp_descriptor.get("protocolSupportEnumeration")
+            return idp_descriptor.get('protocolSupportEnumeration')
         return None
 
     @property
@@ -166,7 +166,7 @@ class SAMLMetadata:
             list[str]: List of NameID format URNs
         """
         formats = []
-        for format_elem in self._root.findall(".//md:NameIDFormat", self.NAMESPACES):
+        for format_elem in self._root.findall('.//md:NameIDFormat', self.NAMESPACES):
             if format_elem.text:
                 formats.append(format_elem.text.strip())
         return formats
@@ -177,16 +177,12 @@ class SAMLMetadata:
         HTTP-Redirect URLs if present.
         """
         sso_services = {
-            sso.get("Binding", ""): sso.get("Location", "")
-            for sso in self._root.findall(".//md:SingleSignOnService", self.NAMESPACES)
+            sso.get('Binding', ''): sso.get('Location', '')
+            for sso in self._root.findall('.//md:SingleSignOnService', self.NAMESPACES)
         }
         return SingleSignOnService(
-            http_post=sso_services.get(
-                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-            ),
-            http_redirect=sso_services.get(
-                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-            ),
+            http_post=sso_services.get('urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'),
+            http_redirect=sso_services.get('urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'),
         )
 
 
