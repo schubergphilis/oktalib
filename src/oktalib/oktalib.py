@@ -40,7 +40,15 @@ from requests import Response, Session
 
 from oktalib.entities.entities import SAMLMetadata
 
-from .entities import AdminRole, Application, ApplicationType, Group, SAMLApplication, User
+from .entities import (
+    AdminRole,
+    APIServiceApp,
+    Application,
+    ApplicationType,
+    Group,
+    SAMLApplication,
+    User,
+)
 from .oktalibexceptions import (
     ApiLimitReached,
     AuthFailed,
@@ -463,18 +471,6 @@ class Okta:
     def _get_api_services_app_payload(
         self,
         label: str,
-        auth_method: Literal['client_secret', 'private_key_jwt'],
-        # kid: str | None,
-        jwks_uri: str | None,
-        jwks: dict[str, Any] | None,
-        auto_key_rotation: bool,
-        pkce_required: bool,
-        grant_types: list[str] | None,
-        response_types: list[str] | None,
-        issuer_mode: str,
-        client_uri: str | None,
-        logo_uri: str | None,
-        redirect_uris: list[str] | None,
         dpop_bound_access_tokens: bool,
         consent_method: str,
     ) -> dict[str, Any]:
@@ -482,18 +478,6 @@ class Okta:
 
         Args:
             label: The application label/name
-            auth_method: Authentication method ('client_secret' or 'private_key_jwt')
-            # kid: Key ID for private_key_jwt
-            jwks_uri: URL to JSON Web Key Set
-            jwks: Inline JSON Web Key Set
-            auto_key_rotation: Enable automatic key rotation
-            pkce_required: Require PKCE for token exchange
-            grant_types: OAuth grant types
-            response_types: OAuth response types
-            issuer_mode: Token issuer mode ('ORG_URL' or 'DYNAMIC')
-            client_uri: Client application URI
-            logo_uri: Client application logo URI
-            redirect_uris: OAuth redirect URIs
             dpop_bound_access_tokens: Enable DPoP bound access tokens
             consent_method: Consent method
 
@@ -501,43 +485,15 @@ class Okta:
             dict: The payload for creating an API Services application
 
         """
-        # Build credentials section
-        credentials: dict[str, Any] = {}
-        if auth_method == 'client_secret':
-            credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
-        else:  # private_key_jwt
-            credentials = {
-                'signing': {'kid': 'kid'},
-                'oauthClient': {
-                    'autoKeyRotation': auto_key_rotation,
-                    'token_endpoint_auth_method': 'private_key_jwt',
-                    'pkce_required': pkce_required,
-                    'client_secret': None,
-                },
-            }
+        credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
 
-        # Build settings.oauthClient section
         oauth_client: dict[str, Any] = {
             'application_type': 'service',
             'consent_method': consent_method,
-            'grant_types': grant_types or ['client_credentials'],
-            'response_types': response_types or ['token'],
+            'grant_types': ['client_credentials'],
+            'response_types': ['token'],
             'dpop_bound_access_tokens': dpop_bound_access_tokens,
         }
-
-        # Add optional fields if provided
-        if client_uri is not None:
-            oauth_client['client_uri'] = client_uri
-        if logo_uri is not None:
-            oauth_client['logo_uri'] = logo_uri
-        if redirect_uris is not None:
-            oauth_client['redirect_uris'] = redirect_uris
-        if jwks_uri is not None:
-            oauth_client['jwks_uri'] = jwks_uri
-        if jwks is not None:
-            oauth_client['jwks'] = jwks
-        if issuer_mode:
-            oauth_client['issuer_mode'] = issuer_mode
 
         payload = {
             'credentials': credentials,
@@ -548,83 +504,89 @@ class Okta:
         }
         return payload
 
+    def _create_application_api_services(self, data: dict[str, Any]) -> APIServiceApp | None:
+        """Creates an API Services application in okta from the provided data.
+
+        Args:
+            data: The application data to create the application from
+        Returns:
+            Application: The created application
+        """
+        url = f'{self.api}/apps'
+        response = self.session.post(url, json=data)
+
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        app = self._create_application_from_data(response.json())
+        return app if isinstance(app, APIServiceApp) else None
+
     def create_application_api_services(
         self,
         label: str,
-        *,
         auth_method: Literal['client_secret', 'private_key_jwt'] = 'client_secret',
-        # kid: str | None = None,
         jwks_uri: str | None = None,
         jwks: dict[str, Any] | None = None,
-        auto_key_rotation: bool = True,
-        pkce_required: bool = False,
-        grant_types: list[str] | None = None,
-        response_types: list[str] | None = None,
-        issuer_mode: str = 'ORG_URL',
-        client_uri: str | None = None,
-        logo_uri: str | None = None,
-        redirect_uris: list[str] | None = None,
         dpop_bound_access_tokens: bool = True,
         consent_method: str = 'REQUIRED',
-    ) -> Application | None:
+    ) -> APIServiceApp | None:
         """Creates an API Services application in okta.
 
         Args:
             label: The application label/name (required)
             auth_method: Authentication method - 'client_secret' (default) or
-                'private_key_jwt'. For private_key_jwt, kid and either jwks_uri or
+                'private_key_jwt'. For private_key_jwt, jwks_uri or
                 jwks are required.
-            # kid: Key ID for private_key_jwt authentication
             jwks_uri: URL to JSON Web Key Set for private_key_jwt
             jwks: Inline JSON Web Key Set for private_key_jwt
-            auto_key_rotation: Enable automatic key rotation (default: True)
-            pkce_required: Require PKCE for token exchange (default: False)
-            grant_types: OAuth grant types (default: ['client_credentials'])
-            response_types: OAuth response types (default: ['token'])
-            issuer_mode: Token issuer mode - 'ORG_URL' (default) or 'DYNAMIC'
-            client_uri: Client application URI
-            logo_uri: Client application logo URI
-            redirect_uris: OAuth redirect URIs
             dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
             consent_method: Consent method (default: 'REQUIRED')
-
         Returns:
             Application: The created application on success, None otherwise
 
+        Raises:
+            ValueError: If private_key_jwt auth_method is used without jwks_uri or jwks
+
+        Note:
+            In order to create an API Services application with private_key_jwt authentication,
+            an application has to be first created, and then jwks_uri/jwks will be configured.
+
         """
-        url = f'{self.api}/apps'
+        if auth_method == 'private_key_jwt' and not (jwks_uri or jwks):
+            raise ValueError(
+                "auth_method 'private_key_jwt' requires either 'jwks_uri' or 'jwks' to be provided"
+            )
+
         payload = self._get_api_services_app_payload(
             label=label,
-            auth_method=auth_method,
-            # kid=kid,
-            jwks_uri=jwks_uri,
-            jwks=jwks,
-            auto_key_rotation=auto_key_rotation,
-            pkce_required=pkce_required,
-            grant_types=grant_types,
-            response_types=response_types,
-            issuer_mode=issuer_mode,
-            client_uri=client_uri,
-            logo_uri=logo_uri,
-            redirect_uris=redirect_uris,
             dpop_bound_access_tokens=dpop_bound_access_tokens,
             consent_method=consent_method,
         )
-        response = self.session.post(url, json=payload)
-        # create default app -> then if jwks_uri or jwks provided, enable public_keys
-                          #  -> then if auth_method is private_key_jwt, set auth_method to private_key_jwt
-
-        # possibly, we first need to create the default app
-        # then add the JSON web key via -
-        # url = "https://{youroktadomain}/api/v1/apps/" + app_id + "/credentials/jwks"
-        # more info:
-        # https://developer.okta.com/docs/api/openapi/okta-management/management/tags/applicationssopublickeys/other/addjwk
-        # and then set the Client authentication to public/private_key
-
-        if not response.ok:
-            self._logger.error(response.json())
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
             return None
-        return self._create_application_from_data(response.json())
+
+        try:
+            match (jwks_uri, jwks):
+                case (str(uri), _):
+                    app.add_public_keys_by_public_url(jwks_uri=uri)
+                case (None, dict(keys)):
+                    app.add_public_keys_by_jwks(jwks=keys)
+                case (None, None):
+                    pass
+            if auth_method == 'private_key_jwt':
+                app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            try:
+                app.deactivate()
+                app.delete()
+            except Exception as cleanup_error:
+                self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
+            return None
+
+
 
     def _create_application_from_data(self, data: dict[str, Any]) -> Application:
         """Create an Application instance based on the application type.
@@ -636,7 +598,7 @@ class Okta:
             data: The application data from the Okta API
 
         Returns:
-            Application: An Application or subclass instance (e.g., SAMLApplication)
+            Application: An Application or subclass instance (e.g., SAMLApplication, APIServiceApp)
 
         """
         sign_on_mode = (data.get('signOnMode') or '').upper()
@@ -649,9 +611,16 @@ class Okta:
         match app_type:
             case ApplicationType.SAML_2_0:
                 return SAMLApplication(self, data)
+            case ApplicationType.OPENID_CONNECT:
+                # Check if this is an API Services application
+                application_type = (
+                    data.get('settings', {}).get('oauthClient', {}).get('application_type')
+                )
+                if application_type == 'service':
+                    return APIServiceApp(self, data)
+                return Application(self, data)
             case (
-                ApplicationType.OPENID_CONNECT
-                | ApplicationType.WS_FEDERATION
+                ApplicationType.WS_FEDERATION
                 | ApplicationType.SECURE_PASSWORD_STORE
                 | ApplicationType.AUTO_LOGIN
                 | ApplicationType.BROWSER_PLUGIN
@@ -669,7 +638,7 @@ class Okta:
         Returns:
             generator: The generator of applications configured in okta.
                        Returns Application subclasses based on sign-on mode
-                       (e.g., SAMLApplication for SAML apps).
+                       (e.g., SAMLApplication for SAML apps, APIServiceApp for API Services apps).
 
         """
         url = f'{self.api}/apps'
@@ -683,7 +652,7 @@ class Okta:
             id_: The id of the application to retrieve
 
         Returns:
-            Application Object or subclass (e.g., SAMLApplication for SAML apps)
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
         url = f'{self.api}/apps/{id_}'
@@ -699,7 +668,7 @@ class Okta:
             label: The label of the application to retrieve
 
         Returns:
-            Application Object or subclass (e.g., SAMLApplication for SAML apps)
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
         app = next(
@@ -722,7 +691,9 @@ class Okta:
             (
                 app
                 for app in self.applications
-                if app.sign_on_mode.lower() == sign_on_mode.lower()
+                if app.sign_on_mode
+                and sign_on_mode
+                and app.sign_on_mode.lower() == sign_on_mode.lower()
             ),
             None,
         )
