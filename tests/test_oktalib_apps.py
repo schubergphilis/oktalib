@@ -1,8 +1,9 @@
 """Tests for Application functionality."""
 
+import logging
+
 import pytest
 from betamax import Betamax
-import logging
 
 from oktalib.entities import APIServiceApp
 
@@ -30,7 +31,7 @@ def api_service_app_cleaner():
             error_str = str(e).lower()
             if '404' in error_str or 'not found' in error_str:
                 continue
-            logger.warning(f"Failed to cleanup app {getattr(app, 'id', 'unknown')}: {e}")
+            logger.warning(f'Failed to cleanup app {getattr(app, "id", "unknown")}: {e}')
 
 
 # saml_application
@@ -108,12 +109,14 @@ def test_get_application_by_sign_on_mode_with_none(okta_service):
 # api_service_app
 
 
-def test_create_api_service_app_client_secret_auth(okta_cassette, okta_service, api_service_app_cleaner):
+def test_create_api_service_app_client_secret_auth(
+    okta_cassette, okta_service, api_service_app_cleaner
+):
     """Test creating an API Service application."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
-                label='Test API Service App with Client Secret Auth', auth_method='client_secret'
+            okta_service.create_application_with_client_secret(
+                label='Test API Service App with Client Secret Auth'
             )
         )
         assert app is not None
@@ -134,9 +137,8 @@ def test_create_api_service_app_private_key_jwt_auth_public_key_url(
     """Test creating an API Service application with private_key_jwt authentication."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
+            okta_service.create_application_with_jwks_uri(
                 label='Test API Service App with JWT Auth and JWKS URI',
-                auth_method='private_key_jwt',
                 jwks_uri='https://some-service.com/oauth/discovery/keys',
             )
         )
@@ -159,9 +161,8 @@ def test_create_api_service_app_private_key_jwt_auth_public_key_provided(
     """Test creating an API Service application with private_key_jwt auth and inline JWKS."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
+            okta_service.create_application_with_jwks(
                 label='Test API Service App with JWT Auth and Inline JWKS',
-                auth_method='private_key_jwt',
                 jwks={
                     'kty': 'RSA',
                     'use': 'sig',
@@ -192,26 +193,14 @@ def test_create_api_service_app_private_key_jwt_auth_public_key_provided(
 # Error scenario tests
 
 
-def test_create_api_service_app_private_key_jwt_without_keys_raises_error(okta_service):
-    """Test that creating an API Service app with private_key_jwt without keys raises ValueError."""
-    with pytest.raises(ValueError) as exc_info:
-        okta_service.create_application_api_services(
-            label='Test API Service App - Should Fail',
-            auth_method='private_key_jwt',
-            # Missing jwks_uri and jwks
-        )
-    assert 'private_key_jwt' in str(exc_info.value)
-    assert 'jwks_uri' in str(exc_info.value) or 'jwks' in str(exc_info.value)
-
-
 def test_create_api_service_app_cleanup_on_configuration_failure(
     okta_cassette, okta_service, api_service_app_cleaner, monkeypatch
 ):
     """Test that app is cleaned up if configuration fails after creation."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
-                label='Test API Service App - Cleanup Test', auth_method='client_secret'
+            okta_service.create_application_with_client_secret(
+                label='Test API Service App - Cleanup Test'
             )
         )
         assert app is not None
@@ -223,9 +212,8 @@ def test_create_api_service_app_cleanup_on_configuration_failure(
             APIServiceApp, 'add_public_keys_by_public_url', mock_add_public_keys_failure
         )
 
-        failed_app = okta_service.create_application_api_services(
+        failed_app = okta_service.create_application_with_jwks_uri(
             label='Test API Service App - Should Be Cleaned Up',
-            auth_method='private_key_jwt',
             jwks_uri='https://some-service.com/oauth/discovery/keys',
         )
 
@@ -239,9 +227,8 @@ def test_create_api_service_app_with_client_secret_no_keys_required(
     with okta_cassette():
         # This should succeed - client_secret doesn't need keys
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
+            okta_service.create_application_with_client_secret(
                 label='Test API Service App - Client Secret No Keys',
-                auth_method='client_secret',
                 # No jwks_uri or jwks provided, and that's OK for client_secret
             )
         )
@@ -256,9 +243,8 @@ def test_create_api_service_app_add_and_remove_client_role(
     """Test adding and removing a client role (Okta admin role) from an API Service app."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
+            okta_service.create_application_with_client_secret(
                 label='Test API Service App - Client Role Lifecycle',
-                auth_method='client_secret',
             )
         )
         assert app is not None
@@ -287,9 +273,8 @@ def test_create_api_service_app_add_and_remove_client_secrets(
     """Test adding and removing client secrets from an API Service app."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
+            okta_service.create_application_with_client_secret(
                 label='Test API Service App - Client Secret Lifecycle',
-                auth_method='client_secret',
             )
         )
         assert app is not None
@@ -332,9 +317,8 @@ def test_create_api_service_app_max_client_secrets_limit(
     """Test that creating more than 2 client secrets fails with appropriate error message."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_api_services(
+            okta_service.create_application_with_client_secret(
                 label='Test API Service App - Max Secrets Limit',
-                auth_method='client_secret',
             )
         )
         assert app is not None
@@ -358,6 +342,6 @@ def test_create_api_service_app_max_client_secrets_limit(
         assert third_secret is None
 
         # Verify the error log mentions the maximum of 2 secrets
-        assert any(
-            'Maximum of 2 client secrets' in record.message for record in caplog.records
-        ), 'Error message should mention the maximum of 2 client secrets'
+        assert any('Maximum of 2 client secrets' in record.message for record in caplog.records), (
+            'Error message should mention the maximum of 2 client secrets'
+        )

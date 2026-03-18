@@ -33,7 +33,7 @@ Main code for oktalib.
 import json
 import logging
 from collections.abc import Generator
-from typing import Any, Literal
+from typing import Any
 
 import backoff
 from requests import Response, Session
@@ -521,42 +521,54 @@ class Okta:
         app = self._create_application_from_data(response.json())
         return app if isinstance(app, APIServiceApp) else None
 
-    def create_application_api_services(
+    def create_application_with_client_secret(
         self,
         label: str,
-        auth_method: Literal['client_secret', 'private_key_jwt'] = 'client_secret',
-        jwks_uri: str | None = None,
-        jwks: dict[str, Any] | None = None,
         dpop_bound_access_tokens: bool = True,
         consent_method: str = 'REQUIRED',
     ) -> APIServiceApp | None:
-        """Creates an API Services application in okta.
+        """Create an API Service application with client_secret authentication.
 
         Args:
-            label: The application label/name (required)
-            auth_method: Authentication method - 'client_secret' (default) or
-                'private_key_jwt'. For private_key_jwt, jwks_uri or
-                jwks are required.
-            jwks_uri: URL to JSON Web Key Set for private_key_jwt
-            jwks: Inline JSON Web Key Set for private_key_jwt
+            label: The application label/name
             dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
             consent_method: Consent method (default: 'REQUIRED')
-        Returns:
-            Application: The created application on success, None otherwise
 
-        Raises:
-            ValueError: If private_key_jwt auth_method is used without jwks_uri or jwks
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        return self._create_application_api_services(payload)
+
+    def create_application_with_jwks_uri(
+        self,
+        label: str,
+        jwks_uri: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using JWKS URI.
+
+        This method creates an application that uses private_key_jwt authentication
+        by fetching public keys from the provided JWKS URI.
+
+        Args:
+            label: The application label/name
+            jwks_uri: URL to JSON Web Key Set (public keys endpoint)
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
 
         Note:
-            In order to create an API Services application with private_key_jwt authentication,
-            an application has to be first created, and then jwks_uri/jwks will be configured.
-
+            The application is first created, then the JWKS URI is configured,
+            and finally private_key_jwt authentication is enabled.
         """
-        if auth_method == 'private_key_jwt' and not (jwks_uri or jwks):
-            raise ValueError(
-                "auth_method 'private_key_jwt' requires either 'jwks_uri' or 'jwks' to be provided"
-            )
-
         payload = self._get_api_services_app_payload(
             label=label,
             dpop_bound_access_tokens=dpop_bound_access_tokens,
@@ -567,26 +579,69 @@ class Okta:
             return None
 
         try:
-            match (jwks_uri, jwks):
-                case (str(uri), _):
-                    app.add_public_keys_by_public_url(jwks_uri=uri)
-                case (None, dict(keys)):
-                    app.add_public_keys_by_jwks(jwks=keys)
-                case (None, None):
-                    pass
-            if auth_method == 'private_key_jwt':
-                app._enable_public_private_key_authentication()
+            app.add_public_keys_by_public_url(jwks_uri=jwks_uri)
+            app._enable_public_private_key_authentication()
             return app
         except Exception as e:
             self._logger.error(f'Failed to configure app {label}: {e}')
-            try:
-                app.deactivate()
-                app.delete()
-            except Exception as cleanup_error:
-                self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
+            self._cleanup_broken_app(app, label)
             return None
 
+    def create_application_with_jwks(
+        self,
+        label: str,
+        jwks: dict[str, Any],
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using inline JWKS.
 
+        This method creates an application that uses private_key_jwt authentication
+        with an inline JSON Web Key Set.
+
+        Args:
+            label: The application label/name
+            jwks: JSON Web Key Set dictionary containing the public key
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_jwks(jwks=jwks)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def _cleanup_broken_app(self, app: APIServiceApp, label: str) -> None:
+        """Clean up a broken application by deactivating and deleting it.
+
+        Args:
+            app: The application to clean up
+            label: The label of the application (for logging)
+        """
+        try:
+            app.deactivate()
+            app.delete()
+        except Exception as cleanup_error:
+            self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
 
     def _create_application_from_data(self, data: dict[str, Any]) -> Application:
         """Create an Application instance based on the application type.
