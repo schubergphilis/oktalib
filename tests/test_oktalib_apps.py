@@ -314,7 +314,7 @@ def test_create_api_service_app_add_and_remove_client_secrets(
 def test_create_api_service_app_max_client_secrets_limit(
     okta_cassette, okta_service, api_service_app_cleaner, caplog
 ):
-    """Test that creating more than 2 client secrets fails with appropriate error message."""
+    """Test that creating more than MAX_CLIENT_SECRETS client secrets fails with appropriate error message."""
     with okta_cassette():
         app = api_service_app_cleaner(
             okta_service.create_application_with_client_secret(
@@ -327,21 +327,22 @@ def test_create_api_service_app_max_client_secrets_limit(
         initial_secrets = app.client_secrets
         initial_count = len(initial_secrets) if initial_secrets else 0
 
-        # Create secrets until we have 2 total
-        secrets_to_create = 2 - initial_count
+        # Create secrets until we have MAX_CLIENT_SECRETS total
+        secrets_to_create = APIServiceApp.MAX_CLIENT_SECRETS - initial_count
         for _ in range(secrets_to_create):
             secret = app.create_client_secrets()
             assert secret is not None
 
-        # Verify we now have 2 secrets
+        # Verify we now have MAX_CLIENT_SECRETS secrets
         current_secrets = app.client_secrets
-        assert len(current_secrets) == 2
+        assert len(current_secrets) == APIServiceApp.MAX_CLIENT_SECRETS
 
-        # Try to create a third secret - should fail
-        third_secret = app.create_client_secrets()
-        assert third_secret is None
+        # Try to create another secret - should fail
+        extra_secret = app.create_client_secrets()
+        assert extra_secret is None
 
-        # Verify the error log mentions the maximum of 2 secrets
-        assert any('Maximum of 2 client secrets' in record.message for record in caplog.records), (
-            'Error message should mention the maximum of 2 client secrets'
-        )
+        # Verify the error log mentions the maximum limit
+        assert any(
+            f'Maximum of {APIServiceApp.MAX_CLIENT_SECRETS} client secrets' in record.message
+            for record in caplog.records
+        ), f'Error message should mention the maximum of {APIServiceApp.MAX_CLIENT_SECRETS} client secrets'

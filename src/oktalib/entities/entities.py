@@ -1966,6 +1966,9 @@ class SAMLApplication(Application):
 class APIServiceApp(Application):
     """Models the API Service apps in okta."""
 
+
+    MAX_CLIENT_SECRETS = 2  # Maximum number of client secrets allowed per application
+
     @property
     def api_endpoint(self) -> str:
         """The API endpoint of the application.
@@ -2008,7 +2011,7 @@ class APIServiceApp(Application):
         """Creates new client secrets for the application.
 
         Note:
-            Applications can have a maximum of 2 client secrets at any time.
+            Applications can have a maximum of MAX_CLIENT_SECRETS client secrets at any time.
 
         Returns:
             ClientSecret | None: The newly created client secrets of the application
@@ -2017,12 +2020,12 @@ class APIServiceApp(Application):
         url = f'{self._okta.api}/apps/{self.id}/credentials/secrets'
         response = self._okta.session.post(url)
         if not response.ok:
-            # Check if error is due to maximum secrets limit (Okta allows max 2 secrets)
+            # Check if error is due to maximum secrets limit
             error_msg = f'Creating client secrets failed. Response: {response.text}'
             if response.status_code == 400 and 'maximum' in response.text.lower():
                 error_msg = (
-                    'Creating client secrets failed: Maximum of 2 client secrets reached. '
-                    f'Response: {response.text}'
+                    f'Creating client secrets failed: Maximum of {self.MAX_CLIENT_SECRETS} '
+                    f'client secrets reached. Response: {response.text}'
                 )
             self._logger.error(error_msg)
             return None
