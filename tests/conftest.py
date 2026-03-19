@@ -162,8 +162,7 @@ def okta_service() -> Okta:
         ) -> Session:  # noqa: ARG001
             # pylint: disable='unused-argument'
             """Create an authenticated session without actual authentication."""
-            session = Session()
-            return session
+            return Session()
 
         Okta._setup_session = _get_authenticated_session
     configure_betamax(token=token, base_url=host)

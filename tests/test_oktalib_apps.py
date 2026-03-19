@@ -314,7 +314,7 @@ def test_create_api_service_app_add_and_remove_client_secrets(
 def test_create_api_service_app_max_client_secrets_limit(
     okta_cassette, okta_service, api_service_app_cleaner, caplog
 ):
-    """Test that creating more than MAX_CLIENT_SECRETS client secrets fails with appropriate error message."""
+    """Test that creating more than MAX_CLIENT_SECRETS client secrets fails appropriately."""
     with okta_cassette():
         app = api_service_app_cleaner(
             okta_service.create_application_with_client_secret(
@@ -342,7 +342,7 @@ def test_create_api_service_app_max_client_secrets_limit(
         assert extra_secret is None
 
         # Verify the error log mentions the maximum limit
-        assert any(
-            f'Maximum of {APIServiceApp.MAX_CLIENT_SECRETS} client secrets' in record.message
-            for record in caplog.records
-        ), f'Error message should mention the maximum of {APIServiceApp.MAX_CLIENT_SECRETS} client secrets'
+        expected_msg = f'Maximum of {APIServiceApp.MAX_CLIENT_SECRETS} client secrets'
+        assert any(expected_msg in record.message for record in caplog.records), (
+            f'Error message should mention maximum of {APIServiceApp.MAX_CLIENT_SECRETS} secrets'
+        )

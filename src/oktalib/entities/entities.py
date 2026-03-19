@@ -1966,7 +1966,6 @@ class SAMLApplication(Application):
 class APIServiceApp(Application):
     """Models the API Service apps in okta."""
 
-
     MAX_CLIENT_SECRETS = 2  # Maximum number of client secrets allowed per application
 
     @property
@@ -2050,17 +2049,17 @@ class APIServiceApp(Application):
         self._update()
         return OAuthApplicationGrant(self._okta, self._data, response.json())
 
-    def add_grants(self, scope_ids: list[str]) -> OAuthApplicationGrant | None:
+    def add_grants(self, scope_ids: list[str]) -> list[OAuthApplicationGrant | None]:
         """Adds API scopes to the application.
 
         Args:
             scope_ids: The ids of the API scopes to add
 
         Returns:
-            OAuthApplicationGrant | None: The newly created OAuth application grant
-                on success, None otherwise
+            list[OAuthApplicationGrant | None]: The newly created OAuth application grants
+                on success, None for failed additions
         """
-        [self.add_grant(scope_id) for scope_id in scope_ids]
+        return [self.add_grant(scope_id) for scope_id in scope_ids]
 
     @property
     def grants(self) -> Generator[OAuthApplicationGrant, None, None]:
@@ -2177,8 +2176,8 @@ class APIServiceApp(Application):
             self._logger.error(
                 f'Adding public keys with JWKS URI failed. Response: {response.text}'
             )
-        else:
-            self._update()
+            return False
+        self._update()
         return response.ok
 
     def add_public_keys_by_jwks(self, jwks: dict[str, Any]) -> bool:
@@ -2194,11 +2193,20 @@ class APIServiceApp(Application):
         response = self._okta.session.post(url, json=jwks)
         if not response.ok:
             self._logger.error(f'Adding public keys with JWKS failed. Response: {response.text}')
-        else:
-            self._update()
+            return False
+        self._update()
         return response.ok
 
-    def _enable_public_private_key_authentication(self):
+    def _enable_public_private_key_authentication(self) -> bool:
+        """Enable public/private key JWT authentication for the application.
+
+        This changes the token endpoint authentication method to 'private_key_jwt'
+        and removes any client secret credentials.
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
         payload = deepcopy(self._data)
         oauth_client = payload.setdefault('credentials', {}).setdefault('oauthClient', {})
         oauth_client['token_endpoint_auth_method'] = 'private_key_jwt'
@@ -2210,6 +2218,6 @@ class APIServiceApp(Application):
             self._logger.error(
                 f'Enabling public key authentication failed. Response: {response.text}'
             )
-        else:
-            self._update()
+            return False
+        self._update()
         return response.ok

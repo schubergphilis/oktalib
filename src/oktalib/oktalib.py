@@ -191,11 +191,10 @@ class Okta:
             Group: The group if a match is found else None
 
         """
-        group = next(
+        return next(
             (group for group in self.search_groups_by_name(name) if group.type == group_type),
             None,
         )
-        return group
 
     def get_group_by_name(self, name: str) -> Group | None:
         """Retrieves the first group (of any type) by name.
@@ -498,14 +497,13 @@ class Okta:
             'dpop_bound_access_tokens': dpop_bound_access_tokens,
         }
 
-        payload = {
+        return {
             'credentials': credentials,
             'label': label,
             'name': 'oidc_client',
             'signOnMode': 'OPENID_CONNECT',
             'settings': {'oauthClient': oauth_client},
         }
-        return payload
 
     def _create_application_api_services(self, data: dict[str, Any]) -> APIServiceApp | None:
         """Creates an API Services application in okta from the provided data.
@@ -729,11 +727,10 @@ class Okta:
             Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
-        app = next(
+        return next(
             (app for app in self.applications if (app.label or '').lower() == label.lower()),
             None,
         )
-        return app
 
     def get_application_by_sign_on_mode(self, sign_on_mode: str) -> Application | None:
         """Retrieves an application by sign-on mode.
@@ -745,7 +742,7 @@ class Okta:
             Application Object
 
         """
-        app = next(
+        return next(
             (
                 app
                 for app in self.applications
@@ -755,7 +752,6 @@ class Okta:
             ),
             None,
         )
-        return app
 
     def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
         """Retrieves an application's SAML metadata by id.
