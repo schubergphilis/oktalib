@@ -177,7 +177,8 @@ class Okta:
         response = self.session.post(url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
-        return Group(self, response.json()) if response.ok else None
+            return None
+        return Group(self, response.json())
 
     def get_group_type_by_name(self, name: str, group_type: str = 'OKTA_GROUP') -> Group | None:
         """Retrieves the group type of okta by name.
@@ -225,7 +226,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
-        return Group(self, response.json()) if response.ok else None
+            return None
+        return Group(self, response.json())
 
     def search_groups_by_name(self, name: str) -> list[Group]:
         """Retrieves the groups (of any type) by name.
@@ -356,7 +358,8 @@ class Okta:
         response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
-        return User(self, response.json()) if response.ok else None
+            return None
+        return User(self, response.json())
 
     def get_user_by_login(self, login: str) -> User | None:
         """Retrieves a user by login.

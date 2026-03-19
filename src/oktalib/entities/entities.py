@@ -2046,11 +2046,9 @@ class APIServiceApp(Application):
         response = self._okta.session.post(url, json=payload)
         if not response.ok:
             self._logger.error(f'Adding grants failed. Response: {response.text}')
-        else:
-            self._update()
-        return (
-            OAuthApplicationGrant(self._okta, self._data, response.json()) if response.ok else None
-        )
+            return None
+        self._update()
+        return OAuthApplicationGrant(self._okta, self._data, response.json())
 
     def add_grants(self, scope_ids: list[str]) -> OAuthApplicationGrant | None:
         """Adds API scopes to the application.
@@ -2111,9 +2109,9 @@ class APIServiceApp(Application):
         response = self._okta.session.post(url, json=payload)
         if not response.ok:
             self._logger.error(f'Adding client role failed. Response: {response.text}')
-        else:
-            self._update()
-        return ClientRole(self._okta, self._data, response.json()) if response.ok else None
+            return None
+        self._update()
+        return ClientRole(self._okta, self._data, response.json())
 
     def add_client_roles(self, role_types: list[str]) -> list[ClientRole | None]:
         """Adds client roles (Okta admin roles) to the application.
