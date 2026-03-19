@@ -11,6 +11,7 @@ import pytest
 from _pytest.fixtures import SubRequest
 from betamax import Betamax
 from betamax.cassette import Cassette, Interaction
+from betamax.serializers import JSONSerializer
 from requests import Session
 
 from oktalib import Okta
@@ -54,12 +55,24 @@ def configure_betamax(token: str, base_url: str | None = None) -> None:
         None
 
     """
+    class PrettyJSONSerializer(JSONSerializer):
+        """Custom JSON serializer that pretty-prints cassettes for readability."""
+
+        name = 'prettyjson'
+
+        def serialize(self, cassette_data: dict) -> str:
+            """Serialize cassette data with indentation for human readability."""
+            return json.dumps(cassette_data, sort_keys=True, indent=2, ensure_ascii=False)
+
+    Betamax.register_serializer(PrettyJSONSerializer)
+
     with Betamax.configure() as config:
         cassette_dir = 'tests/cassettes'
         # make directory if it does not exist.
         Path(cassette_dir).mkdir(parents=True, exist_ok=True)
         config.cassette_library_dir = cassette_dir
         config.default_cassette_options['record_mode'] = 'once'
+        config.default_cassette_options['serialize_with'] = 'prettyjson'
 
         # Redact token
         config.define_cassette_placeholder('<AUTH_TOKEN>', token)
