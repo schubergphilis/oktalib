@@ -522,7 +522,7 @@ class Okta:
         app = self._create_application_from_data(response.json())
         return app if isinstance(app, APIServiceApp) else None
 
-    def create_application_with_client_secret(
+    def create_api_services_app_with_client_secret(
         self,
         label: str,
         dpop_bound_access_tokens: bool = True,
@@ -545,7 +545,7 @@ class Okta:
         )
         return self._create_application_api_services(payload)
 
-    def create_application_with_jwks_uri(
+    def create_api_services_app_with_jwks_uri(
         self,
         label: str,
         jwks_uri: str,
@@ -588,7 +588,7 @@ class Okta:
             self._cleanup_broken_app(app, label)
             return None
 
-    def create_application_with_jwks(
+    def create_api_services_app_with_jwks(
         self,
         label: str,
         jwks: dict[str, Any],

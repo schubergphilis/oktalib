@@ -55,6 +55,7 @@ def configure_betamax(token: str, base_url: str | None = None) -> None:
         None
 
     """
+
     class PrettyJSONSerializer(JSONSerializer):
         """Custom JSON serializer that pretty-prints cassettes for readability."""
 

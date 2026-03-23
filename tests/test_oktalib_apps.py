@@ -115,7 +115,7 @@ def test_create_api_service_app_client_secret_auth(
     """Test creating an API Service application."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_client_secret(
+            okta_service.create_api_services_app_with_client_secret(
                 label='Test API Service App with Client Secret Auth'
             )
         )
@@ -137,7 +137,7 @@ def test_create_api_service_app_private_key_jwt_auth_public_key_url(
     """Test creating an API Service application with private_key_jwt authentication."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_jwks_uri(
+            okta_service.create_api_services_app_with_jwks_uri(
                 label='Test API Service App with JWT Auth and JWKS URI',
                 jwks_uri='https://some-service.com/oauth/discovery/keys',
             )
@@ -161,7 +161,7 @@ def test_create_api_service_app_private_key_jwt_auth_public_key_provided(
     """Test creating an API Service application with private_key_jwt auth and inline JWKS."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_jwks(
+            okta_service.create_api_services_app_with_jwks(
                 label='Test API Service App with JWT Auth and Inline JWKS',
                 jwks={
                     'kty': 'RSA',
@@ -199,7 +199,7 @@ def test_create_api_service_app_cleanup_on_configuration_failure(
     """Test that app is cleaned up if configuration fails after creation."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_client_secret(
+            okta_service.create_api_services_app_with_client_secret(
                 label='Test API Service App - Cleanup Test'
             )
         )
@@ -212,7 +212,7 @@ def test_create_api_service_app_cleanup_on_configuration_failure(
             APIServiceApp, 'add_public_keys_by_public_url', mock_add_public_keys_failure
         )
 
-        failed_app = okta_service.create_application_with_jwks_uri(
+        failed_app = okta_service.create_api_services_app_with_jwks_uri(
             label='Test API Service App - Should Be Cleaned Up',
             jwks_uri='https://some-service.com/oauth/discovery/keys',
         )
@@ -227,7 +227,7 @@ def test_create_api_service_app_with_client_secret_no_keys_required(
     with okta_cassette():
         # This should succeed - client_secret doesn't need keys
         app = api_service_app_cleaner(
-            okta_service.create_application_with_client_secret(
+            okta_service.create_api_services_app_with_client_secret(
                 label='Test API Service App - Client Secret No Keys',
                 # No jwks_uri or jwks provided, and that's OK for client_secret
             )
@@ -243,7 +243,7 @@ def test_create_api_service_app_add_and_remove_client_role(
     """Test adding and removing a client role (Okta admin role) from an API Service app."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_client_secret(
+            okta_service.create_api_services_app_with_client_secret(
                 label='Test API Service App - Client Role Lifecycle',
             )
         )
@@ -273,7 +273,7 @@ def test_create_api_service_app_add_and_remove_client_secrets(
     """Test adding and removing client secrets from an API Service app."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_client_secret(
+            okta_service.create_api_services_app_with_client_secret(
                 label='Test API Service App - Client Secret Lifecycle',
             )
         )
@@ -317,7 +317,7 @@ def test_create_api_service_app_max_client_secrets_limit(
     """Test that creating more than MAX_CLIENT_SECRETS client secrets fails appropriately."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_application_with_client_secret(
+            okta_service.create_api_services_app_with_client_secret(
                 label='Test API Service App - Max Secrets Limit',
             )
         )
