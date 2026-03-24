@@ -1,1 +1,61 @@
-{"http_interactions": [{"request": {"body": {"encoding": "utf-8", "string": ""}, "headers": {"content-type": ["application/json"]}, "method": "GET", "uri": "https://example.com/api/v1/apps/0oa2nq5bkqnNambKF0h8/sso/saml/metadata?kid=8LbVnVXLncB7mkPNbNs3b_-7Rij5tYZdzs76-MMVKtQ"}, "response": {"body": {"encoding": "ISO-8859-1", "string": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><md:EntityDescriptor entityID=\"http://www.okta.com/exk2nq5bkqm3wrGtg0h8\" xmlns:md=\"urn:oasis:names:tc:SAML:2.0:metadata\"><md:IDPSSODescriptor WantAuthnRequestsSigned=\"false\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\"><md:KeyDescriptor use=\"signing\"><ds:KeyInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"><ds:X509Data><ds:X509Certificate>MIIDrDCCApSgAwIBAgIGAZyKxMVNMA0GCSqGSIb3DQEBCwUAMIGWMQswCQYDVQQGEwJVUzETMBEG\nA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEU\nMBIGA1UECwwLU1NPUHJvdmlkZXIxFzAVBgNVBAMMDnNjaHViZXJncGhpbGlzMRwwGgYJKoZIhvcN\nAQkBFg1pbmZvQG9rdGEuY29tMB4XDTI2MDIyMzEzNTAxN1oXDTM2MDIyMzEzNTExN1owgZYxCzAJ\nBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1TYW4gRnJhbmNpc2NvMQ0w\nCwYDVQQKDARPa3RhMRQwEgYDVQQLDAtTU09Qcm92aWRlcjEXMBUGA1UEAwwOc2NodWJlcmdwaGls\naXMxHDAaBgkqhkiG9w0BCQEWDWluZm9Ab2t0YS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\nggEKAoIBAQDQh9IrVWC+9zinPuW4ejavhFrrKTHv4zVAq8GaEwy8MGv0K+vvcJRH1UuOceyDpaT8\nLU7xlaeIWcZSzbbvPw57i7LLxoR7iuNyJydYENQPGUhXTsf6Sbrwo98QDw3hfp6mh1zLVAZUCKwb\n1p9ON3xigxnpSbGO9tPzJ1CLBBldA1T57GcPP8FthvUd/Zz3ClDWdnCwoZ1+n1PxkySmQXWB5+tk\nMDFcznh4wEnIuGGRXw8CMlvDAPLGImN9ZFgwK64QCVw0/6Day4ec/HzhimBM1euRwdIzEhjPfZw+\n85uSwGV3m0OM8JrYeVY7h5P0sYJ3X3ChQcjh7CwGr3naMr8NAgMBAAEwDQYJKoZIhvcNAQELBQAD\nggEBAMa4RcjjUUDSlc5C6rmoImDaxG+WuxKIwkzglVa8xZxrZvRbmFR8x39iyJFYyo1a9PyPN8fz\nmNqwvmrs1UG8UxRX3m7PaNE5v4UXQDNwcvY9zKEBJNfy7PfbkuBAfrcP3CbV8dnu1jLggbvPonjP\n/7Fetjx0HYmkk/JKBvbhqHMvWA5YFEdG4UPmA3QPiJy82huX0rZKupelW+nQKFgXpW4+IV5+oMkC\nSX8W6I/5dcPiVgrBiBgxNwYkYgPqaJhZgORY1MWFHBApnabvDkY1nkjqp9ZfkDPvL3jcZJl2wHFb\neYAqq97k3axzOPtzFQDFRil4VcBCgbUlhSLPuzD/tRI=</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor><md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat><md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat><md:SingleSignOnService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" Location=\"https://example.com/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml\"/><md:SingleSignOnService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\" Location=\"https://example.com/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml\"/></md:IDPSSODescriptor></md:EntityDescriptor>"}, "headers": {"Content-Type": ["text/xml;charset=ISO-8859-1"], "Content-Length": ["2351"], "Connection": ["keep-alive"], "accept-ch": ["Sec-CH-UA-Platform-Version"], "x-xss-protection": ["0"], "p3p": ["CP=\"HONK\""], "pragma": ["no-cache"], "expires": ["0"], "referrer-policy": ["strict-origin-when-cross-origin"]}, "status": {"code": 200, "message": "OK"}, "url": "https://example.com/api/v1/apps/0oa2nq5bkqnNambKF0h8/sso/saml/metadata?kid=8LbVnVXLncB7mkPNbNs3b_-7Rij5tYZdzs76-MMVKtQ"}, "recorded_at": "2026-02-27T13:24:50"}], "recorded_with": "betamax/0.9.0"}
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-03-24T15:07:17",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/api/v1/apps/0oa2nq5bkqnNambKF0h8/sso/saml/metadata?kid=8LbVnVXLncB7mkPNbNs3b_-7Rij5tYZdzs76-MMVKtQ"
+      },
+      "response": {
+        "body": {
+          "encoding": "ISO-8859-1",
+          "string": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><md:EntityDescriptor entityID=\"http://www.okta.com/exk2nq5bkqm3wrGtg0h8\" xmlns:md=\"urn:oasis:names:tc:SAML:2.0:metadata\"><md:IDPSSODescriptor WantAuthnRequestsSigned=\"false\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\"><md:KeyDescriptor use=\"signing\"><ds:KeyInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"><ds:X509Data><ds:X509Certificate>MIIDrDCCApSgAwIBAgIGAZyKxMVNMA0GCSqGSIb3DQEBCwUAMIGWMQswCQYDVQQGEwJVUzETMBEG\nA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEU\nMBIGA1UECwwLU1NPUHJvdmlkZXIxFzAVBgNVBAMMDnNjaHViZXJncGhpbGlzMRwwGgYJKoZIhvcN\nAQkBFg1pbmZvQG9rdGEuY29tMB4XDTI2MDIyMzEzNTAxN1oXDTM2MDIyMzEzNTExN1owgZYxCzAJ\nBgNVBAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1TYW4gRnJhbmNpc2NvMQ0w\nCwYDVQQKDARPa3RhMRQwEgYDVQQLDAtTU09Qcm92aWRlcjEXMBUGA1UEAwwOc2NodWJlcmdwaGls\naXMxHDAaBgkqhkiG9w0BCQEWDWluZm9Ab2t0YS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\nggEKAoIBAQDQh9IrVWC+9zinPuW4ejavhFrrKTHv4zVAq8GaEwy8MGv0K+vvcJRH1UuOceyDpaT8\nLU7xlaeIWcZSzbbvPw57i7LLxoR7iuNyJydYENQPGUhXTsf6Sbrwo98QDw3hfp6mh1zLVAZUCKwb\n1p9ON3xigxnpSbGO9tPzJ1CLBBldA1T57GcPP8FthvUd/Zz3ClDWdnCwoZ1+n1PxkySmQXWB5+tk\nMDFcznh4wEnIuGGRXw8CMlvDAPLGImN9ZFgwK64QCVw0/6Day4ec/HzhimBM1euRwdIzEhjPfZw+\n85uSwGV3m0OM8JrYeVY7h5P0sYJ3X3ChQcjh7CwGr3naMr8NAgMBAAEwDQYJKoZIhvcNAQELBQAD\nggEBAMa4RcjjUUDSlc5C6rmoImDaxG+WuxKIwkzglVa8xZxrZvRbmFR8x39iyJFYyo1a9PyPN8fz\nmNqwvmrs1UG8UxRX3m7PaNE5v4UXQDNwcvY9zKEBJNfy7PfbkuBAfrcP3CbV8dnu1jLggbvPonjP\n/7Fetjx0HYmkk/JKBvbhqHMvWA5YFEdG4UPmA3QPiJy82huX0rZKupelW+nQKFgXpW4+IV5+oMkC\nSX8W6I/5dcPiVgrBiBgxNwYkYgPqaJhZgORY1MWFHBApnabvDkY1nkjqp9ZfkDPvL3jcZJl2wHFb\neYAqq97k3axzOPtzFQDFRil4VcBCgbUlhSLPuzD/tRI=</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor><md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat><md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat><md:SingleSignOnService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\" Location=\"https://example.com/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml\"/><md:SingleSignOnService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\" Location=\"https://example.com/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml\"/></md:IDPSSODescriptor></md:EntityDescriptor>"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Length": [
+            "2351"
+          ],
+          "Content-Type": [
+            "text/xml;charset=ISO-8859-1"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/apps/0oa2nq5bkqnNambKF0h8/sso/saml/metadata?kid=8LbVnVXLncB7mkPNbNs3b_-7Rij5tYZdzs76-MMVKtQ"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}
