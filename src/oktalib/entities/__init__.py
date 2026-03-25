@@ -38,6 +38,7 @@ from .entities import (
     ApplicationType,
     Group,
     SAMLApplication,
+    SAMLMetadata,
     User,
 )
 
@@ -55,6 +56,7 @@ __all__ = [
     'User',
     'Application',
     'SAMLApplication',
+    'SAMLMetadata',
     'APIServiceApp',
     'AdminRole',
     'ApplicationType',

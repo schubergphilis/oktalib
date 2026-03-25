@@ -21,6 +21,7 @@
 #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 #  DEALINGS IN THE SOFTWARE.
 #
+# pylint: disable=too-many-lines
 """
 Main code for entities.
 
