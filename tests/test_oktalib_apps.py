@@ -1,4 +1,5 @@
 """Tests for Application functionality."""
+# pylint: disable=redefined-outer-name
 
 import logging
 
@@ -26,8 +27,9 @@ def api_service_app_cleaner():
         try:
             app.deactivate()
             app.delete()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             # Ignore 404 errors (app already deleted or not found)
+            # Catch all exceptions in cleanup to avoid breaking other tests
             error_str = str(e).lower()
             if '404' in error_str or 'not found' in error_str:
                 continue

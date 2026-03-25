@@ -38,8 +38,6 @@ from typing import Any
 import backoff
 from requests import Response, Session
 
-from oktalib.entities.entities import SAMLMetadata
-
 from .entities import (
     AdminRole,
     APIServiceApp,
@@ -47,6 +45,7 @@ from .entities import (
     ApplicationType,
     Group,
     SAMLApplication,
+    SAMLMetadata,
     User,
 )
 from .oktalibexceptions import (
@@ -583,7 +582,8 @@ class Okta:
             app.add_public_keys_by_public_url(jwks_uri=jwks_uri)
             app._enable_public_private_key_authentication()
             return app
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
             self._logger.error(f'Failed to configure app {label}: {e}')
             self._cleanup_broken_app(app, label)
             return None
@@ -626,7 +626,8 @@ class Okta:
             app.add_public_keys_by_jwks(jwks=jwks)
             app._enable_public_private_key_authentication()
             return app
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
             self._logger.error(f'Failed to configure app {label}: {e}')
             self._cleanup_broken_app(app, label)
             return None
@@ -641,7 +642,8 @@ class Okta:
         try:
             app.deactivate()
             app.delete()
-        except Exception as cleanup_error:
+        except Exception as cleanup_error:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions in cleanup to avoid raising during error handling
             self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
 
     def _create_application_from_data(self, data: dict[str, Any]) -> Application:
