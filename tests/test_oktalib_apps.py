@@ -102,10 +102,11 @@ def test_get_application_by_sign_on_mode_not_found(okta_cassette, okta_service):
         assert app is None
 
 
-def test_get_application_by_sign_on_mode_with_none(okta_service):
+def test_get_application_by_sign_on_mode_with_none(okta_cassette, okta_service):
     """Test that None sign_on_mode is handled gracefully."""
-    app = okta_service.get_application_by_sign_on_mode(None)
-    assert app is None
+    with okta_cassette():
+        app = okta_service.get_application_by_sign_on_mode(None)
+        assert app is None
 
 
 # api_service_app
