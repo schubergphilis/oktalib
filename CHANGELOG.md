@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.0](https://github.com/schubergphilis/oktalib/compare/v3.1.0...v3.2.0) (2026-03-26)
+
+
+### Features
+
+* api service app, broken down in small functions ([f95d407](https://github.com/schubergphilis/oktalib/commit/f95d407db197c386ea8d1d25aa37ec97dd5b7c08))
+* **api:** enhance application creation methods ([dd93419](https://github.com/schubergphilis/oktalib/commit/dd9341981b2c42f8f7bc15e5121ae8655a65b1d9))
+* **api:** update client secrets limit to MAX_CLIENT_SECRETS ([882f389](https://github.com/schubergphilis/oktalib/commit/882f3894f77440cf96d2742277466f980ae74e8a))
+* **entities:** add OAuth application grant and client secret models ([21a9b8f](https://github.com/schubergphilis/oktalib/commit/21a9b8fc23c0fa1b9ca1677e3fe720c18063aae4))
+* **entities:** add SAMLMetadata to exports and disable pylint warning ([13e0fd2](https://github.com/schubergphilis/oktalib/commit/13e0fd2b4de7001d904317200e217b70010c2070))
+* Okta has different kind of application types (sign_on_modes) they differ so much that they need their own classes. When retrieving applications the different classes need to be instantiated ([5d05948](https://github.com/schubergphilis/oktalib/commit/5d059489f6370078677a933f00823b0ddd0d5d9a))
+* **tests:** add pretty JSON serializer for cassettes ([5f98ab4](https://github.com/schubergphilis/oktalib/commit/5f98ab42e1cc6dc83928b715e8598aaa04cbbfe1))
+* **tests:** enhance API service app tests and cleanup ([f2f90cc](https://github.com/schubergphilis/oktalib/commit/f2f90cc9eafd7b2562cf62ba2b3fa2c76486d7f1))
+
+
+### Bug Fixes
+
+* **api:** correct response handling in APIServiceApp and Okta classes ([296e381](https://github.com/schubergphilis/oktalib/commit/296e381f961885d6ab7bfe2f25aabe32cd93d72c))
+* **api:** improve exception handling for app cleanup ([1795ab7](https://github.com/schubergphilis/oktalib/commit/1795ab75e3a138d6d6da3e34e95b1b43a0d4cff9))
+* **tests:** update Content-Length in SAML metadata test ([d349313](https://github.com/schubergphilis/oktalib/commit/d349313876582a08ffeef93d7499c37a6e308aa7))
+
 ## [3.1.0](https://github.com/schubergphilis/oktalib/compare/v3.0.0...v3.1.0) (2026-02-25)
 
 
