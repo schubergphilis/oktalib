@@ -146,14 +146,14 @@ class Entity:
         return ''
 
     @property
-    def id(self) -> str | None:
+    def id(self) -> str:
         """The id of the entity.
 
         Returns:
             string: The internal id of the entity
 
         """
-        return self._data.get('id')
+        return self._data.get('id', '')
 
     def __hash__(self) -> int:
         """Generate hash based on entity ID.

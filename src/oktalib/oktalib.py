@@ -38,7 +38,16 @@ from typing import Any
 import backoff
 from requests import Response, Session
 
-from .entities import AdminRole, Application, Group, User
+from .entities import (
+    AdminRole,
+    APIServiceApp,
+    Application,
+    ApplicationType,
+    Group,
+    SAMLApplication,
+    SAMLMetadata,
+    User,
+)
 from .oktalibexceptions import (
     ApiLimitReached,
     AuthFailed,
@@ -167,7 +176,8 @@ class Okta:
         response = self.session.post(url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
-        return Group(self, response.json()) if response.ok else None
+            return None
+        return Group(self, response.json())
 
     def get_group_type_by_name(self, name: str, group_type: str = 'OKTA_GROUP') -> Group | None:
         """Retrieves the group type of okta by name.
@@ -180,11 +190,10 @@ class Okta:
             Group: The group if a match is found else None
 
         """
-        group = next(
+        return next(
             (group for group in self.search_groups_by_name(name) if group.type == group_type),
             None,
         )
-        return group
 
     def get_group_by_name(self, name: str) -> Group | None:
         """Retrieves the first group (of any type) by name.
@@ -215,7 +224,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
-        return Group(self, response.json()) if response.ok else None
+            return None
+        return Group(self, response.json())
 
     def search_groups_by_name(self, name: str) -> list[Group]:
         """Retrieves the groups (of any type) by name.
@@ -346,7 +356,8 @@ class Okta:
         response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
-        return User(self, response.json()) if response.ok else None
+            return None
+        return User(self, response.json())
 
     def get_user_by_login(self, login: str) -> User | None:
         """Retrieves a user by login.
@@ -458,17 +469,239 @@ class Okta:
             return False
         return True
 
+    def _get_api_services_app_payload(
+        self,
+        label: str,
+        dpop_bound_access_tokens: bool,
+        consent_method: str,
+    ) -> dict[str, Any]:
+        """Gets the payload for creating an API Services application.
+
+        Args:
+            label: The application label/name
+            dpop_bound_access_tokens: Enable DPoP bound access tokens
+            consent_method: Consent method
+
+        Returns:
+            dict: The payload for creating an API Services application
+
+        """
+        credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
+
+        oauth_client: dict[str, Any] = {
+            'application_type': 'service',
+            'consent_method': consent_method,
+            'grant_types': ['client_credentials'],
+            'response_types': ['token'],
+            'dpop_bound_access_tokens': dpop_bound_access_tokens,
+        }
+
+        return {
+            'credentials': credentials,
+            'label': label,
+            'name': 'oidc_client',
+            'signOnMode': 'OPENID_CONNECT',
+            'settings': {'oauthClient': oauth_client},
+        }
+
+    def _create_application_api_services(self, data: dict[str, Any]) -> APIServiceApp | None:
+        """Creates an API Services application in okta from the provided data.
+
+        Args:
+            data: The application data to create the application from
+        Returns:
+            Application: The created application
+        """
+        url = f'{self.api}/apps'
+        response = self.session.post(url, json=data)
+
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        app = self._create_application_from_data(response.json())
+        return app if isinstance(app, APIServiceApp) else None
+
+    def create_api_services_app_with_client_secret(
+        self,
+        label: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with client_secret authentication.
+
+        Args:
+            label: The application label/name
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        return self._create_application_api_services(payload)
+
+    def create_api_services_app_with_jwks_uri(
+        self,
+        label: str,
+        jwks_uri: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using JWKS URI.
+
+        This method creates an application that uses private_key_jwt authentication
+        by fetching public keys from the provided JWKS URI.
+
+        Args:
+            label: The application label/name
+            jwks_uri: URL to JSON Web Key Set (public keys endpoint)
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS URI is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_public_url(jwks_uri=jwks_uri)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def create_api_services_app_with_jwks(
+        self,
+        label: str,
+        jwks: dict[str, Any],
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using inline JWKS.
+
+        This method creates an application that uses private_key_jwt authentication
+        with an inline JSON Web Key Set.
+
+        Args:
+            label: The application label/name
+            jwks: JSON Web Key Set dictionary containing the public key
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_jwks(jwks=jwks)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def _cleanup_broken_app(self, app: APIServiceApp, label: str) -> None:
+        """Clean up a broken application by deactivating and deleting it.
+
+        Args:
+            app: The application to clean up
+            label: The label of the application (for logging)
+        """
+        try:
+            app.deactivate()
+            app.delete()
+        except Exception as cleanup_error:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions in cleanup to avoid raising during error handling
+            self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
+
+    def _create_application_from_data(self, data: dict[str, Any]) -> Application:
+        """Create an Application instance based on the application type.
+
+        Uses pattern matching to determine the application type from sign-on mode
+        and returns the appropriate Application subclass.
+
+        Args:
+            data: The application data from the Okta API
+
+        Returns:
+            Application: An Application or subclass instance (e.g., SAMLApplication, APIServiceApp)
+
+        """
+        sign_on_mode = (data.get('signOnMode') or '').upper()
+
+        try:
+            app_type = ApplicationType(sign_on_mode)
+        except ValueError:
+            app_type = ApplicationType.UNKNOWN
+
+        match app_type:
+            case ApplicationType.SAML_2_0:
+                return SAMLApplication(self, data)
+            case ApplicationType.OPENID_CONNECT:
+                # Check if this is an API Services application
+                application_type = (
+                    data.get('settings', {}).get('oauthClient', {}).get('application_type')
+                )
+                if application_type == 'service':
+                    return APIServiceApp(self, data)
+                return Application(self, data)
+            case (
+                ApplicationType.WS_FEDERATION
+                | ApplicationType.SECURE_PASSWORD_STORE
+                | ApplicationType.AUTO_LOGIN
+                | ApplicationType.BROWSER_PLUGIN
+                | ApplicationType.BASIC_AUTH
+                | ApplicationType.BOOKMARK
+                | ApplicationType.UNKNOWN
+                | _
+            ):
+                return Application(self, data)
+
     @property
     def applications(self) -> Generator[Application, None, None]:
         """The applications configured in okta.
 
         Returns:
-            generator: The generator of applications configured in okta
+            generator: The generator of applications configured in okta.
+                       Returns Application subclasses based on sign-on mode
+                       (e.g., SAMLApplication for SAML apps, APIServiceApp for API Services apps).
 
         """
         url = f'{self.api}/apps'
         for data in self._get_paginated_url(url):
-            yield Application(self, data)
+            yield self._create_application_from_data(data)
 
     def get_application_by_id(self, id_: str) -> Application | None:
         """Retrieves an application by id.
@@ -477,11 +710,14 @@ class Okta:
             id_: The id of the application to retrieve
 
         Returns:
-            Application Object
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
-        app = next((app for app in self.applications if app.id == id_), None)
-        return app
+        url = f'{self.api}/apps/{id_}'
+        response = self.session.get(url)
+        if not response.ok:
+            return None
+        return self._create_application_from_data(response.json())
 
     def get_application_by_label(self, label: str) -> Application | None:
         """Retrieves an application by label.
@@ -490,14 +726,53 @@ class Okta:
             label: The label of the application to retrieve
 
         Returns:
-            Application Object
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
-        app = next(
+        return next(
             (app for app in self.applications if (app.label or '').lower() == label.lower()),
             None,
         )
-        return app
+
+    def get_application_by_sign_on_mode(self, sign_on_mode: str) -> Application | None:
+        """Retrieves an application by sign-on mode.
+
+        Args:
+            sign_on_mode: The sign-on mode of the application to retrieve
+
+        Returns:
+            Application Object
+
+        """
+        return next(
+            (
+                app
+                for app in self.applications
+                if app.sign_on_mode
+                and sign_on_mode
+                and app.sign_on_mode.lower() == sign_on_mode.lower()
+            ),
+            None,
+        )
+
+    def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
+        """Retrieves an application's SAML metadata by id.
+
+        Args:
+            id_: The id of the application to retrieve
+            kid: The key ID to match the SAML metadata with
+
+        Returns:
+            SAMLMetadata: The application's SAML metadata if found, None otherwise
+
+        """
+        url = f'{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}'
+        headers = {'Accept': 'text/xml'}
+        response = self.session.get(url, headers=headers)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return SAMLMetadata(response.text)
 
     def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
         """Assigns a group to an application.

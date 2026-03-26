@@ -1,0 +1,370 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-03-19T14:12:33",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"credentials\": {\"oauthClient\": {\"token_endpoint_auth_method\": \"client_secret_basic\"}}, \"label\": \"Test API Service App - Client Role Lifecycle\", \"name\": \"oidc_client\", \"signOnMode\": \"OPENID_CONNECT\", \"settings\": {\"oauthClient\": {\"application_type\": \"service\", \"consent_method\": \"REQUIRED\", \"grant_types\": [\"client_credentials\"], \"response_types\": [\"token\"], \"dpop_bound_access_tokens\": true}}}"
+        },
+        "headers": {
+          "Content-Length": [
+            "393"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/api/v1/apps"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA7VWW3PaOBT+K4xnH5PYQBKI37g1ZUtsAk42207HI9sCq8iSVpKhwPDf98hyCJ1k22l3+sJFPjo657scee+QzPEdj6MWFwupV4y/H1xP+l7edc4cLhk8hE+frzQSEq8J3vgkE77n8e7N5ivhRXblyfYi9/KOj4RQPidZGqeUYKb9/0jLUIFN3pdIOIuiBFNYjbDSjd503JhjuSYpbvSEaJw3BlXGxoxT3JiQBU63KcWwTWmkSwX7eoNo/DiqEin9IDKksems5bWuz732efMmal76zZbfbl94nvcRAlOJfxyE0hQrRRJCid46/t5RmC7q0hx/gajCZw6WkssZzojEqX6Q0AYrKYVS+JKwV+uHM2dNTlOiUvMJKlmaHzOapXmZFERHnNMEyeOTnGQA3t4h4dzxtSzh+A1O7E/IDBxMCFsBIvtTgGMKi3UQRC2g81JiiPr0GTAkSxayO24SO+F0FIyH8SAMgtEgsjBlAD2BVk3SUmEZAIERLgQF/MyaPv52/tgrXsoUX1S9H2C/3gqTt/8wnkTxOHDgeHMgYUuzdVXpL0rZXTP4siMf7++88aVuz2a7YTceFl50fTvcofn59Ja+v50+nW/Mfg7w5FYRJocB6wPezjhogXCQrIXFijD+nsDrEIVBCxrq2D2RPCvun1bBn+/6s8Gye9WP5fbjbvphPmrunq7ENrxhOo+D9pcW7lK9DFePrb+CdZH1R7PmMDHt8hVmMWaZ4ITp2FQaF1jn3PT5zXlxghRJYYtYpTiW+J8S9ANRlagO0GbJyBpLheiEL3kJ9YH6nuU+HM97/cloaCxQCsGljizO7x4mE1gElQBnejvXKAXinSCM4vn73qzaISTXPOXGbreTsN+bxFH4YRTEs9FjOOhF49CyhLUGlirWQVbwBTUxrsmCpBXQ1ZO1AMD3DsN6wyWctHdSzhj4oGLCOdYJewtwElqCGKw7ckzF0Sym3wKxEtGp5MYe3CqkdhgBsZGU6B54cckK6O3FfEUo9JhBo3YQBGFgxgAUavQNpWcFgUrsmcCLEbD9+1pJNT+lJCcW5vHJf2CocrlZq+0DPhIABo6N0s2a1YADzlpKBBo4rtfpQWxHR0EQYAu9VYhWoYAalGhmn3GfyQw5jhKaje4fxpZGolSJZVxY4w7/Dnp340HFvYgJI2BZmIFxZUQDxHPci3IyvEAl1bFKuTn202dAZENoliKZgSBtp6cknjkgaxEnvGRZbEdjXAke2jamMyxWo8aOCkE5yox4zfG5xAvIlWsNt4TrqjQvEyyXIofRqi5OLpiLlBcuEsRdN+FLKPeta8SFtjj0moPJLM2U8o0BfxrOI+ezqeRlFn4Cgb66dOxMhBQ/VVjOC+yeXF1vV4cou9p1ynyV3F1vO8nd1lt2oNqaXo2/ajfXBXUOwD+4cUEoHjHJKbXS/kW0BDcmwcqVSjeTS0QUXdHO46OC67lrBudzwG/g45j6TU4eakqWkpei4uvnUP+hHOrE0GMlDP+F8QJ0XBZGKt/yzEXTTFOStirxpRmzwlMKa+WSYllJTLm1SS6uOx2v1eouEi9DyeUNal7fXOHF5aWHrlqdmyS5EHCjHSkmBUw61ywZiq3xBye+PynQ3j7qdYX/1yInc8Z9PsRUY407NWKpXml+iYrXWltt2/ddJGe11syc/R1M27xAdIYR3DLr+h3kl5r4znh5fscE/o/HHA6HfwEqGM3wMQsAAA==",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/apps"
+      }
+    },
+    {
+      "recorded_at": "2026-03-19T14:12:33",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"type\": \"MOBILE_ADMIN\"}"
+        },
+        "headers": {
+          "Content-Length": [
+            "24"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles"
+      },
+      "response": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"id\":\"ra12opflz8yUBw6KT0h8\",\"label\":\"Mobile Administrator\",\"type\":\"MOBILE_ADMIN\",\"status\":\"ACTIVE\",\"created\":\"2026-03-19T14:12:33.000Z\",\"lastUpdated\":\"2026-03-19T14:12:33.000Z\",\"assignmentType\":\"CLIENT\",\"_links\":{\"assignee\":{\"href\":\"https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8\"}}}"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "X-Robots-Tag": [
+            "noindex,nofollow"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 201,
+          "message": "Created"
+        },
+        "url": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles"
+      }
+    },
+    {
+      "recorded_at": "2026-03-19T14:12:34",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/api/v1/apps/0oa2opfrtknoHC6LB0h8"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA7VWW2/iOBT+Kyjax5aES6HNGwW2RUOBQlrtTlVFjmOIF8f22g4MRfz3PY5TyqrdGU1X88LFOT4+57scZ+/R1Au9QKCmkEtl1lzc9jvj6yC79M48oTg8hM9QrA2Simwo2YY0lWEQiMur7Tcq8vQiUK1lFmTdEEmpQ0FTHGNGCTfhf6TlKCc271sknMVQQhisRkSbWm82qi2I2lBMaj0pa+e1fpmxNheM1MZ0SfAOMwLbtEGm0LCv149Gj8MykTYPMkWG2M6aQbNzHrTOG1dRox02mmGrVQ+C4CsEYkV+HIQwJlrThDJqdl649zRhy6o0L1wipsmZR5QSak5Sqgg2Dwra4AVjUIpYUf5u/XDmbehpSlQYMUYFx9kxo11aFElOTSQES5A6PsloCuDtPTpdeKFRBRy/JYn7CZmBgzHla0BkfwpwzGCxCoKoJXReKAJRT8+AIV3xKb8TNrE3nQ0no0Hcn04mw37kYEoBegqt2qSFJmoCBEYklwzws2vm+Nv7ba9FoTCpl70fYL/ZSZv3+mE0juLRxIPj7YGUr+zWdam/CPO7xuSvF/r1/i4YtU1rPn8ZXMaDPIg6N4MXtDif3bDbm9kf51u7XwA8mVOEzWHB+kJ2cwFaoAIk62BxIoy/J3Aj1oTHhKdSUG5imzbOicmELararwkIxcQJ0hRDO3KNSazI3wWQDVGlAg5QU8HphiiN2FisRGFKqbxqczBa9K7Hw4HVayGlUCZyoPz+MB7DIlAKAJvdwiAMLHmTaRQvbnvzcodUwggsrDduxtPr3jiOpl+Gk3g+fJz2e9Fo6iAlxgCkJUWgAfiCmrgwdElxiUr5ZCMBnb3HidkKBSftPSw4B9GWsHnHOmFvDrJHK2DOSTkjTB6VbfvNES8QmylhtSwcnZUdKCiDYmp6YJwVz6G3N6fkU2lGHBp1rp1MJ9azUKgVI5Se5hQqcWcCL1Zt7u972it+CkVP/Cbik//AUGlJu1ZpHUQvAQwSW1naNa/UgAc2WCkEGjiuV+mB/KP8IQiwhd5KRMtQQA1KtIPKWsVmhhxHCc2H9w8jRyPVuiAqzp3LBn9Oenejfsm9jCmn4C8YWHHpGgvEa9ybclKyRAUzscbCHvv0DIhsKUsxUikI0nV6SuKZB7KWcSIKnsZujsVls9C2dYhlsZwLzteSCZRa8drjM0WWkCszBka672ucFQlRK5nBHNT1k9ugjkXuI0n9TQO+pPY/mvk+tCWg1wxM5mhmTGwt+LPpIvKebSVvg+sJBPruhnADDFL8VGGZyIl/cs98XB1i/OKlW2Tr5K6z6yZ3u2DVhWoreg35ZvzM5Mw7AP/gxiVlZMiVYMxJ+5NoSWFNQrSvtGkkbUQ1W7Pu46OGu/TSTrnXgF/AxzH1h5w8VJSslChkydfPof5DOVSJocdSGOEb4znouMitVP7Ns5ANO00pbpbiwyl3wtOaGO3TfFVKTPuVSeqdbjdoNi+XSZCipH2FGp2rC7JstwN00exeJUldwvVzpJjmMOl8u2Qpdsbvn/j+pEB3G+j3Ff5fi5zMGf/1EFuNM+7MiqV8//gUFe+1tt617i+Rmldas3P2VzDt8gLRKUFwy2yqF4ZPNfGd8fL6Qgj8H485HA7/AHdojOXeCgAA",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/apps/0oa2opfrtknoHC6LB0h8"
+      }
+    },
+    {
+      "recorded_at": "2026-03-19T14:12:34",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles?limit=100"
+      },
+      "response": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "[{\"id\":\"ra12opflz8yUBw6KT0h8\",\"label\":\"Mobile Administrator\",\"type\":\"MOBILE_ADMIN\",\"status\":\"ACTIVE\",\"created\":\"2026-03-19T14:12:33.000Z\",\"lastUpdated\":\"2026-03-19T14:12:33.000Z\",\"assignmentType\":\"CLIENT\",\"_links\":{\"assignee\":{\"href\":\"https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8\"}}}]"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "X-Robots-Tag": [
+            "noindex,nofollow"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles?limit=100"
+      }
+    },
+    {
+      "recorded_at": "2026-03-19T14:12:34",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Content-Length": [
+            "0"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "DELETE",
+        "uri": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles/ra12opflz8yUBw6KT0h8"
+      },
+      "response": {
+        "body": {
+          "encoding": null,
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "X-Robots-Tag": [
+            "noindex,nofollow"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 204,
+          "message": "No Content"
+        },
+        "url": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles/ra12opflz8yUBw6KT0h8"
+      }
+    },
+    {
+      "recorded_at": "2026-03-19T14:12:34",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles?limit=100"
+      },
+      "response": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "[]"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "X-Robots-Tag": [
+            "noindex,nofollow"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/oauth2/v1/clients/0oa2opfrtknoHC6LB0h8/roles?limit=100"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}
