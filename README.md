@@ -18,7 +18,9 @@ Prerequisite: [uv](https://docs.astral.sh/uv/)
 
 - Fork and clone this repository.
 - Download additional dependencies: `uv sync --all-extras --dev`
-- Optional: validate the setup with `uv run python -m unittest`
+- Optional: validate the setup with 
+    - `uv run pytest tests`
+    - `uv run pylint src tests`
 
 ### Workflow
 

@@ -38,9 +38,18 @@ from typing import Any
 import backoff
 from requests import Response, Session
 
-from oktalib.entities.entities import IDP, IDPKey, SAMLMetadata
-
-from .entities import AdminRole, Application, Group, User
+from .entities import (
+    IDP,
+    AdminRole,
+    APIServiceApp,
+    Application,
+    ApplicationType,
+    Group,
+    IDPKey,
+    SAMLApplication,
+    SAMLMetadata,
+    User,
+)
 from .oktalibexceptions import (
     ApiLimitReached,
     AuthFailed,
@@ -133,9 +142,7 @@ class Okta:
             Response: Response instance.
 
         """
-        self._logger.debug(
-            f'Using patched request for method {method}, url {url}, kwargs {kwargs}'
-        )
+        self._logger.debug(f'Using patched request for method {method}, url {url}, kwargs {kwargs}')
         response = self.session.original_request(  # type: ignore[attr-defined]
             method, url, **kwargs
         )
@@ -181,7 +188,7 @@ class Okta:
             generator: The generator of IDPKey instances
 
         """
-        url = f"{self.api}/idps/credentials/keys"
+        url = f'{self.api}/idps/credentials/keys'
         for data in self._get_paginated_url(url):
             yield IDPKey(self, data)
 
@@ -195,7 +202,7 @@ class Okta:
             IDPKey: The identity provider key if a match is found else None
 
         """
-        url = f"{self.api}/idps/credentials/keys/{kid}"
+        url = f'{self.api}/idps/credentials/keys/{kid}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
@@ -224,17 +231,17 @@ class Okta:
         name: str,
         okta_idp_issuer_url: str,
         okta_idp_sso_url: str,
-        users_regex_filter: str = "",
+        users_regex_filter: str = '',
         kid: str | None = None,
-        idp_username: str = "idpuser.subjectNameId",
+        idp_username: str = 'idpuser.subjectNameId',
         trust_claims: bool = True,
-        provisioning_action: str = "DISABLED",
+        provisioning_action: str = 'DISABLED',
         provisioning_profile_master: bool = False,
-        account_link_action: str = "AUTO",
+        account_link_action: str = 'AUTO',
         account_link_group_filter: list | None = None,
         account_link_exclude_users: list | None = None,
         account_link_exclude_admins: bool = False,
-        account_matching: str = "USERNAME",
+        account_matching: str = 'USERNAME',
         maxClockSkew: int = 120000,
     ) -> IDP | None:
         """Creates an identity provider in okta.
@@ -296,23 +303,19 @@ class Okta:
 
         account_link_filter = {
             **(
-                {"groups": {"include": account_link_group_filter}}
+                {'groups': {'include': account_link_group_filter}}
                 if account_link_group_filter
                 else {}
             ),
             **(
                 {
-                    "users": {
+                    'users': {
                         **(
-                            {"exclude": account_link_exclude_users}
+                            {'exclude': account_link_exclude_users}
                             if account_link_exclude_users
                             else {}
                         ),
-                        **(
-                            {"excludeAdmins": True}
-                            if account_link_exclude_admins
-                            else {}
-                        ),
+                        **({'excludeAdmins': True} if account_link_exclude_admins else {}),
                     }
                 }
                 if account_link_exclude_users or account_link_exclude_admins
@@ -320,62 +323,60 @@ class Okta:
             ),
         }
 
-        url = f"{self.api}/idps"
+        url = f'{self.api}/idps'
         payload: dict[str, Any] = {
-            "type": "SAML2",
-            "name": name,
-            "protocol": {
-                "type": "SAML2",
-                "endpoints": {
-                    "sso": {
-                        "url": okta_idp_sso_url,
-                        "binding": "HTTP-POST",
-                        "destination": okta_idp_issuer_url,
+            'type': 'SAML2',
+            'name': name,
+            'protocol': {
+                'type': 'SAML2',
+                'endpoints': {
+                    'sso': {
+                        'url': okta_idp_sso_url,
+                        'binding': 'HTTP-POST',
+                        'destination': okta_idp_issuer_url,
                     },
-                    "slo": {
-                        "url": f"{okta_idp_issuer_url}/slo",
-                        "binding": "HTTP-POST",
+                    'slo': {
+                        'url': f'{okta_idp_issuer_url}/slo',
+                        'binding': 'HTTP-POST',
                     },
-                    "acs": {"binding": "HTTP-POST", "type": "INSTANCE"},
+                    'acs': {'binding': 'HTTP-POST', 'type': 'INSTANCE'},
                 },
-                "settings": {"participateSlo": True},
-                "algorithms": {
-                    "request": {
-                        "signature": {"algorithm": "SHA-256", "scope": "REQUEST"}
-                    },
-                    "response": {"signature": {"algorithm": "SHA-256", "scope": "ANY"}},
+                'settings': {'participateSlo': True},
+                'algorithms': {
+                    'request': {'signature': {'algorithm': 'SHA-256', 'scope': 'REQUEST'}},
+                    'response': {'signature': {'algorithm': 'SHA-256', 'scope': 'ANY'}},
                 },
-                "credentials": {
-                    "trust": {
-                        "issuer": okta_idp_issuer_url,
-                        "audience": "",
-                        "kid": kid,
-                        "additionalKids": ["additional-key-id"],
+                'credentials': {
+                    'trust': {
+                        'issuer': okta_idp_issuer_url,
+                        'audience': '',
+                        'kid': kid,
+                        'additionalKids': ['additional-key-id'],
                     }
                 },
             },
-            "policy": {
-                "provisioning": {
-                    "action": provisioning_action,
-                    "profileMaster": provisioning_profile_master,
-                    "groups": {"action": "NONE"},
-                    "conditions": {
-                        "deprovisioned": {"action": "NONE"},
-                        "suspended": {"action": "NONE"},
+            'policy': {
+                'provisioning': {
+                    'action': provisioning_action,
+                    'profileMaster': provisioning_profile_master,
+                    'groups': {'action': 'NONE'},
+                    'conditions': {
+                        'deprovisioned': {'action': 'NONE'},
+                        'suspended': {'action': 'NONE'},
                     },
                 },
-                "accountLink": {
-                    "filter": account_link_filter,
-                    "action": account_link_action,
+                'accountLink': {
+                    'filter': account_link_filter,
+                    'action': account_link_action,
                 },
-                "subject": {
-                    "userNameTemplate": {"template": idp_username},
-                    "format": ["urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified"],
-                    "filter": users_regex_filter,
-                    "matchType": account_matching,
+                'subject': {
+                    'userNameTemplate': {'template': idp_username},
+                    'format': ['urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'],
+                    'filter': users_regex_filter,
+                    'matchType': account_matching,
                 },
-                "trustClaims": trust_claims,
-                "maxClockSkew": maxClockSkew,
+                'trustClaims': trust_claims,
+                'maxClockSkew': maxClockSkew,
             },
         }
         response = self.session.post(url=url, json=payload)
@@ -443,11 +444,10 @@ class Okta:
         response = self.session.post(url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
-        return Group(self, response.json()) if response.ok else None
+            return None
+        return Group(self, response.json())
 
-    def get_group_type_by_name(
-        self, name: str, group_type: str = 'OKTA_GROUP'
-    ) -> Group | None:
+    def get_group_type_by_name(self, name: str, group_type: str = 'OKTA_GROUP') -> Group | None:
         """Retrieves the group type of okta by name.
 
         Args:
@@ -458,15 +458,10 @@ class Okta:
             Group: The group if a match is found else None
 
         """
-        group = next(
-            (
-                group
-                for group in self.search_groups_by_name(name)
-                if group.type == group_type
-            ),
+        return next(
+            (group for group in self.search_groups_by_name(name) if group.type == group_type),
             None,
         )
-        return group
 
     def get_group_by_name(self, name: str) -> Group | None:
         """Retrieves the first group (of any type) by name.
@@ -497,7 +492,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.json())
-        return Group(self, response.json()) if response.ok else None
+            return None
+        return Group(self, response.json())
 
     def search_groups_by_name(self, name: str) -> list[Group]:
         """Retrieves the groups (of any type) by name.
@@ -554,9 +550,7 @@ class Okta:
             yield from response.json()
             next_link = response.links.get('next', {}).get('url')
 
-    def _validate_response(
-        self, url: str, params: dict[str, Any] | None = None
-    ) -> Response:
+    def _validate_response(self, url: str, params: dict[str, Any] | None = None) -> Response:
         """Validate API response and raise appropriate exceptions on error.
 
         Args:
@@ -630,7 +624,8 @@ class Okta:
         response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
             self._logger.error(response.json())
-        return User(self, response.json()) if response.ok else None
+            return None
+        return User(self, response.json())
 
     def get_user_by_login(self, login: str) -> User | None:
         """Retrieves a user by login.
@@ -705,9 +700,7 @@ class Okta:
             return None
         return [AdminRole(self, data) for data in response.json()]
 
-    def assign_role_to_user_by_id(
-        self, user_id: str, role_name: str
-    ) -> AdminRole | None:
+    def assign_role_to_user_by_id(self, user_id: str, role_name: str) -> AdminRole | None:
         """Assigns an admin role to a user by id.
 
         Args:
@@ -744,17 +737,239 @@ class Okta:
             return False
         return True
 
+    def _get_api_services_app_payload(
+        self,
+        label: str,
+        dpop_bound_access_tokens: bool,
+        consent_method: str,
+    ) -> dict[str, Any]:
+        """Gets the payload for creating an API Services application.
+
+        Args:
+            label: The application label/name
+            dpop_bound_access_tokens: Enable DPoP bound access tokens
+            consent_method: Consent method
+
+        Returns:
+            dict: The payload for creating an API Services application
+
+        """
+        credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
+
+        oauth_client: dict[str, Any] = {
+            'application_type': 'service',
+            'consent_method': consent_method,
+            'grant_types': ['client_credentials'],
+            'response_types': ['token'],
+            'dpop_bound_access_tokens': dpop_bound_access_tokens,
+        }
+
+        return {
+            'credentials': credentials,
+            'label': label,
+            'name': 'oidc_client',
+            'signOnMode': 'OPENID_CONNECT',
+            'settings': {'oauthClient': oauth_client},
+        }
+
+    def _create_application_api_services(self, data: dict[str, Any]) -> APIServiceApp | None:
+        """Creates an API Services application in okta from the provided data.
+
+        Args:
+            data: The application data to create the application from
+        Returns:
+            Application: The created application
+        """
+        url = f'{self.api}/apps'
+        response = self.session.post(url, json=data)
+
+        if not response.ok:
+            self._logger.error(response.json())
+            return None
+        app = self._create_application_from_data(response.json())
+        return app if isinstance(app, APIServiceApp) else None
+
+    def create_api_services_app_with_client_secret(
+        self,
+        label: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with client_secret authentication.
+
+        Args:
+            label: The application label/name
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        return self._create_application_api_services(payload)
+
+    def create_api_services_app_with_jwks_uri(
+        self,
+        label: str,
+        jwks_uri: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using JWKS URI.
+
+        This method creates an application that uses private_key_jwt authentication
+        by fetching public keys from the provided JWKS URI.
+
+        Args:
+            label: The application label/name
+            jwks_uri: URL to JSON Web Key Set (public keys endpoint)
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS URI is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_public_url(jwks_uri=jwks_uri)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def create_api_services_app_with_jwks(
+        self,
+        label: str,
+        jwks: dict[str, Any],
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using inline JWKS.
+
+        This method creates an application that uses private_key_jwt authentication
+        with an inline JSON Web Key Set.
+
+        Args:
+            label: The application label/name
+            jwks: JSON Web Key Set dictionary containing the public key
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_jwks(jwks=jwks)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def _cleanup_broken_app(self, app: APIServiceApp, label: str) -> None:
+        """Clean up a broken application by deactivating and deleting it.
+
+        Args:
+            app: The application to clean up
+            label: The label of the application (for logging)
+        """
+        try:
+            app.deactivate()
+            app.delete()
+        except Exception as cleanup_error:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions in cleanup to avoid raising during error handling
+            self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
+
+    def _create_application_from_data(self, data: dict[str, Any]) -> Application:
+        """Create an Application instance based on the application type.
+
+        Uses pattern matching to determine the application type from sign-on mode
+        and returns the appropriate Application subclass.
+
+        Args:
+            data: The application data from the Okta API
+
+        Returns:
+            Application: An Application or subclass instance (e.g., SAMLApplication, APIServiceApp)
+
+        """
+        sign_on_mode = (data.get('signOnMode') or '').upper()
+
+        try:
+            app_type = ApplicationType(sign_on_mode)
+        except ValueError:
+            app_type = ApplicationType.UNKNOWN
+
+        match app_type:
+            case ApplicationType.SAML_2_0:
+                return SAMLApplication(self, data)
+            case ApplicationType.OPENID_CONNECT:
+                # Check if this is an API Services application
+                application_type = (
+                    data.get('settings', {}).get('oauthClient', {}).get('application_type')
+                )
+                if application_type == 'service':
+                    return APIServiceApp(self, data)
+                return Application(self, data)
+            case (
+                ApplicationType.WS_FEDERATION
+                | ApplicationType.SECURE_PASSWORD_STORE
+                | ApplicationType.AUTO_LOGIN
+                | ApplicationType.BROWSER_PLUGIN
+                | ApplicationType.BASIC_AUTH
+                | ApplicationType.BOOKMARK
+                | ApplicationType.UNKNOWN
+                | _
+            ):
+                return Application(self, data)
+
     @property
     def applications(self) -> Generator[Application, None, None]:
         """The applications configured in okta.
 
         Returns:
-            generator: The generator of applications configured in okta
+            generator: The generator of applications configured in okta.
+                       Returns Application subclasses based on sign-on mode
+                       (e.g., SAMLApplication for SAML apps, APIServiceApp for API Services apps).
 
         """
         url = f'{self.api}/apps'
         for data in self._get_paginated_url(url):
-            yield Application(self, data)
+            yield self._create_application_from_data(data)
 
     def get_application_by_id(self, id_: str) -> Application | None:
         """Retrieves an application by id.
@@ -763,11 +978,14 @@ class Okta:
             id_: The id of the application to retrieve
 
         Returns:
-            Application Object
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
-        app = next((app for app in self.applications if app.id == id_), None)
-        return app
+        url = f'{self.api}/apps/{id_}'
+        response = self.session.get(url)
+        if not response.ok:
+            return None
+        return self._create_application_from_data(response.json())
 
     def get_application_by_label(self, label: str) -> Application | None:
         """Retrieves an application by label.
@@ -776,18 +994,13 @@ class Okta:
             label: The label of the application to retrieve
 
         Returns:
-            Application Object
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
-        app = next(
-            (
-                app
-                for app in self.applications
-                if (app.label or '').lower() == label.lower()
-            ),
+        return next(
+            (app for app in self.applications if (app.label or '').lower() == label.lower()),
             None,
         )
-        return app
 
     def get_application_by_sign_on_mode(self, sign_on_mode: str) -> Application | None:
         """Retrieves an application by sign-on mode.
@@ -799,15 +1012,16 @@ class Okta:
             Application Object
 
         """
-        app = next(
+        return next(
             (
                 app
                 for app in self.applications
-                if (app.sign_on_mode or "").lower() == sign_on_mode.lower()
+                if app.sign_on_mode
+                and sign_on_mode
+                and app.sign_on_mode.lower() == sign_on_mode.lower()
             ),
             None,
         )
-        return app
 
     def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
         """Retrieves an application's SAML metadata by id.
@@ -820,17 +1034,15 @@ class Okta:
             SAMLMetadata: The application's SAML metadata if found, None otherwise
 
         """
-        url = f"{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}"
-        headers = {"Accept": "text/xml"}
+        url = f'{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}'
+        headers = {'Accept': 'text/xml'}
         response = self.session.get(url, headers=headers)
         if not response.ok:
             self._logger.error(response.text)
             return None
         return SAMLMetadata(response.text)
 
-    def assign_group_to_application(
-        self, application_label: str, group_name: str
-    ) -> bool:
+    def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
         """Assigns a group to an application.
 
         Args:
@@ -849,9 +1061,7 @@ class Okta:
             raise InvalidGroup(group_name)
         return application.add_group_by_id(group.id)
 
-    def remove_group_from_application(
-        self, application_label: str, group_name: str
-    ) -> bool:
+    def remove_group_from_application(self, application_label: str, group_name: str) -> bool:
         """Removes a group from an application.
 
         Args:
