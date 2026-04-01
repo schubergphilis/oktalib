@@ -1,7 +1,7 @@
 {
   "http_interactions": [
     {
-      "recorded_at": "2026-04-01T08:07:36",
+      "recorded_at": "2026-04-01T08:18:18",
       "request": {
         "body": {
           "encoding": "utf-8",
@@ -23,9 +23,6 @@
         "headers": {
           "Connection": [
             "keep-alive"
-          ],
-          "Content-Length": [
-            "2351"
           ],
           "Content-Type": [
             "text/xml;charset=ISO-8859-1"

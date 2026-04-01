@@ -41,6 +41,7 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'X-Rate-Limit-Limit',
     'X-Rate-Limit-Remaining',
     'X-Rate-Limit-Reset',
+    'Content-Length',
 ]
 
 
