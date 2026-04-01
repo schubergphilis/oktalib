@@ -31,16 +31,20 @@ Import all parts from entities here
    https://google.github.io/styleguide/pyguide.html
 """
 
-from .entities import (
-    AdminRole,
+from .adminrole import AdminRole
+from .apps import (
     APIServiceApp,
     Application,
     ApplicationType,
-    Group,
+    ClientRole,
+    ClientSecret,
+    OAuthApplicationGrant,
     SAMLApplication,
     SAMLMetadata,
-    User,
+    SingleSignOnService,
 )
+from .groups import Group, GroupAssignment
+from .users import User, UserAssignment
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
@@ -52,12 +56,18 @@ __email__ = '<ctyfoxylos@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 __all__ = [
-    'Group',
-    'User',
+    'AdminRole',
+    'APIServiceApp',
     'Application',
+    'ApplicationType',
+    'ClientRole',
+    'ClientSecret',
+    'Group',
+    'GroupAssignment',
+    'OAuthApplicationGrant',
     'SAMLApplication',
     'SAMLMetadata',
-    'APIServiceApp',
-    'AdminRole',
-    'ApplicationType',
+    'SingleSignOnService',
+    'User',
+    'UserAssignment',
 ]
