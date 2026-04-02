@@ -1,0 +1,137 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-04-01T15:21:09",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/api/v1/idps?limit=100"
+      },
+      "response": {
+        "body": {
+          "base64_string": "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",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "link": [
+            "<https://example.com/api/v1/idps?limit=100>; rel=\"self\""
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/idps?limit=100"
+      }
+    },
+    {
+      "recorded_at": "2026-04-01T15:21:10",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"type\": \"SAML2\", \"name\": \"test_saml_idp\", \"protocol\": {\"type\": \"SAML2\", \"endpoints\": {\"sso\": {\"url\": \"https://example.com/app/test_app/exk_test/sso/saml\", \"binding\": \"HTTP-POST\", \"destination\": \"http://www.okta.com/exk_test_issuer\"}, \"slo\": {\"url\": \"http://www.okta.com/exk_test_issuer/slo\", \"binding\": \"HTTP-POST\"}, \"acs\": {\"binding\": \"HTTP-POST\", \"type\": \"INSTANCE\"}}, \"settings\": {\"participateSlo\": true}, \"algorithms\": {\"request\": {\"signature\": {\"algorithm\": \"SHA-256\", \"scope\": \"REQUEST\"}}, \"response\": {\"signature\": {\"algorithm\": \"SHA-256\", \"scope\": \"ANY\"}}}, \"credentials\": {\"trust\": {\"issuer\": \"http://www.okta.com/exk_test_issuer\", \"audience\": \"\", \"kid\": \"1bc1ad82-2818-4a29-9c1b-945dad3d18eb\"}}}, \"policy\": {\"provisioning\": {\"action\": \"DISABLED\", \"profileMaster\": false, \"groups\": {\"action\": \"NONE\"}, \"conditions\": {\"deprovisioned\": {\"action\": \"NONE\"}, \"suspended\": {\"action\": \"NONE\"}}}, \"accountLink\": {\"filter\": {}, \"action\": \"AUTO\"}, \"subject\": {\"userNameTemplate\": {\"template\": \"idpuser.subjectNameId\"}, \"format\": [\"urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified\"], \"filter\": \".*@example.com\", \"matchType\": \"USERNAME\"}, \"trustClaims\": true, \"maxClockSkew\": 120000}}"
+        },
+        "headers": {
+          "Content-Length": [
+            "1206"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/api/v1/idps"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA51V74/iNhD9X/Kx2pAfhRWbT5fjaI8KWO4IJ7VVhRzbEC+O7bUdWBbt/96xE7bXExWinzY7nnnz/OZ5OAWMBFkQS5Sq/r05HKuBTuRkF1fD4C4QqKZwaqmxa4NqvmZEQdhYZBsDB/momHwbQwRriix1SGmc3odxP4yTIhlkaZLFD704jv+AJI6MXSlyPVFpaSWWPMhOgT0qR2GZz6YpYFBBlGTCQvdTYIx0fxoNmUFlrTJZFBlcNSXVW1UxzkxP7ixSmu4ZPfSwrCOkVOTv4z7oy27t/okAKXIXhA4lE4SJLSB+LopFuHhcFhAlkMUEskyKrhe0OhwOHt8Dn7HWzJiG6uANdOI/8LtSE7kCqEPYX+8yk06QyXxZ5PPROHhzBXwrNbNV7es0fW6ArleIbYF0o0HC0z9ZTs/PeZgO7t0wsfQKfx1/WY3hrg5PU6OkML7qBoh8/juUu4tTC2ptPRvnoV+krhEQglGJTCLDTObCJrM4c5PNkl7iI4yEG5+bNcIoitmGgavugkoKqRdUQ6Wlws4hdQJus7qh0A7cRyDKEPcdIdrevptE640r2kMT1BBGBXZinM30rwk7g6SRoXrPMA3BpHtGqI6MIqXZHNUred2a8lmSp+dXQNv5h5WUOEFkmIbpMBmGfZQ+hA84KcOH/oAg8jNJhrSEZDCoxJ27RMP595ERwhWdsg21zL3G2OkLY/UePXVtpvWTeQq/USRXg9+aj2nOqsk+bzaHL4mx8379uNukZMEWyWzbTkhJzvDRAfh7GPB1B4hwZ/JPk2X+cTr+BPQgZ8M4ncEDBmdnGxCa3gVbLRvlFX+vmT/OwZEwEQmPyOH4Y0Lfm7gdcSHfNDBtQS6eeoNjLBthp0zsXD2Q8URaqd6756vi0b+7pnyi2D+ABsbl3FLQWnHYPN4f79+w/JTL6HUVna8A4twh6P30gb4gKKbulYMWYE5cFe1WWi3HX+f5zG1AH86t1axsXBtHDXBq9DLiEu+WO3oIsiSFVRjftQ4dccTcg3UmdiEkjPM+JStg5B7DzEHCVMYCldxJ43UH0B924pqDLF7omloE+xW570rTzS1rkUX7JAI9THTpxyA6Q/de/JbsKMASBR9540btARBulzPiXMKV/wx+HRfBX+0QPcnbiJ03c3qR1m1M/C73VNzQ/wcZpK6o1OLCvvpvFQh1ft13XrxNjKv9OawJfMScRt+1uUTnLMXb298sHHqfAggAAA==",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/idps"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

@@ -44,7 +44,8 @@ from .apps import (
     SingleSignOnService,
 )
 from .groups import Group, GroupAssignment
-from .users import User, UserAssignment
+from .idp import IDP, IDPKey
+from .users import User, UserAssignment, UserFactor, UserSupportedFactor
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
@@ -64,10 +65,14 @@ __all__ = [
     'ClientSecret',
     'Group',
     'GroupAssignment',
+    'IDP',
+    'IDPKey',
     'OAuthApplicationGrant',
     'SAMLApplication',
     'SAMLMetadata',
     'SingleSignOnService',
     'User',
     'UserAssignment',
+    'UserFactor',
+    'UserSupportedFactor',
 ]

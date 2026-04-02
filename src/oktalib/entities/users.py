@@ -32,6 +32,7 @@ User-related entities.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Generator
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -58,6 +59,10 @@ __license__ = 'MIT'
 __maintainer__ = 'Yorick Hoorneman'
 __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
+
+LOGGER_BASENAME = 'users'
+LOGGER = logging.getLogger(LOGGER_BASENAME)
+LOGGER.addHandler(logging.NullHandler())
 
 
 @register_entity('User')
@@ -738,3 +743,169 @@ class UserAssignment(Entity):
     def profile_saml_roles(self) -> list[str]:
         """Profile saml roles."""
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
+
+
+class UserFactor(Entity):
+    """Models the user factor object of okta."""
+
+    def __init__(
+        self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        super().__init__(okta_instance, data)
+        self._user_data = user_data
+
+    @property
+    def factor_type(self) -> str:
+        """The type of the user factor.
+
+        Returns:
+            factor_type (str): The type of the user factor.
+
+        """
+        return self._data.get('factorType', '')
+
+    @property
+    def provider(self) -> str:
+        """The provider of the user factor.
+
+        Returns:
+            provider (str): The provider of the user factor.
+
+        """
+        return self._data.get('provider', '')
+
+    @property
+    def vendor_name(self) -> str:
+        """The vendor name of the user factor.
+
+        Returns:
+            vendor_name (str): The vendor name of the user factor.
+
+        """
+        return self._data.get('vendorName', '')
+
+    @property
+    def status(self) -> str:
+        """The status of the user factor.
+
+        Returns:
+            status (str): The status of the user factor.
+
+        """
+        return self._data.get('status', '')
+
+    @property
+    def profile(self) -> dict[str, Any]:
+        """The profile of the user factor.
+
+        Returns:
+            profile (dict): The profile of the user factor.
+
+        """
+        return self._data.get('profile', {})
+
+    def delete(self) -> bool:
+        """Deletes the user factor from okta.
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
+        url = f'{self._okta.api}/users/{self._user_data.get("id")}/factors/{self.id}'
+        response = self._okta.session.delete(url)
+        return response.ok
+
+
+class UserSupportedFactor:
+    """Models a supported (but not yet enrolled) user factor from the catalog endpoint.
+
+    Unlike UserFactor, these factors don't have an ID yet since they're not enrolled.
+    They represent factor types that can be enrolled for a user.
+    """
+
+    def __init__(
+        self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        """Initialize UserSupportedFactor.
+
+        Args:
+            okta_instance: The Okta instance
+            user_data: The user data dictionary
+            data: The factor data from the catalog endpoint
+        """
+        self._okta = okta_instance
+        self._user_data = user_data
+        self._data = data
+        self._logger = logging.getLogger(f'{LOGGER_BASENAME}.UserSupportedFactor')
+
+    @property
+    def factor_type(self) -> str:
+        """The type of the user factor.
+
+        Returns:
+            str: The type of the user factor (e.g., 'sms',
+                'token:software:totp', 'question')
+
+        """
+        return self._data.get('factorType', '')
+
+    @property
+    def provider(self) -> str:
+        """The provider of the user factor.
+
+        Returns:
+            str: The provider of the user factor (e.g., 'OKTA', 'GOOGLE', 'RSA')
+
+        """
+        return self._data.get('provider', '')
+
+    @property
+    def vendor_name(self) -> str | None:
+        """The vendor name of the user factor.
+
+        Returns:
+            str | None: The vendor name of the user factor, if present
+
+        """
+        return self._data.get('vendorName')
+
+    @property
+    def enrollment(self) -> str:
+        """The optionality of the user factor.
+
+        Returns:
+            str: The optionality of the user factor (e.g., 'required', 'optional')
+
+        """
+        return self._data.get('enrollment', '')
+
+    @property
+    def enroll_link(self) -> str | None:
+        """The enrollment URL for this factor.
+
+        Returns:
+            str | None: The URL to POST to for enrolling in this factor
+
+        """
+        return self._data.get('_links', {}).get('enroll', {}).get('href')
+
+    @property
+    def questions_link(self) -> str | None:
+        """The questions URL for security question factors.
+
+        Returns:
+            str | None: The URL to GET available security questions
+                (only for question factors)
+
+        """
+        return self._data.get('_links', {}).get('questions', {}).get('href')
+
+    @property
+    def embedded_phones(self) -> list[dict[str, Any]]:
+        """Embedded phone data for SMS/call factors.
+
+        Returns:
+            list[dict]: List of phone objects with id, profile (phoneNumber), and status
+
+        """
+        return self._data.get('_embedded', {}).get('phones', [])

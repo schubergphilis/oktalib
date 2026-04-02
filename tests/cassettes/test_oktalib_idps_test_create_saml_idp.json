@@ -1,0 +1,71 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-04-01T15:21:10",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"type\": \"SAML2\", \"name\": \"test_saml_idp_create\", \"protocol\": {\"type\": \"SAML2\", \"endpoints\": {\"sso\": {\"url\": \"https://example.com/app/test_app/exk_test/sso/saml\", \"binding\": \"HTTP-POST\", \"destination\": \"http://www.okta.com/exk_test_issuer\"}, \"slo\": {\"url\": \"http://www.okta.com/exk_test_issuer/slo\", \"binding\": \"HTTP-POST\"}, \"acs\": {\"binding\": \"HTTP-POST\", \"type\": \"INSTANCE\"}}, \"settings\": {\"participateSlo\": true}, \"algorithms\": {\"request\": {\"signature\": {\"algorithm\": \"SHA-256\", \"scope\": \"REQUEST\"}}, \"response\": {\"signature\": {\"algorithm\": \"SHA-256\", \"scope\": \"ANY\"}}}, \"credentials\": {\"trust\": {\"issuer\": \"http://www.okta.com/exk_test_issuer\", \"audience\": \"\", \"kid\": \"1bc1ad82-2818-4a29-9c1b-945dad3d18eb\"}}}, \"policy\": {\"provisioning\": {\"action\": \"DISABLED\", \"profileMaster\": false, \"groups\": {\"action\": \"NONE\"}, \"conditions\": {\"deprovisioned\": {\"action\": \"NONE\"}, \"suspended\": {\"action\": \"NONE\"}}}, \"accountLink\": {\"filter\": {}, \"action\": \"AUTO\"}, \"subject\": {\"userNameTemplate\": {\"template\": \"idpuser.subjectNameId\"}, \"format\": [\"urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified\"], \"filter\": \".*@example.com\", \"matchType\": \"USERNAME\"}, \"trustClaims\": true, \"maxClockSkew\": 120000}}"
+        },
+        "headers": {
+          "Content-Length": [
+            "1213"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/api/v1/idps"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA51VXW/jNhD8L3osIuujTpDoqTqf27iwHd9ZDtAWhUFTlMWYIlmSshMY+e/dpeT0enBhuE9RyN3Z4ezs+hjwMsiCWJFUD++sjd1j3D6vaFzfBzeBJA2DW8esW1vSiDUv9ZoaRhyDW+uIay3c56Ni8jyGk+4KAdM4vQvjYRgnRXKbpUmWxIM4jn+HIEGsW+kSMC4EaqOcokoE2TFwbxqZLPPZNAUMJkutuHRQ/RhYq/BPayAyqJ3TNosiS+t2w8xW11xwO1A7R7Rhe84OA6qaiGgd+WfhB3vdrfGfCJAifCdU2HBZcrkFxMeiWISLp2UBpyVEcUkcV7KvBaUOh4PH98AnrDW3tmUmeAedxHf8LuREmAB5hPrnnWfSCzKZL4t8PhoH75ggtspwVzc+z7C/WqDrFeJbIN0akPD4TxTq+ZiH6e0dNpMqr/DX8ZfVGN6KeIZZraT1WVdA5PPfIB0fzhyotfVs0Eo/K9MQIAStkpkiltsMj23maIadzZJB4k94GVY+Nmul1YzyioNZboJaSWUWzECmY9LNIXQCJnKmZVAO3FfCKSfCV4TT7vV9JzpvXNAeipC25ExSFONkpn91GA2SRpaZPacsBJPueclMZLV0L6ZS+gCc9xVv3gQFtJ2fr2RDE1Lep2F6n9yHQ5I+hA802YQPw9uSlD+WyT3bQDAYVNHeXbIV4tuTEaE1m/KKOY5DGaO+0Fbv0WNfZtq82JfwmRG1uv21/ZTmvJ7s87Y6fEmsmw+bp12Vlgu+SGbbrkNaCU7fEMC/w4Kve0BCe5N/nizzT9PxZ6AHMRUXbAYDDM7OKhCa3QRbo1rtFf/ImT/NwZHQEQVDhDj+umQfRXD0z8TbFroty7O33uCUqla6KZc7zAcynkgn1Uf1fFU8+blrNy+M+gFooV3oloI1WuD2Qn98fMMO1Bgx6DN6XwHEqUIw+OEn9kogmeGUgxZgTloX3VZaLcdf5/kMN6A/zp0zfNNiGaQGOA15HQlFd8sdOwRZksIqjG86h44E4TiwaGI8ItKi91m5AkY4DDOEhK6MJdkIlMbrDqDf7cS1AFm80A1zBPYrwe/asOqatcijfRKBHjY695sQnaAHr35L9hRgiYKPvHGj7gIId8uZCKHgyX8Ev4yL4M+uiZ7kdcROmzk9S+s6Jn6XeyrY9P9BhugLKnW4sK/+W4WSoV/3vRevE+NifQFrgr5RwaJvypyjc5Li/f1vlr+E6AkIAAA=",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/idps"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

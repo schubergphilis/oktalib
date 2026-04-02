@@ -1,0 +1,253 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-04-01T15:21:18",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"type\": \"SAML2\", \"name\": \"test_saml_idp_delete\", \"protocol\": {\"type\": \"SAML2\", \"endpoints\": {\"sso\": {\"url\": \"https://example.com/app/test_app/exk_test/sso/saml\", \"binding\": \"HTTP-POST\", \"destination\": \"http://www.okta.com/exk_test_issuer\"}, \"slo\": {\"url\": \"http://www.okta.com/exk_test_issuer/slo\", \"binding\": \"HTTP-POST\"}, \"acs\": {\"binding\": \"HTTP-POST\", \"type\": \"INSTANCE\"}}, \"settings\": {\"participateSlo\": true}, \"algorithms\": {\"request\": {\"signature\": {\"algorithm\": \"SHA-256\", \"scope\": \"REQUEST\"}}, \"response\": {\"signature\": {\"algorithm\": \"SHA-256\", \"scope\": \"ANY\"}}}, \"credentials\": {\"trust\": {\"issuer\": \"http://www.okta.com/exk_test_issuer\", \"audience\": \"\", \"kid\": \"1bc1ad82-2818-4a29-9c1b-945dad3d18eb\"}}}, \"policy\": {\"provisioning\": {\"action\": \"DISABLED\", \"profileMaster\": false, \"groups\": {\"action\": \"NONE\"}, \"conditions\": {\"deprovisioned\": {\"action\": \"NONE\"}, \"suspended\": {\"action\": \"NONE\"}}}, \"accountLink\": {\"filter\": {}, \"action\": \"AUTO\"}, \"subject\": {\"userNameTemplate\": {\"template\": \"idpuser.subjectNameId\"}, \"format\": [\"urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified\"], \"filter\": \".*@example.com\", \"matchType\": \"USERNAME\"}, \"trustClaims\": true, \"maxClockSkew\": 120000}}"
+        },
+        "headers": {
+          "Content-Length": [
+            "1213"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/api/v1/idps"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA51V73PiNhD9X/yxE2Pskgzxp/o42qNDCDnMzbSdDiOkBSvIlqofkByT/70r2aTXGzoM/RRntfv26e3Tcow4i/KoL0mmBnfaDN14PngaqX41jG6ihtSApxaMXRlSixVnasVAgAU8NZZYZ/C8GJWTL2OMUA3EggfM+tld3B/E/bRMb/MszdNhr9/v/45Jghi7VOxyotLSSipFlB8j+6o8k0XxMM0QAxqmJG8sdj9Gxkj/x2nMjCprlcmTxNDKrUFvVcUFNz25s0Rp2HM49KisE6JUEq7lP+Blt/L/JIiU+HtihzVvGG+2iPipLOfx/HFRYpRhFm+I5bLpemGrw+EQ8APwCWvFjXGgozfUSXzH70JN4guwjtBwvfNMOkEms0VZzEbj6M0XiK3U3FZ1qNPwl0O6QSG+RdJOo4THf7K8np+KOLu988OkMij8efy0HONdPZ4Go2RjQtUVEMXsNyz3FweLam0DG2+ln6WuCRLCUTW5JIab3IdNbmnuJ5unvTREOIs3ITd3jVFA+Yajq26iSjZSz0FjpYXGzjB1gm6z2gG2Q/cxjHIiQkeMtrfvJtF644L22IQ4xqGhXoyTmf41YW+QLDGg95xCjCbdcwY6MUo7Lr/azWtNXioL6+e9QrRdeF/pmqaEDbM4G6bDeECy+/iepuv4fnDLCPuRpUNYYzIaVNLOXY0T4tvIiNAKpnwDlvtH2ff64liDR49dm2n9bJ7jL0Dk8vZX9yEreDXZF25zeEqNnQ3qx90mY3M+Tx+27YSUFJy+eoBwD4O+7gAJ7Uz+cbIoPkzHH5Ee5my4gAd8wOjsfINCw0201dKpoPh7zexxho7EiUh8RB4nHDN4b+J3xJl843DaDTt7GgxOqXSNnfJm5+uRTCDSSvXevViWj+HdufUz0PAAHI7Lu6WEWgncPMEf79+4A5XP6HUVna8Q4tQh6v3wE7wQLAb/ylELNCetynYrLRfjz7PiwW/AEC6s1XztfBtPDXHQEiMh6W6xg0OUpxmuwv5N69CRINw/WG9iHyKN8d4HtkRG/jE8eEicyrgha+GlCboj6Hc7cSVQliB0DZbgfiX+u9KwuWYt8mSfJqiHSc79JiQn6N5L2JIdBVyi6KNg3KQ9QMLtciZCSLzyH9Ev4zL6sx1iIHkdsdNmzs7Suo5J2OWBih/6/yBD1AWVWlzcV/+tAgPv133nxevEuNhf4Jqgr1RA8k2bc3ROUry9/Q1p6b+kCQgAAA==",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/idps"
+      }
+    },
+    {
+      "recorded_at": "2026-04-01T15:21:19",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Content-Length": [
+            "0"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/api/v1/idps/0oa2p46rs8uEP4QCp0h8/lifecycle/deactivate"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA51V23LiOBD9Fz9uxfiyJEX8tB6G3WELCBnMVO1MbVFCbrCCbGl1gWSp/Pu2ZJO5FDUU+xRH6j59dPp0cwxYGWRBLEgq+3dKD+xo3n8cyrgaBDdBQ2rAWwParDSp+YqVclUCBwN4qw0xVuP9eJYPi/GnEZ5RBcSAg0zj9C6M+2GcFMltliZZMujFcfwZgzjRZinLy4FSCSOo4EF2DMyLdFwW+XSSIgY0pRSsMVj/GGgt3B+rMDKojJE6iyJNK7sGtZUV40z3xM4QqWDP4NCjoo6IlJF/mPuA593K/RMhUuReihXWrClZs0XED0UxD+cPiwJPS4xiDTFMNF0tLHU4HDy+Bz5hrZjWFlTwikrxH/hdyIlcAuYR6p93nkknyHi2KPLZcBS8ugS+FYqZqvZ5Cv6xSNcrxLZI2iqU8Pg1yun5IQ/T2zvXTiq8wh9Hj8sRvtXhKdBSNNpnXQGRz/7CdPdwMKjW1rNxZvpdqJogIWxVkwmimc7csc4MzVxns6SX+BNWhhsfm9lGS6Bsw9BVN0ElGqHmoDDTQGNmGDpGtxllAcuh+0o8ZYT7injavr7rROuNC9pjEWJLBg11YpzM9F2HnUHSSIPaMwohmnTPSlCRlsoy8a/ZvNTkuTKwftpLRNv5CUvWNCHlIA3TQTII+yS9D+9psg7v+7clKX8tkwGsMRgNKmjnrsZy/u3JkNAKJmwDhrmxjJ2+2Fbv0WNXZlI/6afwExCxvP3TvktzVo33ud0cHhNtZv36YbdJyzmbJ9Nt2yEpOKMvDsC/Q6OvO0BCO5O/Hy/yd5PRe6SHMRvGYYoDjM7ONig03ARbJaz0ir/lzB5m6EjsiMAhcjj+uoS3Im5HnInXFrvdlGdvvcEpFbYxE9bsXD6S8URaqd6q58viwc+dXT8B9QNgsV3OLQXUkuPm8f54+8YtKF1Er8vofIUQpwpB75ff4JlgMrgpRy3QnLQq2q20XIw+zvKp24D+ODdGsbV1ZRw1xEFLDLmgu8UODkGWpLgK45vWoUNOmBtYZ2J3RBrtvA/lEhm5YZg6SOzKqCFr7qTxuiPoDztxxVEWL3QNhuB+Je67UrC5Zi2yaJ9EqIeOzv0qRCfo3rPfkh0FXKLoI2/cqL1Awu1yJpwLfPKX4I9REfzdNtGTvI7YaTOnZ2ldx8Tvck/FNf1/kCHygkotLu6rn6lg2L5z4nVSXKzOcUnQF8ohciPhi5yjcpLh9fU/a7o04gcIAAA=",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/idps/0oa2p46rs8uEP4QCp0h8/lifecycle/deactivate"
+      }
+    },
+    {
+      "recorded_at": "2026-04-01T15:21:19",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/api/v1/idps/0oa2p46rs8uEP4QCp0h8"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAAAA51V23LiOBD9Fz9uxfiyJEX8tB6G3WELCBnMVO1MbVFCbrCCbGl1gWSp/Pu2ZJO5FDUU+xRH6j59dPp0cwxYGWRBLEgq+3dKD+xo3n8cyrgaBDdBQ2rAWwParDSp+YqVclUCBwN4qw0xVuP9eJYPi/GnEZ5RBcSAg0zj9C6M+2GcFMltliZZMujFcfwZgzjRZinLy4FSCSOo4EF2DMyLdFwW+XSSIgY0pRSsMVj/GGgt3B+rMDKojJE6iyJNK7sGtZUV40z3xM4QqWDP4NCjoo6IlJF/mPuA593K/RMhUuReihXWrClZs0XED0UxD+cPiwJPS4xiDTFMNF0tLHU4HDy+Bz5hrZjWFlTwikrxH/hdyIlcAuYR6p93nkknyHi2KPLZcBS8ugS+FYqZqvZ5Cv6xSNcrxLZI2iqU8Pg1yun5IQ/T2zvXTiq8wh9Hj8sRvtXhKdBSNNpnXQGRz/7CdPdwMKjW1rNxZvpdqJogIWxVkwmimc7csc4MzVxns6SX+BNWhhsfm9lGS6Bsw9BVN0ElGqHmoDDTQGNmGDpGtxllAcuh+0o8ZYT7injavr7rROuNC9pjEWJLBg11YpzM9F2HnUHSSIPaMwohmnTPSlCRlsoy8a/ZvNTkuTKwftpLRNv5CUvWNCHlIA3TQTII+yS9D+9psg7v+7clKX8tkwGsMRgNKmjnrsZy/u3JkNAKJmwDhrmxjJ2+2Fbv0WNXZlI/6afwExCxvP3TvktzVo33ud0cHhNtZv36YbdJyzmbJ9Nt2yEpOKMvDsC/Q6OvO0BCO5O/Hy/yd5PRe6SHMRvGYYoDjM7ONig03ARbJaz0ir/lzB5m6EjsiMAhcjj+uoS3Im5HnInXFrvdlGdvvcEpFbYxE9bsXD6S8URaqd6q58viwc+dXT8B9QNgsV3OLQXUkuPm8f54+8YtKF1Er8vofIUQpwpB75ff4JlgMrgpRy3QnLQq2q20XIw+zvKp24D+ODdGsbV1ZRw1xEFLDLmgu8UODkGWpLgK45vWoUNOmBtYZ2J3RBrtvA/lEhm5YZg6SOzKqCFr7qTxuiPoDztxxVEWL3QNhuB+Je67UrC5Zi2yaJ9EqIeOzv0qRCfo3rPfkh0FXKLoI2/cqL1Awu1yJpwLfPKX4I9REfzdNtGTvI7YaTOnZ2ldx8Tvck/FNf1/kCHygkotLu6rn6lg2L5z4nVSXKzOcUnQF8ohciPhi5yjcpLh9fU/a7o04gcIAAA=",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/idps/0oa2p46rs8uEP4QCp0h8"
+      }
+    },
+    {
+      "recorded_at": "2026-04-01T15:21:19",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Content-Length": [
+            "0"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "DELETE",
+        "uri": "https://example.com/api/v1/idps/0oa2p46rs8uEP4QCp0h8"
+      },
+      "response": {
+        "body": {
+          "encoding": null,
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 204,
+          "message": "No Content"
+        },
+        "url": "https://example.com/api/v1/idps/0oa2p46rs8uEP4QCp0h8"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

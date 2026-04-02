@@ -226,7 +226,7 @@ class Okta:
             raise InvalidIDPKey(kid)
         return idp_key.delete()
 
-    def create_saml_idp(
+    def create_saml_idp(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
         name: str,
         okta_idp_issuer_url: str,
@@ -242,7 +242,7 @@ class Okta:
         account_link_exclude_users: list | None = None,
         account_link_exclude_admins: bool = False,
         account_matching: str = 'USERNAME',
-        maxClockSkew: int = 120000,
+        max_clock_skew: int = 120000,
     ) -> IDP | None:
         """Creates an identity provider in okta.
 
@@ -278,7 +278,7 @@ class Okta:
                 from account linking.
             account_link_exclude_admins: Users with any admin roles or
                 privileges will be excluded from account linking.
-            maxClockSkew: The maximum allowed clock skew in milliseconds
+            max_clock_skew: The maximum allowed clock skew in milliseconds
                 (default is 120000)
         Returns:
             IDP: The created identity provider on success, None otherwise
@@ -347,12 +347,17 @@ class Okta:
                     'response': {'signature': {'algorithm': 'SHA-256', 'scope': 'ANY'}},
                 },
                 'credentials': {
-                    'trust': {
-                        'issuer': okta_idp_issuer_url,
-                        'audience': '',
-                        'kid': kid,
-                        'additionalKids': ['additional-key-id'],
-                    }
+                    **(
+                        {
+                            'trust': {
+                                'issuer': okta_idp_issuer_url,
+                                'audience': '',
+                                'kid': kid,
+                            }
+                        }
+                        if kid
+                        else {}
+                    )
                 },
             },
             'policy': {
@@ -376,7 +381,7 @@ class Okta:
                     'matchType': account_matching,
                 },
                 'trustClaims': trust_claims,
-                'maxClockSkew': maxClockSkew,
+                'maxClockSkew': max_clock_skew,
             },
         }
         response = self.session.post(url=url, json=payload)
