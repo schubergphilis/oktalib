@@ -42,8 +42,8 @@ from typing import TYPE_CHECKING, Any
 
 from oktalib.oktalibexceptions import InvalidGroup
 
+from . import groups, users
 from .core import Entity
-from .registry import get_entity, register_entity
 
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
@@ -517,7 +517,6 @@ class SAMLMetadata:
         )
 
 
-@register_entity('Application')
 class Application(Entity):
     """Models the apps in okta."""
 
@@ -650,10 +649,9 @@ class Application(Entity):
             generator: A generator of User objects for the users of the application
 
         """
-        User = get_entity('User')  # pylint: disable=invalid-name
         url = self._data.get('_links', {}).get('users', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield User(self._okta, data)
+            yield users.User(self._okta, data)
 
     @property
     def groups(self) -> Generator[Group | None, None, None]:
@@ -675,10 +673,9 @@ class Application(Entity):
             generator: A generator of group assignments for application
 
         """
-        GroupAssignment = get_entity('GroupAssignment')  # pylint: disable=invalid-name
         url = self._data.get('_links', {}).get('groups', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield GroupAssignment(self._okta, data)
+            yield groups.GroupAssignment(self._okta, data)
 
     def get_group_assignment_by_group_name(self, name: str) -> GroupAssignment | None:
         """Retrieves a group assignment by a group name.
@@ -701,10 +698,9 @@ class Application(Entity):
             generator: A generator of user assignments for application
 
         """
-        UserAssignment = get_entity('UserAssignment')  # pylint: disable=invalid-name
         url = self._data.get('_links', {}).get('users', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield UserAssignment(self._okta, data)
+            yield users.UserAssignment(self._okta, data)
 
     def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
         """Retrieves a user assignment by a user email.
@@ -827,7 +823,6 @@ class Application(Entity):
         return response.ok
 
 
-@register_entity('SAMLApplication')
 class SAMLApplication(Application):
     """Models the SAML apps in okta."""
 
@@ -923,7 +918,6 @@ class SAMLApplication(Application):
         )
 
 
-@register_entity('APIServiceApp')
 class APIServiceApp(Application):
     """Models the API Service apps in okta."""
 

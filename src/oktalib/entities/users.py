@@ -40,9 +40,9 @@ from cachetools import TTLCache, cached
 
 from oktalib.oktalibexceptions import UnableToUpdate
 
+from . import groups
 from .adminrole import AdminRole
 from .core import Entity
-from .registry import get_entity, register_entity
 
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
@@ -60,7 +60,6 @@ __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 
-@register_entity('User')
 class User(Entity):
     """Models the user object of okta."""
 
@@ -438,10 +437,9 @@ class User(Entity):
             generator: A generator of Group objects for which the user is member of
 
         """
-        Group = get_entity('Group')  # pylint: disable=invalid-name
         url = f'{self._okta.api}/users/{self.id}/groups'
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield Group(self._okta, data)
+            yield groups.Group(self._okta, data)
 
     def delete(self) -> bool:
         """Deletes the user from okta.
@@ -630,7 +628,6 @@ class User(Entity):
         return response.ok
 
 
-@register_entity('UserAssignment')
 class UserAssignment(Entity):
     """Models the user assignment object of okta for apps."""
 
@@ -664,12 +661,11 @@ class UserAssignment(Entity):
             group (Group): The group that the user assignment refers to.
 
         """
-        Group = get_entity('Group')  # pylint: disable=invalid-name
         url = self._user_assignment_data.get('_links', {}).get('group', {}).get('href')
         response = self._okta.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return Group(self._okta, response.json())
+        return groups.Group(self._okta, response.json())
 
     @property
     def email(self) -> str | None:
