@@ -40,8 +40,8 @@ from cachetools import TTLCache, cached
 
 from oktalib.oktalibexceptions import InvalidApplication, InvalidGroup, InvalidUser
 
+from . import apps, users
 from .core import Entity
-from .registry import get_entity, register_entity
 
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
@@ -60,7 +60,6 @@ __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 
-@register_entity('Group')
 class Group(Entity):
     """Models the group object of okta."""
 
@@ -180,10 +179,9 @@ class Group(Entity):
             generator: A generator of User objects for the users of the group
 
         """
-        User = get_entity('User')  # pylint: disable=invalid-name
         url = self._data.get('_links', {}).get('users', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield User(self._okta, data)
+            yield users.User(self._okta, data)
 
     @property
     def applications(self) -> Generator[Application, None, None]:
@@ -194,10 +192,9 @@ class Group(Entity):
                 of the group
 
         """
-        Application = get_entity('Application')  # pylint: disable=invalid-name
         url = self._data.get('_links', {}).get('apps', {}).get('href')
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield Application(self._okta, data)
+            yield apps.Application(self._okta, data)
 
     def delete(self) -> bool:
         """Deletes the group from okta.
@@ -314,7 +311,6 @@ class Group(Entity):
         return response.ok
 
 
-@register_entity('GroupAssignment')
 class GroupAssignment(Group):
     """Models the group assignment object of okta for apps."""
 
