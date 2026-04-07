@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.3.0](https://github.com/schubergphilis/oktalib/compare/v3.2.0...v3.3.0) (2026-04-07)
+
+
+### Features
+
+* **smaller modules:** breaking up  entities into smaller modules ([642bb55](https://github.com/schubergphilis/oktalib/commit/642bb55032e9f04e97ff895252061df08ed6bad9))
+* **smaller modules:** breaking up  entities into smaller modules ([db5badc](https://github.com/schubergphilis/oktalib/commit/db5badc196c3b7b30eb5c9f38e2bface471fae16))
+
+
+### Bug Fixes
+
+* **docs:** correct entity references in API documentation ([928e541](https://github.com/schubergphilis/oktalib/commit/928e5412717f2fd9c2717c62b10cdeeb58e65bfc))
+* **tests:** update recorded_at timestamp and remove Content-Length ([da0dba3](https://github.com/schubergphilis/oktalib/commit/da0dba32d2cd1559e67384ad8206b68e2a3a2408))
+* **tests:** update recorded_at timestamp in SAML metadata test ([2bcba72](https://github.com/schubergphilis/oktalib/commit/2bcba729a22c2ed99ebf18261b8489a67d83e562))
+
 ## [3.2.0](https://github.com/schubergphilis/oktalib/compare/v3.1.0...v3.2.0) (2026-03-26)
 
 
