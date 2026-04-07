@@ -16,7 +16,7 @@ Main client for interacting with the Okta API.
 
 ### Group
 
-::: oktalib.entities.entities.Group
+::: oktalib.entities.groups.Group
     options:
       show_source: false
       members: true
@@ -24,7 +24,7 @@ Main client for interacting with the Okta API.
 
 ### User
 
-::: oktalib.entities.entities.User
+::: oktalib.entities.users.User
     options:
       show_source: false
       members: true
@@ -32,7 +32,7 @@ Main client for interacting with the Okta API.
 
 ### Application
 
-::: oktalib.entities.entities.Application
+::: oktalib.entities.apps.Application
     options:
       show_source: false
       members: true
@@ -40,7 +40,7 @@ Main client for interacting with the Okta API.
 
 ### AdminRole
 
-::: oktalib.entities.entities.AdminRole
+::: oktalib.entities.adminrole.AdminRole
     options:
       show_source: false
       members: true
@@ -48,7 +48,7 @@ Main client for interacting with the Okta API.
 
 ### GroupAssignment
 
-::: oktalib.entities.entities.GroupAssignment
+::: oktalib.entities.groups.GroupAssignment
     options:
       show_source: false
       members: true
@@ -56,7 +56,7 @@ Main client for interacting with the Okta API.
 
 ### UserAssignment
 
-::: oktalib.entities.entities.UserAssignment
+::: oktalib.entities.users.UserAssignment
     options:
       show_source: false
       members: true
