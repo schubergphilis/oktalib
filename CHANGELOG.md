@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.0](https://github.com/schubergphilis/oktalib/compare/v3.3.0...v3.4.0) (2026-07-20)
+
+
+### Features
+
+* add search groups by query ([688a50b](https://github.com/schubergphilis/oktalib/commit/688a50b0e3ca4a1370928ce737a0b7845972e8b7))
+
 ## [3.3.0](https://github.com/schubergphilis/oktalib/compare/v3.2.0...v3.3.0) (2026-04-07)
 
 
