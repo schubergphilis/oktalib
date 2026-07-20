@@ -245,7 +245,8 @@ class Okta:
 
     def search_groups_by_query(self, query: str) -> list[Group]:
         """Retrieves the groups according to the raw query provided.
-        Details about the filtering expression can be found in the [Okta Documentation](https://developer.okta.com/docs/api#filter)
+        Details about the filtering expression can be found in the
+        [Okta Documentation](https://developer.okta.com/docs/api#filter)
 
         Args:
             query: Okta query to be used to retrieve subset of groups.
