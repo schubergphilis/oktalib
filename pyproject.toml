@@ -1,6 +1,6 @@
 [project]
 name = "oktalib"
-version = "3.4.0"
+version = "3.5.0"
 description = "A library to interface with Okta through it's restful api"
 readme = "README.md"
 license = { file = "LICENSE" }

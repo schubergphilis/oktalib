@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.5.0](https://github.com/schubergphilis/oktalib/compare/v3.4.0...v3.5.0) (2026-07-23)
+
+
+### Features
+
+* add user MFA factor management with sanitized test fixtures ([#43](https://github.com/schubergphilis/oktalib/issues/43)) ([a9f6fa2](https://github.com/schubergphilis/oktalib/commit/a9f6fa2bef2493d5c92692552db6fbceaa868031))
+
 ## [3.4.0](https://github.com/schubergphilis/oktalib/compare/v3.3.0...v3.4.0) (2026-07-20)
 
 
