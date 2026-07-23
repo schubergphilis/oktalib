@@ -43,6 +43,7 @@ from .entities import (
     APIServiceApp,
     Application,
     ApplicationType,
+    Feature,
     Group,
     SAMLApplication,
     SAMLMetadata,
@@ -147,6 +148,83 @@ class Okta:
             self._logger.warning('Api is exhausted for endpoint, backing off.')
             raise ApiLimitReached
         return response
+
+    @property
+    def features(self) -> Generator[Feature, None, None]:
+        """The features configured in okta.
+
+        Returns:
+            generator: The generator of features configured in okta
+
+        """
+        url = f'{self.api}/features'
+        for data in self._get_paginated_url(url):
+            yield Feature(self, data)
+
+    def get_feature_by_id(self, feature_id: str) -> Feature | None:
+        """Retrieves the feature by id.
+
+        Args:
+            feature_id: The id of the feature to retrieve
+
+        Returns:
+            Feature: The feature if a match is found else None
+
+        """
+        url = f'{self.api}/features/{feature_id}'
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.text)
+        return Feature(self, response.json()) if response.ok else None
+
+    def get_feature_by_name(self, name: str) -> Feature | None:
+        """Retrieves the first feature (of any type) by name.
+
+        Args:
+            name: The name of the feature to retrieve
+
+        Returns:
+            Feature: The feature if a match is found else None
+
+        """
+        return next(
+            (feature for feature in self.features if feature.name == name),
+            None,
+        )
+
+    def get_feature_dependencies_by_id(self, feature_id: str) -> Generator[Feature, None, None]:
+        """Lists all feature dependencies for a specified feature.
+
+        A feature's dependencies are the features that it requires to be
+        enabled in order for itself to be enabled.
+
+        Args:
+            feature_id: The id of the feature to retrieve
+
+        Returns:
+            generator: The generator of feature dependencies for the specified feature
+
+        """
+        url = f'{self.api}/features/{feature_id}/dependencies'
+        for data in self._get_paginated_url(url):
+            yield Feature(self, data)
+
+    def get_feature_dependents_by_id(self, feature_id: str) -> Generator[Feature, None, None]:
+        """Lists all feature dependents for the specified feature.
+
+        A feature's dependents are the features that need to be disabled in
+        order for the feature itself to be disabled.
+
+        Args:
+            feature_id: The id of the feature to retrieve
+
+        Returns:
+            generator: The generator of feature dependents for the specified feature
+
+        """
+        url = f'{self.api}/features/{feature_id}/dependents'
+        for data in self._get_paginated_url(url):
+            yield Feature(self, data)
 
     @property
     def groups(self) -> Generator[Group, None, None]:

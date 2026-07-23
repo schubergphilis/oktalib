@@ -5,7 +5,6 @@ import contextlib
 import gzip
 import json
 import os
-import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -49,9 +48,10 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'Content-Length',
 ]
 
-CASSETTE_DIR = Path(__file__).parent / 'cassettes'
-# Key under which the session start time is stashed for the end-of-session sanitizer.
-_SESSION_START = pytest.StashKey[float]()
+# Paths of cassettes that received a new recording this session (populated by the
+# before_record hook). Only these are sanitized at session end, so replayed /
+# already-clean cassettes are never re-processed.
+_recorded_cassettes: set[str] = set()
 
 
 def _redact_shared_secrets(obj: object) -> object:
@@ -166,9 +166,12 @@ def configure_betamax(token: str, base_url: str | None = None) -> None:
         # Strip both request and response headers in one callback
         def strip_sensitive_headers(
             interaction: Interaction,
-            cassette: Cassette,  # noqa: ARG001
+            cassette: Cassette,
         ) -> None:
-            # pylint: disable='unused-argument'
+            # this hook only fires when an interaction is recorded (never on
+            # replay), so it marks exactly the cassettes needing sanitization.
+            _recorded_cassettes.add(cassette.cassette_path)
+
             # Create lowercase sets for case-insensitive comparison
             req_headers_lower = {h.lower() for h in REQUEST_HEADERS_TO_REMOVE}
             resp_headers_lower = {h.lower() for h in RESPONSE_HEADERS_TO_REMOVE}
@@ -300,24 +303,19 @@ def _sanitize_cassette_file(path: Path, host: str) -> None:
         path.write_text(sanitized, encoding='utf-8')
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:
-    """Record when the session started so we only sanitize cassettes written during it."""
-    session.stash[_SESSION_START] = time.time()
-
-
 def pytest_sessionfinish(session: pytest.Session) -> None:
-    """Sanitize every cassette recorded or updated during this session.
+    """Sanitize the cassettes that were (re)recorded during this session.
 
-    Runs once after all tests and fixture teardowns, so it covers cassettes made
-    through any path (okta_cassette, raw betamax, module-scoped fixtures) without
-    interfering with the live recording flow. Redaction is a no-op on unchanged
-    files, so this never rewrites already-clean cassettes.
+    Only cassettes captured by the before_record hook are processed, so replayed
+    or already-clean cassettes are never touched. Recording happens through the
+    global betamax config, so this covers every path (okta_cassette, raw betamax,
+    module-scoped fixtures) without interfering with the live recording flow.
     """
-    started = session.stash.get(_SESSION_START, 0.0)
     host = _okta_hostname()
-    for path in CASSETTE_DIR.glob('*.json'):
-        if path.stat().st_mtime >= started:
-            _sanitize_cassette_file(path, host)
+    for path in _recorded_cassettes:
+        cassette = Path(path)
+        if cassette.exists():
+            _sanitize_cassette_file(cassette, host)
 
 
 def make_error_response(status: int = 502, body: bytes = b'<html>502 Bad Gateway</html>') -> Response:
