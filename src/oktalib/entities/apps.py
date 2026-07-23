@@ -61,7 +61,7 @@ __maintainer__ = 'Yorick Hoorneman'
 __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
-LOGGER_BASENAME = 'entities'
+LOGGER_BASENAME = 'apps'
 
 
 class ApplicationType(Enum):

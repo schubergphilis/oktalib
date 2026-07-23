@@ -32,6 +32,7 @@ User-related entities.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Generator
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -58,6 +59,8 @@ __license__ = 'MIT'
 __maintainer__ = 'Yorick Hoorneman'
 __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
+
+LOGGER_BASENAME = 'users'
 
 
 class User(Entity):
@@ -627,6 +630,59 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
+    def enrolled_factors(self) -> Generator[UserFactor, None, None]:
+        """Lists the factors the user is enrolled in.
+
+        Returns:
+            generator: A generator of UserFactor objects for which the user
+                is enrolled in
+
+        """
+        url = f'{self._okta.api}/users/{self.id}/factors'
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+            yield _create_factor_from_data(self._okta, self._data, data)
+
+    def supported_factors(self) -> Generator[UserSupportedFactor, None, None]:
+        """Lists all the supported factors that can be enrolled for the
+        specified user that are included in the highest priority
+        authenticator enrollment policy that applies to the user.
+
+        Only factors that are REQUIRED or OPTIONAL in the highest priority
+        authenticator enrollment policy can be returned.
+
+        Returns:
+            generator: A generator of UserSupportedFactor objects for which
+                the user can enroll in
+
+        """
+        url = f'{self._okta.api}/users/{self.id}/factors/catalog'
+        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+            yield UserSupportedFactor(self._okta, self._data, data)
+
+    def enroll_factor(
+        self, factor_type: str, provider: str, query: dict[str, Any]
+    ) -> UserFactor | None:
+        """Enrolls the user in a new factor.
+
+        Args:
+            factor_type: The type of the factor to enroll in (e.g., 'sms',
+                'token:software:totp', 'question')
+            provider: The provider of the factor to enroll in (e.g., 'OKTA',
+                'GOOGLE', 'RSA')
+            query: A dictionary containing the query attributes required for
+                enrolling in the factor (e.g., {'phoneNumber': '+1234567890'}
+                for sms factors)
+        Returns:
+            UserFactor: The enrolled UserFactor object on success, None otherwise
+        """
+        url = f'{self._okta.api}/users/{self.id}/factors'
+        payload = {'factorType': factor_type, 'provider': provider}
+        response = self._okta.session.post(url, data=json.dumps(payload), params=query)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return _create_factor_from_data(self._okta, self._data, response.json())
+
 
 class UserAssignment(Entity):
     """Models the user assignment object of okta for apps."""
@@ -734,3 +790,284 @@ class UserAssignment(Entity):
     def profile_saml_roles(self) -> list[str]:
         """Profile saml roles."""
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
+
+
+def _create_factor_from_data(
+    okta_instance: Okta,
+    user_data: dict[str, Any],
+    factor_data: dict[str, Any],
+) -> UserFactor:
+    """Create a UserFactor instance based on the factor type and provider.
+
+    Uses pattern matching to determine the factor type from factorType and provider
+    fields and returns the appropriate UserFactor subclass.
+
+    Args:
+        okta_instance: The Okta instance
+        user_data: The user data dictionary
+        factor_data: The factor data from the Okta API
+
+    Returns:
+        UserFactor: A UserFactor or subclass instance (e.g., UserFactorGoogleOTP)
+
+    """
+    factor_type = factor_data.get('factorType', '')
+    provider = factor_data.get('provider', '')
+
+    match (factor_type, provider):
+        case ('token:software:totp', 'GOOGLE'):
+            return UserFactorGoogleOTP(okta_instance, user_data, factor_data)
+        case _:
+            return UserFactor(okta_instance, user_data, factor_data)
+
+
+class UserFactor(Entity):
+    """Models the user factor object of okta."""
+
+    def __init__(
+        self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        super().__init__(okta_instance, data)
+        self._user_data = user_data
+
+    @property
+    def factor_type(self) -> str:
+        """The type of the user factor.
+
+        Returns:
+            factor_type (str): The type of the user factor.
+
+        """
+        return self._data.get('factorType', '')
+
+    @property
+    def provider(self) -> str:
+        """The provider of the user factor.
+
+        Returns:
+            provider (str): The provider of the user factor.
+
+        """
+        return self._data.get('provider', '')
+
+    @property
+    def vendor_name(self) -> str:
+        """The vendor name of the user factor.
+
+        Returns:
+            vendor_name (str): The vendor name of the user factor.
+
+        """
+        return self._data.get('vendorName', '')
+
+    @property
+    def status(self) -> str:
+        """The status of the user factor.
+
+        Returns:
+            status (str): The status of the user factor.
+
+        """
+        return self._data.get('status', '')
+
+    @property
+    def profile(self) -> dict[str, Any]:
+        """The profile of the user factor.
+
+        Returns:
+            profile (dict): The profile of the user factor.
+
+        """
+        return self._data.get('profile', {})
+
+    def delete(self) -> bool:
+        """Deletes the user factor from okta.
+
+        Returns:
+            bool: True on success, False otherwise
+
+        """
+        url = f'{self._okta.api}/users/{self._user_data.get("id")}/factors/{self.id}'
+        response = self._okta.session.delete(url)
+        return response.ok
+
+
+class UserFactorGoogleOTP(UserFactor):
+    """Models a Google OTP (Authenticator) factor with enrollment and activation support.
+
+    This subclass extends UserFactor to handle Google Authenticator TOTP factors,
+    providing access to shared secrets, QR codes, and activation functionality.
+    """
+
+    @property
+    def shared_secret(self) -> str:
+        """The base32-encoded shared secret for TOTP generation.
+
+        This secret is used to generate time-based one-time passwords and is
+        typically displayed as a QR code or manual entry code during enrollment.
+
+        Returns:
+            str: The base32-encoded shared secret, or empty string if not available
+
+        """
+        return self._data.get('_embedded', {}).get('activation', {}).get('sharedSecret', '')
+
+    @property
+    def qr_code_link(self) -> str:
+        """The URL to the QR code image for enrollment.
+
+        Users can scan this QR code with their Google Authenticator app to
+        automatically configure the TOTP factor.
+
+        Returns:
+            str: The QR code image URL, or empty string if not available
+
+        """
+        return (
+            self._data.get('_embedded', {})
+            .get('activation', {})
+            .get('_links', {})
+            .get('qrcode', {})
+            .get('href', '')
+        )
+
+    @property
+    def activation_link(self) -> str:
+        """The API endpoint URL for activating this factor.
+
+        Returns:
+            str: The activation endpoint URL, or empty string if not available
+
+        """
+        return self._data.get('_links', {}).get('activate', {}).get('href', '')
+
+    def activate(self, passcode: str) -> bool:
+        """Activate the pending Google OTP factor with a TOTP code.
+
+        This method activates a factor that is in PENDING_ACTIVATION status by
+        verifying a time-based one-time password. The passcode can be generated
+        by a user's Google Authenticator app or programmatically using the
+        shared_secret property.
+
+        Args:
+            passcode: The 6-digit TOTP code to verify and activate the factor
+
+        Returns:
+            bool: True if activation was successful, False otherwise
+
+        Example:
+            >>> factor = user.enroll_factor('token:software:totp', 'GOOGLE', {})
+            >>> # User scans QR code or uses shared_secret
+            >>> factor.activate('123456')
+            True
+
+        """
+        if not self.activation_link:
+            self._logger.error('No activation link available for this factor')
+            return False
+
+        payload = {'passCode': passcode}
+        response = self._okta.session.post(self.activation_link, data=json.dumps(payload))
+
+        if not response.ok:
+            self._logger.error(f'Failed to activate factor: {response.text}')
+            return False
+
+        # Update the factor data with the activation response
+        self._data = response.json()
+        return True
+
+
+class UserSupportedFactor:
+    """Models a supported (but not yet enrolled) user factor from the catalog endpoint.
+
+    Unlike UserFactor, these factors don't have an ID yet since they're not enrolled.
+    They represent factor types that can be enrolled for a user.
+    """
+
+    def __init__(
+        self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        """Initialize UserSupportedFactor.
+
+        Args:
+            okta_instance: The Okta instance
+            user_data: The user data dictionary
+            data: The factor data from the catalog endpoint
+        """
+        self._okta = okta_instance
+        self._user_data = user_data
+        self._data = data
+        self._logger = logging.getLogger(f'{LOGGER_BASENAME}.UserSupportedFactor')
+
+    @property
+    def factor_type(self) -> str:
+        """The type of the user factor.
+
+        Returns:
+            str: The type of the user factor (e.g., 'sms',
+                'token:software:totp', 'question')
+
+        """
+        return self._data.get('factorType', '')
+
+    @property
+    def provider(self) -> str:
+        """The provider of the user factor.
+
+        Returns:
+            str: The provider of the user factor (e.g., 'OKTA', 'GOOGLE', 'RSA')
+
+        """
+        return self._data.get('provider', '')
+
+    @property
+    def vendor_name(self) -> str | None:
+        """The vendor name of the user factor.
+
+        Returns:
+            str | None: The vendor name of the user factor, if present
+
+        """
+        return self._data.get('vendorName')
+
+    @property
+    def enrollment(self) -> str:
+        """The optionality of the user factor.
+
+        Returns:
+            str: The optionality of the user factor (e.g., 'required', 'optional')
+
+        """
+        return self._data.get('enrollment', '')
+
+    @property
+    def enroll_link(self) -> str | None:
+        """The enrollment URL for this factor.
+
+        Returns:
+            str | None: The URL to POST to for enrolling in this factor
+
+        """
+        return self._data.get('_links', {}).get('enroll', {}).get('href')
+
+    @property
+    def questions_link(self) -> str | None:
+        """The questions URL for security question factors.
+
+        Returns:
+            str | None: The URL to GET available security questions
+                (only for question factors)
+
+        """
+        return self._data.get('_links', {}).get('questions', {}).get('href')
+
+    @property
+    def embedded_phones(self) -> list[dict[str, Any]]:
+        """Embedded phone data for SMS/call factors.
+
+        Returns:
+            list[dict]: List of phone objects with id, profile (phoneNumber), and status
+
+        """
+        return self._data.get('_embedded', {}).get('phones', [])
