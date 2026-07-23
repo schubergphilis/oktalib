@@ -1,0 +1,134 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-07-21T11:29:44",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"profile\": {\"firstName\": \"Test\", \"lastName\": \"Supported Factors\", \"email\": \"test.mfa.supported@example.com\", \"login\": \"test.mfa.supported@example.com\"}}"
+        },
+        "headers": {
+          "Content-Length": [
+            "153"
+          ],
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/api/v1/users?activate=true"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAACE7VTS2/UMBD+K8hnuvamhbY5gaBIFai7sAsSXCrXnjQujm15nLSrKv+dSbxZcVjYSpSbH99jvhn7kRnNSiZEW+BdpW5898o32HWiPmMvGSaZWqT75ZfFt8vV5eLq4j0dqwgywcArRPH6SJweFfP1fF4W5+XJ8UwI8YNAUiXTHYZli3e1dLeHoFZi+uRvjWOla63NB1+DPmwSJOK9j3pnk/lpE4CVj7kFPm3Ozu8fTDjB73ftcfdZ1KesJ270lbEjrjIR05VsaMPWgGlb0/Zk1YbgI9Xy4gNl9xHpuvE3xF3W3sFkiqC80xeNNHaXI4diiTRnTSVnOEm9gQfZBAsz5RuSg8w6BOzHEWlwyUiLQ+UUojMa4rDOqdni4/otSbpc/LjriXhtjfs5crDFAE4PyzpCRaA6pYAl5795cRkM7+a8RYjI9z0jbk0FaqMs8EmR+gKp9kPXl4vVeqgXVU3hnuZFZMkzAUdj7lHtnV0EhLTcDv8Zg4y619Or2peHfsj2/T+r7U50XwvBVv9qNuhMv+KJgxjg0xj+8IX0/2iG/ksz+v4Xl+PG+9gEAAA=",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/users?activate=true"
+      }
+    },
+    {
+      "recorded_at": "2026-07-21T11:29:44",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/api/v1/users/00u2sjfcbov5omsvv0h8/factors/catalog?limit=100"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAACE9VTwU7jMBT8l3cuxCmEbX2rtIDQoqZSg5CoqsqNnxUvjm3ZTgqq8u84bZCgHDj3Zs0bj2dGz6s9CFYG44p3i0AhmFfU1BsRdswhDSZYGIF1ppUcXSTc5/n9423EWtTcuDmr8Su6UVK/eqB7QO2MUv2pcigipwrBepok+MZqq/CyNHXCrEzaNGk8Op8Q0oz9f1FuTZuZ2rctqSbJ0Z2P0pXU4aDMlDI7oCtY5MsC1l3XjcAHFpo4hXlebJa3xdMi3jhaqFGHOMgXxUM+nz1CNzrJvMMta0Klvwe9e/ibn8YcsDMIeYgipMJIX+1B8jgU1onsmjPCCbtOb9IUp5NI1Mdsz7id9S1sDpyIcxSsUVE1uAZjaKy3yDny3p3A6MQN4uFYI+PGBmn6GofnhMiy7GY6mX59rnTxbq8CY5JOL8ifizQtxoSSK3o1viSEvESSYj48Wf47sWSOS82UDO+9r1pqoGQENXsDmpK+M1Riia6VZfSoG6W69WdnyO+G3ukqFrz+sRi28dX3pcj/FbPTpRiwc9z8X3/7meddfwChIwke3wQAAA==",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/users/00u2sjfcbov5omsvv0h8/factors/catalog?limit=100"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

@@ -1,11 +1,16 @@
 """Reusable test fixtures for oktalib testing."""
 
+import base64
+import contextlib
+import gzip
 import json
 import os
+import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
 from types import TracebackType
+from urllib.parse import urlparse
 
 import pytest
 from _pytest.fixtures import SubRequest
@@ -43,6 +48,84 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'X-Rate-Limit-Reset',
     'Content-Length',
 ]
+
+CASSETTE_DIR = Path(__file__).parent / 'cassettes'
+# Key under which the session start time is stashed for the end-of-session sanitizer.
+_SESSION_START = pytest.StashKey[float]()
+
+
+def _redact_shared_secrets(obj: object) -> object:
+    """Return a copy of ``obj`` with every ``sharedSecret`` value replaced.
+
+    The marker stays valid base32 so pyotp can still parse it on replay (betamax
+    matches on request URL/method, not body, so the passcode value is ignored).
+    """
+    if isinstance(obj, dict):
+        return {
+            key: 'REDACTED' if key == 'sharedSecret' else _redact_shared_secrets(value)
+            for key, value in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redact_shared_secrets(item) for item in obj]
+    return obj
+
+
+def sanitize_response_body(body: dict, host: str) -> None:
+    """Redact the TOTP ``sharedSecret`` and the real Okta host from a body, in place.
+
+    betamax's placeholders can't reach into gzipped response bodies, so we decode,
+    redact, and re-encode here, preserving the original encoding so replay works.
+
+    Args:
+        body: The ``response['body']`` dict from a betamax cassette interaction.
+        host: The real Okta host to replace with ``example.com`` (e.g.
+            ``schubergphilis.oktapreview.com``); pass an empty string when the
+            host is unknown (e.g. on replay), which skips host redaction.
+
+    """
+    is_base64 = 'base64_string' in body
+    raw = base64.b64decode(body['base64_string']) if is_base64 else body.get('string', '').encode()
+    is_gzip = raw[:2] == b'\x1f\x8b'  # gzip magic bytes
+    try:
+        text = gzip.decompress(raw).decode() if is_gzip else raw.decode()
+    except (OSError, UnicodeDecodeError):
+        return  # binary or corrupt body: not text, so nothing to redact
+
+    redacted = text
+    if 'sharedSecret' in redacted:
+        with contextlib.suppress(ValueError):
+            redacted = json.dumps(_redact_shared_secrets(json.loads(redacted)))
+    if host:
+        redacted = redacted.replace(host, 'example.com')
+    if redacted == text:
+        return
+
+    if is_base64:
+        payload = gzip.compress(redacted.encode(), mtime=0) if is_gzip else redacted.encode()
+        body['base64_string'] = base64.b64encode(payload).decode('ascii')
+    else:
+        body['string'] = redacted
+
+
+def _normalize_host(raw: str) -> str:
+    """Add an https scheme (if missing) and strip a trailing slash.
+
+    An empty string is returned unchanged, so callers can distinguish
+    "no host configured".
+    """
+    if raw and not raw.startswith(('http://', 'https://')):
+        raw = f'https://{raw}'
+    return raw.rstrip('/')
+
+
+def _okta_base_url() -> str:
+    """Full base URL for the Okta client, defaulting to the placeholder host."""
+    return _normalize_host(os.environ.get('OKTA_HOST', 'https://example.com'))
+
+
+def _okta_hostname() -> str:
+    """Bare host to redact from cassettes (e.g. 'schubergphilis.oktapreview.com'), or ''."""
+    return urlparse(_normalize_host(os.environ.get('OKTA_HOST', ''))).hostname or ''
 
 
 def configure_betamax(token: str, base_url: str | None = None) -> None:
@@ -137,9 +220,13 @@ def get_cassette(request: SubRequest, recorder: Betamax) -> Callable[[], Abstrac
     class CassetteCtx:
         """A cassette context manager."""
 
-        def __call__(self) -> Betamax:
-            """Allow the context manager to be called directly."""
-            return self.__enter__()
+        def __call__(self) -> 'CassetteCtx':
+            """Allow the fixture to be used as ``with okta_cassette():``.
+
+            Returns self so the ``with`` statement uses this wrapper's
+            __enter__/__exit__ (which scrubs secrets on exit), not betamax's.
+            """
+            return self
 
         def __enter__(self) -> Betamax:
             """Enter the cassette context."""
@@ -151,13 +238,17 @@ def get_cassette(request: SubRequest, recorder: Betamax) -> Callable[[], Abstrac
             exc_val: BaseException | None,
             exc_tb: TracebackType | None,
         ) -> bool | None:
-            """Exit the cassette context and clean up empty cassettes."""
+            """Exit the cassette context and clean up empty cassettes.
+
+            Secret/host sanitization is handled once per session by
+            ``pytest_sessionfinish`` so it covers every cassette regardless of
+            how it was recorded, not only those created through this fixture.
+            """
             result = ctx.__exit__(exc_type, exc_val, exc_tb)
-            # cleanup if file exists but has no recorded interactions
             cassette = Path(cassette_path)
+            # remove the file if betamax recorded no interactions
             if cassette.exists():
-                with cassette.open(encoding='utf-8') as f:
-                    data = json.load(f)
+                data = json.loads(cassette.read_text(encoding='utf-8'))
                 if not data.get('http_interactions'):
                     cassette.unlink()
             return result
@@ -168,7 +259,7 @@ def get_cassette(request: SubRequest, recorder: Betamax) -> Callable[[], Abstrac
 @pytest.fixture(scope='session')
 def okta_service() -> Okta:
     """Return a library instance with an authenticated session."""
-    host = os.environ.get('OKTA_HOST', 'https://example.com')
+    host = _okta_base_url()
     token = os.environ.get('OKTA_API_KEY', 'fake_api_key')
     if token == 'fake_api_key':
 
@@ -197,3 +288,34 @@ def okta_cassette(
 ) -> Callable[[], AbstractContextManager]:
     """Create a cassette recorder for okta."""
     return get_cassette(request=request, recorder=okta_recorder)
+
+
+def _sanitize_cassette_file(path: Path, host: str) -> None:
+    """Redact the TOTP shared secret and real host from one cassette file, in place."""
+    data = json.loads(path.read_text(encoding='utf-8'))
+    original = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False)
+    for interaction in data.get('http_interactions', []):
+        sanitize_response_body(interaction['response']['body'], host)
+    sanitized = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False)
+    if sanitized != original:
+        path.write_text(sanitized, encoding='utf-8')
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Record when the session started so we only sanitize cassettes written during it."""
+    session.stash[_SESSION_START] = time.time()
+
+
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    """Sanitize every cassette recorded or updated during this session.
+
+    Runs once after all tests and fixture teardowns, so it covers cassettes made
+    through any path (okta_cassette, raw betamax, module-scoped fixtures) without
+    interfering with the live recording flow. Redaction is a no-op on unchanged
+    files, so this never rewrites already-clean cassettes.
+    """
+    started = session.stash.get(_SESSION_START, 0.0)
+    host = _okta_hostname()
+    for path in CASSETTE_DIR.glob('*.json'):
+        if path.stat().st_mtime >= started:
+            _sanitize_cassette_file(path, host)
