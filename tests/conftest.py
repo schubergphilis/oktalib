@@ -17,7 +17,7 @@ from _pytest.fixtures import SubRequest
 from betamax import Betamax
 from betamax.cassette import Cassette, Interaction
 from betamax.serializers import JSONSerializer
-from requests import Session
+from requests import Response, Session
 
 from oktalib import Okta
 
@@ -62,8 +62,7 @@ def _redact_shared_secrets(obj: object) -> object:
     """
     if isinstance(obj, dict):
         return {
-            key: 'REDACTED' if key == 'sharedSecret' else _redact_shared_secrets(value)
-            for key, value in obj.items()
+            key: 'REDACTED' if key == 'sharedSecret' else _redact_shared_secrets(value) for key, value in obj.items()
         }
     if isinstance(obj, list):
         return [_redact_shared_secrets(item) for item in obj]
@@ -319,3 +318,24 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
     for path in CASSETTE_DIR.glob('*.json'):
         if path.stat().st_mtime >= started:
             _sanitize_cassette_file(path, host)
+
+
+def make_error_response(status: int = 502, body: bytes = b'<html>502 Bad Gateway</html>') -> Response:
+    """Build a non-ok Response whose body is not JSON (response.json() would raise)."""
+    response = Response()
+    response.status_code = status
+    response._content = body
+    return response
+
+
+@pytest.fixture
+def okta_with_error(okta_service, monkeypatch):  # pylint: disable=redefined-outer-name
+    """An Okta client whose every HTTP verb returns a non-JSON error response.
+
+    Shared across feature test modules to assert that methods handle a non-JSON
+    error body gracefully (return their error value) instead of raising.
+    """
+    error = make_error_response()
+    for verb in ('get', 'post', 'put', 'delete'):
+        monkeypatch.setattr(okta_service.session, verb, lambda *a, **k: error)
+    return okta_service

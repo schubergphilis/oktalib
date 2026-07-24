@@ -321,9 +321,7 @@ class ClientSecret(Entity):
 class ClientRole(Entity):
     """Models an OAuth client role (admin role assigned to an OAuth client)."""
 
-    def __init__(
-        self, okta_instance: Okta, client_data: dict[str, Any], data: dict[str, Any]
-    ) -> None:
+    def __init__(self, okta_instance: Okta, client_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a ClientRole instance.
 
         Args:
@@ -856,9 +854,7 @@ class SAMLApplication(Application):
         """
         return self.settings.get('audience') if self.settings else None
 
-    def assign_group_to_saml_user_roles(
-        self, group_id: str, role: str, saml_roles: list[str]
-    ) -> bool:
+    def assign_group_to_saml_user_roles(self, group_id: str, role: str, saml_roles: list[str]) -> bool:
         """Assigns an okta group to an okta application with saml user roles.
 
         Args:
@@ -874,9 +870,7 @@ class SAMLApplication(Application):
         payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
-            self._logger.error(
-                f'Assigning group to the saml user roles failed. Response: {response.text}'
-            )
+            self._logger.error(f'Assigning group to the saml user roles failed. Response: {response.text}')
         return response.ok
 
     def get_associated_saml_roles(self) -> list[str]:
@@ -913,9 +907,7 @@ class SAMLApplication(Application):
         if not self.metadata_url:
             self._logger.info('This application does not have a metadata URL.')
             return None
-        return self._okta.get_application_metadata(
-            self.id, self.credentials.get('signing', {}).get('kid')
-        )
+        return self._okta.get_application_metadata(self.id, self.credentials.get('signing', {}).get('kid'))
 
 
 class APIServiceApp(Application):
@@ -957,9 +949,7 @@ class APIServiceApp(Application):
         if not response.ok:
             self._logger.error(f'Retrieving client secrets failed. Response: {response.text}')
             return None
-        return [
-            ClientSecret(self._okta, self._data, client_secret) for client_secret in response.json()
-        ]
+        return [ClientSecret(self._okta, self._data, client_secret) for client_secret in response.json()]
 
     def create_client_secrets(self) -> ClientSecret | None:
         """Creates new client secrets for the application.
@@ -1128,9 +1118,7 @@ class APIServiceApp(Application):
         url = f'{self._okta.api}/apps/{self.id}'
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
-            self._logger.error(
-                f'Adding public keys with JWKS URI failed. Response: {response.text}'
-            )
+            self._logger.error(f'Adding public keys with JWKS URI failed. Response: {response.text}')
             return False
         self._update()
         return response.ok
@@ -1170,9 +1158,7 @@ class APIServiceApp(Application):
         url = f'{self._okta.api}/apps/{self.id}'
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
-            self._logger.error(
-                f'Enabling public key authentication failed. Response: {response.text}'
-            )
+            self._logger.error(f'Enabling public key authentication failed. Response: {response.text}')
             return False
         self._update()
         return response.ok

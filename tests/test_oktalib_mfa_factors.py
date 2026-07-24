@@ -56,10 +56,7 @@ def test_supported_factors(okta_cassette, okta_service, test_user_cleaner):
         assert supported_factors[0].factor_type == 'token:software:totp'
         assert supported_factors[0].provider == 'GOOGLE'
         assert supported_factors[0].vendor_name == 'GOOGLE'
-        assert (
-            supported_factors[0].enroll_link
-            == f'{test_user._okta.host}/api/v1/users/{test_user.id}/factors'
-        )
+        assert supported_factors[0].enroll_link == f'{test_user._okta.host}/api/v1/users/{test_user.id}/factors'
 
 
 def test_enroll_and_remove_google_otp(okta_cassette, okta_service, test_user_cleaner):
@@ -117,6 +114,4 @@ def test_enroll_and_remove_google_otp(okta_cassette, okta_service, test_user_cle
         # Step 6: Verify the factor is no longer enrolled
         enrolled_factors_after = list(test_user.enrolled_factors())
         factor_ids_after = [f.id for f in enrolled_factors_after]
-        assert factor.id not in factor_ids_after, (
-            'Factor should not be in enrolled factors list after deletion'
-        )
+        assert factor.id not in factor_ids_after, 'Factor should not be in enrolled factors list after deletion'
