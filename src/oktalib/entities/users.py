@@ -659,9 +659,7 @@ class User(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield UserSupportedFactor(self._okta, self._data, data)
 
-    def enroll_factor(
-        self, factor_type: str, provider: str, query: dict[str, Any]
-    ) -> UserFactor | None:
+    def enroll_factor(self, factor_type: str, provider: str, query: dict[str, Any]) -> UserFactor | None:
         """Enrolls the user in a new factor.
 
         Args:
@@ -824,9 +822,7 @@ def _create_factor_from_data(
 class UserFactor(Entity):
     """Models the user factor object of okta."""
 
-    def __init__(
-        self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]
-    ) -> None:
+    def __init__(self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]) -> None:
         super().__init__(okta_instance, data)
         self._user_data = user_data
 
@@ -923,13 +919,7 @@ class UserFactorGoogleOTP(UserFactor):
             str: The QR code image URL, or empty string if not available
 
         """
-        return (
-            self._data.get('_embedded', {})
-            .get('activation', {})
-            .get('_links', {})
-            .get('qrcode', {})
-            .get('href', '')
-        )
+        return self._data.get('_embedded', {}).get('activation', {}).get('_links', {}).get('qrcode', {}).get('href', '')
 
     @property
     def activation_link(self) -> str:
@@ -985,9 +975,7 @@ class UserSupportedFactor:
     They represent factor types that can be enrolled for a user.
     """
 
-    def __init__(
-        self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]
-    ) -> None:
+    def __init__(self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize UserSupportedFactor.
 
         Args:

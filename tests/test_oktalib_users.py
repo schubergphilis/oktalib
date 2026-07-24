@@ -12,13 +12,9 @@ import pytest
             None,
             id='create_user',
         ),
-        pytest.param(
-            lambda okta: okta.get_user_by_login('e@example.com'), None, id='get_user_by_login'
-        ),
+        pytest.param(lambda okta: okta.get_user_by_login('e@example.com'), None, id='get_user_by_login'),
         pytest.param(lambda okta: okta.search_users('value'), [], id='search_users'),
-        pytest.param(
-            lambda okta: okta.search_users_by_email('e@example.com'), [], id='search_users_by_email'
-        ),
+        pytest.param(lambda okta: okta.search_users_by_email('e@example.com'), [], id='search_users_by_email'),
         pytest.param(
             lambda okta: okta.get_user_assigned_roles_by_id('usr'),
             None,

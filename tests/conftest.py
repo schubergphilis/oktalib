@@ -62,8 +62,7 @@ def _redact_shared_secrets(obj: object) -> object:
     """
     if isinstance(obj, dict):
         return {
-            key: 'REDACTED' if key == 'sharedSecret' else _redact_shared_secrets(value)
-            for key, value in obj.items()
+            key: 'REDACTED' if key == 'sharedSecret' else _redact_shared_secrets(value) for key, value in obj.items()
         }
     if isinstance(obj, list):
         return [_redact_shared_secrets(item) for item in obj]
@@ -321,9 +320,7 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
             _sanitize_cassette_file(path, host)
 
 
-def make_error_response(
-    status: int = 502, body: bytes = b'<html>502 Bad Gateway</html>'
-) -> Response:
+def make_error_response(status: int = 502, body: bytes = b'<html>502 Bad Gateway</html>') -> Response:
     """Build a non-ok Response whose body is not JSON (response.json() would raise)."""
     response = Response()
     response.status_code = status

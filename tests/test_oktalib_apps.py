@@ -70,13 +70,9 @@ def test_get_saml_application_metadata(okta_cassette, test_saml_app):
         assert metadata is not None
         assert metadata.entity_id == 'http://www.okta.com/exk2nq5bkqm3wrGtg0h8'
         assert sso is not None
-        expected_post_url = (
-            f'{test_saml_app._okta.host}/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml'
-        )
+        expected_post_url = f'{test_saml_app._okta.host}/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml'
         assert sso.http_post == expected_post_url
-        assert (
-            cert is not None and 'MIIDrDCCApSgAwIBAgIGAZyKxMVNMA0GCSqGSIb3DQEBCwUAMIGWMQsw' in cert
-        )
+        assert cert is not None and 'MIIDrDCCApSgAwIBAgIGAZyKxMVNMA0GCSqGSIb3DQEBCwUAMIGWMQsw' in cert
 
 
 def test_get_application_by_sign_on_mode_saml(okta_cassette, okta_service):
@@ -112,9 +108,7 @@ def test_get_application_by_sign_on_mode_with_none(okta_cassette, okta_service):
 # api_service_app
 
 
-def test_create_api_service_app_client_secret_auth(
-    okta_cassette, okta_service, api_service_app_cleaner
-):
+def test_create_api_service_app_client_secret_auth(okta_cassette, okta_service, api_service_app_cleaner):
     """Test creating an API Service application."""
     with okta_cassette():
         app = api_service_app_cleaner(
@@ -202,18 +196,14 @@ def test_create_api_service_app_cleanup_on_configuration_failure(
     """Test that app is cleaned up if configuration fails after creation."""
     with okta_cassette():
         app = api_service_app_cleaner(
-            okta_service.create_api_services_app_with_client_secret(
-                label='Test API Service App - Cleanup Test'
-            )
+            okta_service.create_api_services_app_with_client_secret(label='Test API Service App - Cleanup Test')
         )
         assert app is not None
 
         def mock_add_public_keys_failure(*args, **kwargs):
             raise RuntimeError('Simulated failure during public key configuration')
 
-        monkeypatch.setattr(
-            APIServiceApp, 'add_public_keys_by_public_url', mock_add_public_keys_failure
-        )
+        monkeypatch.setattr(APIServiceApp, 'add_public_keys_by_public_url', mock_add_public_keys_failure)
 
         failed_app = okta_service.create_api_services_app_with_jwks_uri(
             label='Test API Service App - Should Be Cleaned Up',
@@ -240,9 +230,7 @@ def test_create_api_service_app_with_client_secret_no_keys_required(
         assert app.client_authentication == 'client_secret_basic'
 
 
-def test_create_api_service_app_add_and_remove_client_role(
-    okta_cassette, okta_service, api_service_app_cleaner
-):
+def test_create_api_service_app_add_and_remove_client_role(okta_cassette, okta_service, api_service_app_cleaner):
     """Test adding and removing a client role (Okta admin role) from an API Service app."""
     with okta_cassette():
         app = api_service_app_cleaner(
@@ -270,9 +258,7 @@ def test_create_api_service_app_add_and_remove_client_role(
         assert len(roles_after_delete) == 0
 
 
-def test_create_api_service_app_add_and_remove_client_secrets(
-    okta_cassette, okta_service, api_service_app_cleaner
-):
+def test_create_api_service_app_add_and_remove_client_secrets(okta_cassette, okta_service, api_service_app_cleaner):
     """Test adding and removing client secrets from an API Service app."""
     with okta_cassette():
         app = api_service_app_cleaner(
@@ -314,9 +300,7 @@ def test_create_api_service_app_add_and_remove_client_secrets(
         assert not any(s.id == new_secret.id for s in secrets_after_delete)
 
 
-def test_create_api_service_app_max_client_secrets_limit(
-    okta_cassette, okta_service, api_service_app_cleaner, caplog
-):
+def test_create_api_service_app_max_client_secrets_limit(okta_cassette, okta_service, api_service_app_cleaner, caplog):
     """Test that creating more than MAX_CLIENT_SECRETS client secrets fails appropriately."""
     with okta_cassette():
         app = api_service_app_cleaner(

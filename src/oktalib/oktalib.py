@@ -278,9 +278,7 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    def _get_paginated_url(
-        self, url: str, result_limit: int = 100
-    ) -> Generator[dict[str, Any], None, None]:
+    def _get_paginated_url(self, url: str, result_limit: int = 100) -> Generator[dict[str, Any], None, None]:
         """Gets the paginated data from a url.
 
         Args:
@@ -392,11 +390,7 @@ class Okta:
             self._logger.error(response.text)
             return None
         return next(
-            (
-                User(self, data)
-                for data in response.json()
-                if data.get('profile', {}).get('login', '') == login
-            ),
+            (User(self, data) for data in response.json() if data.get('profile', {}).get('login', '') == login),
             None,
         )
 
@@ -688,9 +682,7 @@ class Okta:
                 return SAMLApplication(self, data)
             case ApplicationType.OPENID_CONNECT:
                 # Check if this is an API Services application
-                application_type = (
-                    data.get('settings', {}).get('oauthClient', {}).get('application_type')
-                )
+                application_type = data.get('settings', {}).get('oauthClient', {}).get('application_type')
                 if application_type == 'service':
                     return APIServiceApp(self, data)
                 return Application(self, data)
@@ -765,9 +757,7 @@ class Okta:
             (
                 app
                 for app in self.applications
-                if app.sign_on_mode
-                and sign_on_mode
-                and app.sign_on_mode.lower() == sign_on_mode.lower()
+                if app.sign_on_mode and sign_on_mode and app.sign_on_mode.lower() == sign_on_mode.lower()
             ),
             None,
         )
