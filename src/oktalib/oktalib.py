@@ -175,7 +175,7 @@ class Okta:
         payload = {'profile': {'name': name, 'description': description}}
         response = self.session.post(url, data=json.dumps(payload))
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         return Group(self, response.json())
 
@@ -223,7 +223,7 @@ class Okta:
         url = f'{self.api}/groups/{group_id}'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         return Group(self, response.json())
 
@@ -240,7 +240,7 @@ class Okta:
         url = f'{self.api}/groups?q={name}'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
         return [Group(self, data) for data in response.json()] if response.ok else []
 
     def search_groups_by_query(self, query: str) -> list[Group]:
@@ -257,7 +257,7 @@ class Okta:
         url = f'{self.api}/groups?search={query}'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
         return [Group(self, data) for data in response.json()] if response.ok else []
 
     def delete_group(self, name: str) -> bool:
@@ -372,7 +372,7 @@ class Okta:
             payload.update({'credentials': {'password': {'value': password}}})
         response = self.session.post(url=url, data=json.dumps(payload))
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         return User(self, response.json())
 
@@ -389,7 +389,7 @@ class Okta:
         url = f'{self.api}/users?filter=profile.login+eq+"{login}"'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         return next(
             (
@@ -413,8 +413,8 @@ class Okta:
         url = f'{self.api}/users?q={value}'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
-        return [User(self, data) for data in response.json()]
+            self._logger.error(response.text)
+        return [User(self, data) for data in response.json()] if response.ok else []
 
     def search_users_by_email(self, email: str) -> list[User]:
         """Retrieves a list of users by email.
@@ -429,8 +429,8 @@ class Okta:
         url = f'{self.api}/users?filter=profile.email+eq+"{email}"'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
-        return [User(self, data) for data in response.json()]
+            self._logger.error(response.text)
+        return [User(self, data) for data in response.json()] if response.ok else []
 
     def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
         """Retrieves if any, admin roles assigned to the user by id.
@@ -445,7 +445,7 @@ class Okta:
         url = f'{self.api}/users/{user_id}/roles'
         response = self.session.get(url)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         return [AdminRole(self, data) for data in response.json()]
 
@@ -464,7 +464,7 @@ class Okta:
         data = {'type': role_name}
         response = self.session.post(url, json=data)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         return AdminRole(self, response.json())
 
@@ -482,7 +482,7 @@ class Okta:
         url = f'{self.api}/users/{user_id}/roles/{role_id}'
         response = self.session.delete(url)
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return False
         return True
 
@@ -533,7 +533,7 @@ class Okta:
         response = self.session.post(url, json=data)
 
         if not response.ok:
-            self._logger.error(response.json())
+            self._logger.error(response.text)
             return None
         app = self._create_application_from_data(response.json())
         return app if isinstance(app, APIServiceApp) else None

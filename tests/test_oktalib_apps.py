@@ -349,3 +349,8 @@ def test_create_api_service_app_max_client_secrets_limit(
         assert any(expected_msg in record.message for record in caplog.records), (
             f'Error message should mention maximum of {APIServiceApp.MAX_CLIENT_SECRETS} secrets'
         )
+
+
+def test_get_application_metadata_handles_non_json_error(okta_with_error):
+    """get_application_metadata returns None on a non-JSON error body, not raise."""
+    assert okta_with_error.get_application_metadata('app', 'kid') is None
