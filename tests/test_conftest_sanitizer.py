@@ -20,10 +20,12 @@ _BODY = {
 
 
 def _gzip_b64(text: str) -> str:
+    """Gzip and base64-encode text the way betamax stores a compressed body."""
     return base64.b64encode(gzip.compress(text.encode(), mtime=0)).decode()
 
 
 def _decode(body: dict) -> str:
+    """Return the body's text, transparently decompressing a gzipped one."""
     if 'base64_string' in body:
         return gzip.decompress(base64.b64decode(body['base64_string'])).decode()
     return body['string']

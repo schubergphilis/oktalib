@@ -303,7 +303,7 @@ def _sanitize_cassette_file(path: Path, host: str) -> None:
         path.write_text(sanitized, encoding='utf-8')
 
 
-def pytest_sessionfinish(session: pytest.Session) -> None:
+def pytest_sessionfinish() -> None:
     """Sanitize the cassettes that were (re)recorded during this session.
 
     Only cassettes captured by the before_record hook are processed, so replayed
