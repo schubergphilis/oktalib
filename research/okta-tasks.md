@@ -19,8 +19,12 @@ endpoints** (observed from a HAR capture of `/admin/tasks` on a live org).
    authenticate with an **admin session cookie + XSRF token**, not the SSWS token oktalib
    is built on, and the per-category detail endpoints return **HTML fragments**, not JSON.
 3. So the choice is not "possible vs impossible" — it's **a documented but partial
-   reconstruction (§C)** vs **an undocumented, session-authenticated, HTML-scraping
-   client (§B)**. Recommendation in §E: do the former in oktalib, keep the latter out.
+   reconstruction (§C)** vs **an undocumented, session-authenticated client (§B)**. The
+   internal summary endpoint is better than expected: JSON, and it accepts a
+   `selectedUserId` to answer "what's outstanding for this user?" in one request, which
+   the public API cannot do at all. The blocker is its **auth model**, not its format.
+   Recommendation in §E: build the documented primitives in oktalib, keep the
+   session-authenticated route in a separate tool that owns that problem honestly.
 
 ## A. What "Tasks" contains
 
@@ -85,6 +89,14 @@ The `numProvisioningTasks` mapping is the one inference here; the other eight ar
 unambiguous from the names. Note `pendo` and `timeLimitedOrg` are console UI concerns
 leaking into the payload — a sign this is a view-model endpoint, not an API contract.
 
+**It takes a `selectedUserId`.** `GET /admin/tasks/main?selectedUserId={userId}&taskDate=ALL`
+returns the identical nine-field shape scoped to a single user — observed:
+`numDeprovisioningTasks: 2`, `numProfilesTasks: 8`, `numTotalTasks: 10`. That is
+significant: it answers "what is outstanding for *this* user?" in **one request**, which is
+exactly the query the public API cannot express (§C row 7) and which the
+scan-every-app workaround would need O(apps) requests to approximate. `taskDate=ALL`
+implies other values exist (a date window); none were observed.
+
 ### B2. Detail: `GET /admin/tasks/errors?taskDate=ALL`
 
 `Content-Type: text/html; charset=utf-8` — **an HTML fragment, not JSON.** A list of `<li>`
@@ -123,7 +135,35 @@ Two structural facts matter more than the field list:
   (`/admin/tasks/deprovisioning`, `/admin/tasks/profiles`, …) very likely exist with the
   same shape, but that is inference, not observed.
 
-### B3. Auth and transport
+### B3. The console also calls the *public* API
+
+Not everything the Tasks page does is internal. The user-picker on that page issues:
+
+```
+GET https://{org}-admin.okta-emea.com/api/v1/users
+    ?q=&limit=10&sortBy=profile.lastName&timestamp={epoch_ms}
+    &search=(status eq "ACTIVE" or status eq "STAGED" or status eq "PROVISIONED"
+             or status eq "RECOVERY" or status eq "PASSWORD_EXPIRED"
+             or status eq "LOCKED_OUT" or status eq "SUSPENDED"
+             or status eq "DEPROVISIONED")
+        and (profile.firstName sw "{term}" or profile.lastName sw "{term}"
+             or profile.login sw "{term}" or profile.email sw "{term}")
+```
+
+Three things worth noting:
+
+- This is the **documented** `/api/v1/users` endpoint, and its `Link: rel="self"` response
+  header points back at the **org** host (`https://{org}.okta-emea.com/api/v1/users?…`) —
+  the admin host just fronts the same API. So it is reachable with an SSWS token from
+  oktalib as-is.
+- `x-rate-limit-limit: 600` here versus **250** on `/admin/tasks/*` — confirming the
+  internal console endpoints sit in a separate, tighter bucket.
+- The `search=` expression syntax is directly reusable: `status eq "…"` combined with
+  `sw` (starts-with) over `profile.*`, plus `sortBy`. oktalib's `search_users` /
+  `search_users_by_email` currently use only `?q=` and `?filter=`, which can't express
+  this. See E6.
+
+### B4. Auth and transport
 
 - **Cookies**: `sid`, `JSESSIONID`, `xids`, `DT`, `proximity_*`. Session-scoped;
   `srefresh` is re-issued per response with `Max-Age=1800`, and `smax` caps the session.
@@ -229,13 +269,28 @@ affected user, and it wasn't in the capture.
 
 ## E. Recommendation
 
-**Do not put the internal endpoints in oktalib.** Not on principle — on cost. It would mean
-a second auth mechanism (interactive OIDC login + cookie jar + scraped XSRF token) grafted
-onto a library whose entire design is a single SSWS-token `requests.Session`, plus an HTML
-parser whose contract is a console template that can change in any Okta release, plus an
-unknown number of additional requests per app for the user rows. A library that silently
-breaks on a Thursday release is worse than one that doesn't have the feature. If this is
-needed operationally, it belongs in a script whose owner accepts that maintenance.
+**Do not put the internal endpoints in oktalib** — but the reason is narrower than it first
+appears, so it's worth stating precisely.
+
+The HTML-scraping objection only applies to the **detail** endpoints (§B2). The **summary**
+endpoint (§B1) is clean JSON, and with `selectedUserId` it answers the per-user question in
+one request — something the public API genuinely cannot do. If the requirement is "how many
+tasks are outstanding, org-wide or for user X", the internal route is *one JSON GET* and the
+documented route is O(apps × users) requests that may not even be able to answer it (§D1).
+That is a real capability gap, not a stylistic preference.
+
+What still rules it out for this library is **auth**, not parsing: it needs an interactive
+admin OIDC login (likely MFA), a cookie jar with a 30-minute sliding session, and an XSRF
+token scraped out of the console HTML — grafted onto a library whose entire design is one
+SSWS-token `requests.Session`. Add a 250/min shared bucket and a payload that carries
+`pendo` UI flags, and it is a console view-model that can change in any release, not an
+interface. A library that silently breaks on a Thursday release is worse than one that
+doesn't have the feature.
+
+If someone needs those numbers operationally, the honest shape is a **separate script or
+tool** that owns the browser-session problem explicitly — not an oktalib method that
+pretends the auth model is the same. Worth revisiting only if Okta ever exposes
+`/admin/tasks/main`'s data under `/api/v1` with token auth.
 
 **Do ship the primitives.** Each is independently useful, matches existing repo patterns,
 and none depends on anything unverified:
@@ -247,11 +302,14 @@ and none depends on anything unverified:
 | E3 | `Application.signing_keys`, `.expiring_signing_keys(days=30)` | `entities/apps.py` | small |
 | E4 | `Okta.search_users_by_status(status)` (covers `LOCKED_OUT`) | `oktalib.py` | trivial |
 | E5 | `AgentPool` / `Agent` entities + `Okta.agent_pools` | new entity + `oktalib.py` | small |
+| E6 | `Okta.search_users(query)` supporting the `search=` parameter (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B3 | `oktalib.py` | small |
 
-E1 alone unblocks callers who want to write the deprovisioning scan themselves.
+E1 alone unblocks callers who want to write the deprovisioning scan themselves. E6 is
+independently the most broadly useful item: `search=` is strictly more capable than the
+`?q=` the library uses today, and it subsumes E4.
 
 Suggested order: **D3 first** (it validates or kills E1/E2 before any code), then D1, then
-E1 → E2/E4 → E3/E5.
+E1 → E6/E2 → E3/E5.
 
 An aggregating `Okta.tasks` façade over E1–E5 is tempting but will never match the console
 (§C rows 7–12 are partly or wholly unavailable), so it invites trust in a quietly
@@ -271,10 +329,19 @@ incomplete number. If it is ever built, name the pieces for what they are —
 
 ## Note on the capture
 
-The HAR used for §B carried a live admin session (`sid`, `JSESSIONID`, `xids`, `DT`,
-`proximity_*`) and an XSRF token. None of it is recorded here or anywhere in the repo, and
-no user-identifying data from the org's task rows is reproduced — only element/field
-structure. Any future capture should stay outside the repo for the same reason.
+The HARs used for §B carried live admin sessions (`sid`, `JSESSIONID`, `xids`, `DT`,
+`proximity_*`) and XSRF tokens, and the §B3 response body included a full user profile —
+among its custom attributes a `tacacsHash` (a `$6$` SHA-512 crypt hash), phone numbers,
+employee number and address. None of that is recorded here or anywhere in the repo: this
+document reproduces only endpoint paths, parameter names, field names and element
+structure. No cookie, token, user id, app instance id, email or profile value appears.
+
+Two follow-ups for whoever owns the org, independent of this research:
+
+- Rotate whatever credential `profile.tacacsHash` derives from, and review whether a
+  password hash belongs in an Okta profile attribute that any admin-console user search
+  returns in cleartext JSON.
+- Future captures should stay outside the repo, and be scrubbed before pasting anywhere.
 
 ## Sources
 
