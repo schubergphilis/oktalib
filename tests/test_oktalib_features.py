@@ -5,6 +5,7 @@ import pytest
 from requests import Response
 
 from oktalib.entities import Feature
+from oktalib.oktalibexceptions import InvalidLifecycle
 
 FEATURE_NAME = 'Authentication Activity report'
 # 'Authentication Activity report' has no dependencies/dependents, so a feature
@@ -65,9 +66,9 @@ def test_feature_dependencies_and_dependents(okta_cassette, okta_service):
 
 
 def test_update_feature_rejects_invalid_lifecycle(okta_service):
-    """An invalid lifecycle fails fast with ValueError before any request."""
+    """An invalid lifecycle fails fast with InvalidLifecycle before any request."""
     feature = Feature(okta_service, {'id': 'ftr_x'})
-    with pytest.raises(ValueError, match='enable'):
+    with pytest.raises(InvalidLifecycle, match='enable'):
         feature.update_feature('activate', force=False)
 
 

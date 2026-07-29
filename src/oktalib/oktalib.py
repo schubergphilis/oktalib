@@ -175,7 +175,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return Feature(self, response.json()) if response.ok else None
+            return None
+        return Feature(self, response.json())
 
     def get_feature_by_name(self, name: str) -> Feature | None:
         """Retrieves the first feature (of any type) by name.
@@ -319,7 +320,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [Group(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [Group(self, data) for data in response.json()]
 
     def search_groups_by_query(self, query: str) -> list[Group]:
         """Retrieves the groups according to the raw query provided.
@@ -336,7 +338,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [Group(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [Group(self, data) for data in response.json()]
 
     def delete_group(self, name: str) -> bool:
         """Deletes a group from okta.
@@ -486,7 +489,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [User(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [User(self, data) for data in response.json()]
 
     def search_users_by_email(self, email: str) -> list[User]:
         """Retrieves a list of users by email.
@@ -502,7 +506,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [User(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [User(self, data) for data in response.json()]
 
     def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
         """Retrieves if any, admin roles assigned to the user by id.

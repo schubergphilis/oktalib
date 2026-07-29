@@ -34,6 +34,8 @@ from __future__ import annotations
 from collections.abc import Generator
 from typing import Any
 
+from oktalib.oktalibexceptions import InvalidLifecycle
+
 from .core import Entity
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
@@ -177,17 +179,15 @@ class Feature(Entity):
                 refreshed, False otherwise
 
         Raises:
-            ValueError: If lifecycle is not 'enable' or 'disable'
+            InvalidLifecycle: If lifecycle is not 'enable' or 'disable'
 
         """
         if lifecycle not in ('enable', 'disable'):
-            raise ValueError(f"lifecycle must be 'enable' or 'disable', got {lifecycle!r}")
-        url = (
-            f'{self._okta.api}/features/{self.id}/{lifecycle}'
-            if not force
-            else f'{self._okta.api}/features/{self.id}/{lifecycle}?mode=force'
-        )
+            raise InvalidLifecycle(f"lifecycle must be 'enable' or 'disable', got {lifecycle!r}")
+        base_url = f'{self._okta.api}/features/{self.id}/{lifecycle}'
+        url = f'{base_url}?mode=force' if force else base_url
         response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f'Updating feature failed. Response: {response.text}')
-        return response.ok and self._update()
+            return False
+        return self._update()
