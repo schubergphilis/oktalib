@@ -189,7 +189,7 @@ class Okta:
 
         """
         return next(
-            (feature for feature in self.features if feature.name == name),
+            (feature for feature in self.features if (feature.name or '').lower() == name.lower()),
             None,
         )
 
