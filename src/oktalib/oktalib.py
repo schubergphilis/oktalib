@@ -43,6 +43,7 @@ from .entities import (
     APIServiceApp,
     Application,
     ApplicationType,
+    Feature,
     Group,
     SAMLApplication,
     SAMLMetadata,
@@ -149,6 +150,84 @@ class Okta:
         return response
 
     @property
+    def features(self) -> Generator[Feature, None, None]:
+        """The features configured in okta.
+
+        Returns:
+            generator: The generator of features configured in okta
+
+        """
+        url = f'{self.api}/features'
+        for data in self._get_paginated_url(url):
+            yield Feature(self, data)
+
+    def get_feature_by_id(self, feature_id: str) -> Feature | None:
+        """Retrieves the feature by id.
+
+        Args:
+            feature_id: The id of the feature to retrieve
+
+        Returns:
+            Feature: The feature if a match is found else None
+
+        """
+        url = f'{self.api}/features/{feature_id}'
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return Feature(self, response.json())
+
+    def get_feature_by_name(self, name: str) -> Feature | None:
+        """Retrieves the first feature (of any type) by name.
+
+        Args:
+            name: The name of the feature to retrieve
+
+        Returns:
+            Feature: The feature if a match is found else None
+
+        """
+        return next(
+            (feature for feature in self.features if (feature.name or '').lower() == name.lower()),
+            None,
+        )
+
+    def get_feature_dependencies_by_id(self, feature_id: str) -> Generator[Feature, None, None]:
+        """Lists all feature dependencies for a specified feature.
+
+        A feature's dependencies are the features that it requires to be
+        enabled in order for itself to be enabled.
+
+        Args:
+            feature_id: The id of the feature to retrieve
+
+        Returns:
+            generator: The generator of feature dependencies for the specified feature
+
+        """
+        url = f'{self.api}/features/{feature_id}/dependencies'
+        for data in self._get_paginated_url(url):
+            yield Feature(self, data)
+
+    def get_feature_dependents_by_id(self, feature_id: str) -> Generator[Feature, None, None]:
+        """Lists all feature dependents for the specified feature.
+
+        A feature's dependents are the features that need to be disabled in
+        order for the feature itself to be disabled.
+
+        Args:
+            feature_id: The id of the feature to retrieve
+
+        Returns:
+            generator: The generator of feature dependents for the specified feature
+
+        """
+        url = f'{self.api}/features/{feature_id}/dependents'
+        for data in self._get_paginated_url(url):
+            yield Feature(self, data)
+
+    @property
     def groups(self) -> Generator[Group, None, None]:
         """The groups configured in okta.
 
@@ -241,7 +320,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [Group(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [Group(self, data) for data in response.json()]
 
     def search_groups_by_query(self, query: str) -> list[Group]:
         """Retrieves the groups according to the raw query provided.
@@ -258,7 +338,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [Group(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [Group(self, data) for data in response.json()]
 
     def delete_group(self, name: str) -> bool:
         """Deletes a group from okta.
@@ -408,7 +489,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [User(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [User(self, data) for data in response.json()]
 
     def search_users_by_email(self, email: str) -> list[User]:
         """Retrieves a list of users by email.
@@ -424,7 +506,8 @@ class Okta:
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
-        return [User(self, data) for data in response.json()] if response.ok else []
+            return []
+        return [User(self, data) for data in response.json()]
 
     def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
         """Retrieves if any, admin roles assigned to the user by id.

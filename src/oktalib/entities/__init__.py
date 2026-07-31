@@ -43,6 +43,7 @@ from .apps import (
     SAMLMetadata,
     SingleSignOnService,
 )
+from .features import Feature
 from .groups import Group, GroupAssignment
 from .users import User, UserAssignment
 
@@ -62,6 +63,7 @@ __all__ = [
     'ApplicationType',
     'ClientRole',
     'ClientSecret',
+    'Feature',
     'Group',
     'GroupAssignment',
     'OAuthApplicationGrant',
