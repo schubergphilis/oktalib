@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.6.0](https://github.com/schubergphilis/oktalib/compare/v3.5.0...v3.6.0) (2026-07-31)
+
+
+### Features
+
+* add Okta feature-flag management with tests ([74c5a18](https://github.com/schubergphilis/oktalib/commit/74c5a181d13bd6262c9f33b9f1f13f5356352eb9))
+* Okta feature-flag management (Feature entity + endpoints) ([6ef9393](https://github.com/schubergphilis/oktalib/commit/6ef939350dbc4e59a4eddb171372e93d4bb9828b))
+* raise InvalidLifecycle for invalid feature lifecycle actions ([71e18b8](https://github.com/schubergphilis/oktalib/commit/71e18b83ba52f67610981cbe0690acb1edbd7776))
+
+
+### Bug Fixes
+
+* don't raise on non-JSON API error bodies ([4e5e1af](https://github.com/schubergphilis/oktalib/commit/4e5e1af66ffa01778c9895ca1e5a220cbb0116ee))
+* match feature names case-insensitively in get_feature_by_name ([287eab9](https://github.com/schubergphilis/oktalib/commit/287eab90ad72b40c6b861b8e4e2fdd57130a94d7))
+
 ## [3.5.0](https://github.com/schubergphilis/oktalib/compare/v3.4.0...v3.5.0) (2026-07-23)
 
 
