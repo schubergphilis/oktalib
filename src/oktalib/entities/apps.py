@@ -37,6 +37,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Generator
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -316,6 +317,138 @@ class ClientSecret(Entity):
         if not response.ok:
             self._logger.error(f'Deleting client secret failed. Response: {response.text}')
         return response.ok
+
+
+class AppKey(Entity):
+    """Models a key credential of an application.
+
+    Okta identifies these by ``kid`` rather than ``id``, so :attr:`id` is
+    overridden to expose the ``kid``. Without that, every key would hash to the
+    same value and compare equal to every other key, since the base entity
+    reads a non-existent ``id`` field.
+    """
+
+    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+        """Initialize an AppKey instance.
+
+        Args:
+            okta_instance: The Okta instance
+            app_data: The application data the key belongs to
+            data: The key data from the API response
+
+        """
+        super().__init__(okta_instance, data)
+        self._app_data = app_data
+
+    @property
+    def id(self) -> str:
+        """The kid, which is how Okta identifies this key.
+
+        Returns:
+            string: The key id (``kid``) of the key
+
+        """
+        return self._data.get('kid', '')
+
+    @property
+    def url(self) -> str:
+        """The url of the key.
+
+        Returns:
+            string: The url of the key
+
+        """
+        return f'{self._okta.api}/apps/{self._app_data.get("id")}/credentials/keys/{self.id}'
+
+    @property
+    def key_type(self) -> str | None:
+        """The cryptographic algorithm family of the key.
+
+        Returns:
+            string: The key type (``kty``), e.g. RSA
+
+        """
+        return self._data.get('kty')
+
+    @property
+    def use(self) -> str | None:
+        """The intended use of the key.
+
+        Returns:
+            string: The use of the key, e.g. sig
+
+        """
+        return self._data.get('use')
+
+
+class AppSigningCertificate(AppKey):
+    """Models an x509 signing certificate of an application.
+
+    These are the certificates behind the admin console's "Renew your SAML app
+    certificates" tasks. Unlike the JSON Web Keys used for private_key_jwt
+    client authentication, they carry an expiry.
+    """
+
+    @property
+    def expires_at(self) -> datetime | None:
+        """The date and time the certificate expires.
+
+        Returns:
+            datetime: The datetime the certificate expires, None if absent
+
+        """
+        return self._get_date_from_key('expiresAt')
+
+    @property
+    def x509_chain(self) -> list[str]:
+        """The x509 certificate chain.
+
+        Returns:
+            list: The base64 encoded certificate chain, empty list if absent
+
+        """
+        return self._data.get('x5c', [])
+
+    @property
+    def thumbprint(self) -> str | None:
+        """The SHA-256 thumbprint of the certificate.
+
+        Returns:
+            string: The thumbprint of the certificate, None if absent
+
+        """
+        return self._data.get('x5t#S256')
+
+    @property
+    def is_expired(self) -> bool:
+        """Whether the certificate has already expired.
+
+        A certificate without an expiry date is never reported as expired.
+
+        Returns:
+            bool: True if the certificate expired, False otherwise
+
+        """
+        return self.expires_within(0)
+
+    def expires_within(self, days: int) -> bool:
+        """Whether the certificate expires within the provided number of days.
+
+        Already expired certificates satisfy any window, so a caller asking for
+        the certificates expiring in the next 30 days also sees the ones that
+        lapsed last month.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            bool: True if the certificate expires within the window, False
+                otherwise or when the certificate has no expiry date
+
+        """
+        if self.expires_at is None:
+            return False
+        return self.expires_at <= datetime.now(tz=self.expires_at.tzinfo) + timedelta(days=days)
 
 
 class ClientRole(Entity):
@@ -607,6 +740,41 @@ class Application(Entity):
 
         """
         return self._data.get('credentials', {})
+
+    @property
+    def signing_certificates(self) -> Generator[AppSigningCertificate, None, None]:
+        """The x509 signing certificates of the application.
+
+        Returns:
+            generator: A generator of AppSigningCertificate objects for the
+                application, empty on failure
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/credentials/keys'
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(f'Retrieving signing certificates failed. Response: {response.text}')
+            return
+        for data in response.json():
+            yield AppSigningCertificate(self._okta, self._data, data)
+
+    def expiring_signing_certificates(self, days: int = 30) -> Generator[AppSigningCertificate, None, None]:
+        """The signing certificates of the application expiring within a window.
+
+        Already expired certificates are included, since they need renewing at
+        least as urgently as the ones about to lapse.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            generator: A generator of AppSigningCertificate objects expiring
+                within the window
+
+        """
+        for certificate in self.signing_certificates:
+            if certificate.expires_within(days):
+                yield certificate
 
     def delete(self) -> bool:
         """Deletes the application from okta.

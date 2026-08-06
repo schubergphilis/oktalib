@@ -43,6 +43,7 @@ from .entities import (
     APIServiceApp,
     Application,
     ApplicationType,
+    AppSigningCertificate,
     Group,
     SAMLApplication,
     SAMLMetadata,
@@ -65,6 +66,12 @@ __license__ = 'MIT'
 __maintainer__ = 'Costas Tyfoxylos'
 __email__ = '<ctyfoxylos@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
+
+# The sign-on modes whose applications sign assertions, and so hold signing certificates.
+SIGNING_SIGN_ON_MODES = (
+    ApplicationType.SAML_2_0.value,
+    ApplicationType.WS_FEDERATION.value,
+)
 
 # This is the main prefix used for logging
 LOGGER_BASENAME = 'oktalib'
@@ -761,6 +768,40 @@ class Okta:
             ),
             None,
         )
+
+    def get_expiring_app_certificates(
+        self, days: int = 30
+    ) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
+        """Retrieves the app signing certificates expiring within a window.
+
+        Only applications whose sign-on mode signs assertions are inspected, so
+        the sign-on mode already present in the application listing keeps this
+        to one extra request per signing application rather than one per
+        application. Already expired certificates are included.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            generator: A generator of (Application, AppSigningCertificate)
+                tuples for every certificate expiring within the window
+
+        """
+        for application in self.applications:
+            if application.sign_on_mode not in SIGNING_SIGN_ON_MODES:
+                continue
+            for certificate in application.expiring_signing_certificates(days):
+                yield application, certificate
+
+    def get_expired_app_certificates(self) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
+        """Retrieves the app signing certificates that have already expired.
+
+        Returns:
+            generator: A generator of (Application, AppSigningCertificate)
+                tuples for every expired certificate
+
+        """
+        yield from self.get_expiring_app_certificates(days=0)
 
     def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
         """Retrieves an application's SAML metadata by id.

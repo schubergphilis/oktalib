@@ -243,15 +243,50 @@ events yourself, with the usual retention-window and missed-event correctness pr
 Unverified that `task.lifecycle.*` means Tasks-page items rather than some other internal
 notion of "system task" (§D2). oktalib doesn't wrap `/api/v1/logs` at all today.
 
+## C-bis. Request cost, and the per-user shortcut
+
+An earlier draft of this document claimed items over app users and certificates were both
+`O(apps × users)`. That was wrong, and the correction matters for prioritisation:
+
+| Query | Requests |
+| --- | --- |
+| Tasks for one **user** | **1 paginated call** — see below |
+| Tasks for one **app** | O(app's users ÷ 200) — no server-side predicate exists |
+| Certificates expiring org-wide | O(signing apps) — one per app, *not* per user |
+| Group push errors org-wide | O(apps), with server-side `status=ERROR` |
+| Org-wide app-user rollup | expensive, and inherently so |
+
+Certificates are one request per app because keys are only reachable per app; there is no
+org-wide key listing. Narrowing to apps that actually sign assertions is free, because
+`signOnMode` is already in the `/api/v1/apps` listing.
+
+The per-user case needs no scanning at all. Per the spec, `/api/v1/apps` supports:
+
+> `expand` — "Only supports `expand=user/{userId}` and must be used with the
+> `user.id eq "{userId}"` filter query for the same user. Returns the assigned application
+> user in the `_embedded` property."
+
+```
+GET /api/v1/apps?filter=user.id eq "{userId}"&expand=user/{userId}
+```
+
+That returns every app assigned to the user with the app-user object (`status`, `syncState`,
+`scope`) embedded — the documented public equivalent of the console's `selectedUserId`
+(§B1). Caveat to verify: the `filter` parameter's own documentation lists supported
+properties as `id`, `status`, `credentials.signing.kid`, `settings.slo.enabled`, `name` and
+omits `user.id`, even though the `expand` documentation mandates pairing with `user.id eq`.
+The docs contradict each other; one curl against a real org settles it.
+
 ## D. Open verification items
 
-**D1 — the deprovisioning question.** On an app configured for manual deprovisioning:
-unassign a user in Okta, then check whether the app user *stays* in
-`GET /api/v1/apps/{appId}/users` with `status` `UNASSIGNED`/`DEPROVISIONED`/`REVOKED`, or
-disappears. Stays → the biggest category (1958 items in the captured org) is reachable
-publicly, at the cost of scanning every app's user list. Disappears → it genuinely isn't,
-and the README should say so rather than ship an approximation. The presence of
-`UNASSIGNED`/`REVOKED` in the enum makes "stays" plausible; it is not proof.
+**D1 — the deprovisioning question.** *Deprioritised — "Application accounts need
+deprovisioning" is not a priority for this org, despite being 1958 of 2248 tasks.* Kept for
+the record: on an app configured for manual deprovisioning, unassign a user in Okta, then
+check whether the app user *stays* in `GET /api/v1/apps/{appId}/users` with `status`
+`UNASSIGNED`/`DEPROVISIONED`/`REVOKED`, or disappears. Stays → reachable publicly at the
+cost of the org-wide scan above. Disappears → not implementable, and the README should say
+so rather than ship an approximation. The presence of `UNASSIGNED`/`REVOKED` in the enum
+makes "stays" plausible; it is not proof.
 
 **D2 — is `task.lifecycle.*` the Tasks page?** Trigger a task, then
 `GET /api/v1/logs?filter=eventType eq "task.lifecycle.create"&since=…` and inspect
@@ -295,21 +330,40 @@ pretends the auth model is the same. Worth revisiting only if Okta ever exposes
 **Do ship the primitives.** Each is independently useful, matches existing repo patterns,
 and none depends on anything unverified:
 
-| | Change | Where | Size |
-| --- | --- | --- | --- |
-| E1 | `UserAssignment.status` / `.sync_state` / `.scope` / `.last_sync` | `entities/users.py` (entity exists) | trivial |
-| E2 | `GroupPushMapping` entity + `Application.group_push_mappings(status=None)` | new entity + `entities/apps.py` | small |
-| E3 | `Application.signing_keys`, `.expiring_signing_keys(days=30)` | `entities/apps.py` | small |
-| E4 | `Okta.search_users_by_status(status)` (covers `LOCKED_OUT`) | `oktalib.py` | trivial |
-| E5 | `AgentPool` / `Agent` entities + `Okta.agent_pools` | new entity + `oktalib.py` | small |
-| E6 | `Okta.search_users(query)` supporting the `search=` parameter (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B3 | `oktalib.py` | small |
+| | Change | Where | Size | Status |
+| --- | --- | --- | --- | --- |
+| E3 | `AppKey` / `AppSigningCertificate` entities, `Application.signing_certificates`, `.expiring_signing_certificates(days)`, `Okta.get_expiring_app_certificates(days)` / `.get_expired_app_certificates()` | `entities/apps.py`, `oktalib.py` | small | **done** |
+| E2 | `GroupPushMapping` entity + `Application.group_push_mappings(status=None)` | new entity + `entities/apps.py` | small | todo |
+| E6 | `search=` support (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B3; subsumes a status-only helper | `oktalib.py` | small | todo |
+| E5 | `AgentPool` / `Agent` entities + `Okta.agent_pools` | new entity + `oktalib.py` | small | todo |
+| E1 | `UserAssignment.status` / `.sync_state` / `.scope` / `.last_sync` | `entities/users.py` (entity exists) | trivial | todo |
+| E7 | `User.app_assignments()` via the filter+expand shortcut in §C-bis | `entities/users.py` | small | blocked on the `user.id` filter check |
 
-E1 alone unblocks callers who want to write the deprovisioning scan themselves. E6 is
-independently the most broadly useful item: `search=` is strictly more capable than the
-`?q=` the library uses today, and it subsumes E4.
+E6 is the most broadly useful of the remainder: `search=` is strictly more capable than the
+`?q=` the library uses today. E1 is trivial and unblocks callers writing their own scans.
 
-Suggested order: **D3 first** (it validates or kills E1/E2 before any code), then D1, then
-E1 → E6/E2 → E3/E5.
+### Two design decisions worth recording (E3)
+
+**The key entity must override `id`.** Okta identifies application keys by `kid`, not `id`.
+`Entity.id` reads `_data['id']` and both `__hash__` and `__eq__` are built on it, so
+inheriting unchanged makes *every* key hash to `hash('')` and compare equal to every other
+key — two certificates collapse to one in a `set()`. Overriding `id` to return `kid` fixes
+identity and keeps the inherited `created_at`/`last_updated_at`, which work because the
+payload does use `created` and `lastUpdated`. The key payload carries no app id either, so
+the entity takes its parent app's data to build `url`, matching `ClientSecret`.
+
+**The class split is expiry, not SAML.** `/api/v1/apps/{appId}/credentials/keys` is not
+SAML-scoped — it is the app signing key store, and WS-Fed apps have signing certificates
+too, which is why `Okta.get_expiring_app_certificates` narrows on
+`SIGNING_SIGN_ON_MODES = (SAML_2_0, WS_FEDERATION)` rather than SAML alone. The real
+distinction is that x509 signing certificates expire while the JSON Web Keys used for
+`private_key_jwt` client authentication (which this library already *creates* via
+`create_api_services_app_with_jwks`) do not. So `AppKey` holds the shared JWK fields and
+`AppSigningCertificate` adds `expires_at` / `is_expired` / `expires_within` / `x509_chain` /
+`thumbprint`. A future `AppJsonWebKey` slots in beside it.
+
+Suggested order for the rest: **D3 first** (it validates or kills E2 before any code), then
+E6 → E2 → E5 → E1, with E7 after the `user.id` filter check.
 
 An aggregating `Okta.tasks` façade over E1–E5 is tempting but will never match the console
 (§C rows 7–12 are partly or wholly unavailable), so it invites trust in a quietly

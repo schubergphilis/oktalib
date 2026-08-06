@@ -34,8 +34,10 @@ Import all parts from entities here
 from .adminrole import AdminRole
 from .apps import (
     APIServiceApp,
+    AppKey,
     Application,
     ApplicationType,
+    AppSigningCertificate,
     ClientRole,
     ClientSecret,
     OAuthApplicationGrant,
@@ -58,8 +60,10 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 __all__ = [
     'AdminRole',
     'APIServiceApp',
+    'AppKey',
     'Application',
     'ApplicationType',
+    'AppSigningCertificate',
     'ClientRole',
     'ClientSecret',
     'Group',
