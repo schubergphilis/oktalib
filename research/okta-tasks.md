@@ -89,6 +89,22 @@ The `numProvisioningTasks` mapping is the one inference here; the other eight ar
 unambiguous from the names. Note `pendo` and `timeLimitedOrg` are console UI concerns
 leaking into the payload — a sign this is a view-model endpoint, not an API contract.
 
+**The counts move, and unevenly.** Two captures nine days apart:
+
+| Counter | 2026-07-29 | 2026-08-07 | |
+| --- | ---: | ---: | ---: |
+| `numDeprovisioningTasks` | 1958 | 2157 | +199 |
+| `numErrorsTasks` | 45 | 49 | +4 |
+| `numGroupPushErrorsTasks` | 84 | 85 | +1 |
+| `numProfilesTasks` | 155 | 155 | **0** |
+| `numExpiredAppInstancesTasks` | 1 | 1 | 0 |
+| `numTotalTasks` | 2248 | 2452 | +204 |
+
+Two consequences. Any reconciliation against the console (D3) has to be **same-moment** —
+comparing an API scan to yesterday's console number proves nothing. And `numProfilesTasks`
+holding at exactly 155 while everything else grows suggests those items are **stuck rather
+than accruing**, which is worth knowing before investing in that category.
+
 **It takes a `selectedUserId`.** `GET /admin/tasks/main?selectedUserId={userId}&taskDate=ALL`
 returns the identical nine-field shape scoped to a single user — observed:
 `numDeprovisioningTasks: 2`, `numProfilesTasks: 8`, `numTotalTasks: 10`. That is
@@ -121,21 +137,101 @@ rows, one per app instance:
 ```
 
 Extractable per row: **app instance id** (`0oa…`, from the element id), app name, instance
-label, and a **per-app error count**. In the captured org: 10 app instances accounting for
-45 errors (largest single app: 15).
+label, and a **per-app count**. The element id prefix and `data-task-type` track the
+category, so the *profiles* variant emits `profiles-instance-row-{appInstanceId}` and so on.
 
-Two structural facts matter more than the field list:
+`<ul …-userrows-{appInstanceId}>` arrives **empty** — user rows are lazy-loaded per app
+(§B3). `<span class="deprovision-firstresult">0</span>` is the pagination offset for that
+lazy load; note the `deprovision-` class prefix appears on *every* category, confirming one
+shared template.
 
-- `<ul …-userrows-{appInstanceId}>` is **empty** — the individual user rows are lazy-loaded
-  by a further request when the row is expanded. That request was not in the capture, so
-  the endpoint that yields *which user* needs action is still unknown.
-- `<span class="deprovision-firstresult">0</span>` is a **pagination offset**, so the
-  per-app user lists are paged. The `deprovision-` class prefix on the *errors* page
-  suggests all categories share one template — i.e. sibling endpoints
-  (`/admin/tasks/deprovisioning`, `/admin/tasks/profiles`, …) very likely exist with the
-  same shape, but that is inference, not observed.
+**Both fragments reconcile exactly against §B1**, which is the strongest evidence that these
+are the authoritative task lists rather than a filtered view:
 
-### B3. The console also calls the *public* API
+| Fragment | App instances | Rows sum to | Matching counter |
+| --- | --- | --- | --- |
+| `/admin/tasks/errors` | 10 | **45** | `numErrorsTasks` 45 |
+| `/admin/tasks/profiles` | 28 | **155** | `numProfilesTasks` 155 |
+
+#### Which detail routes exist
+
+Okta's admin router returns **404 for unknown paths before the auth redirect**, and **302 to
+`/admin/sso/oidc-entry` for paths that exist**. That difference is an unauthenticated
+route-existence oracle — no credentials needed. Probing it:
+
+| Route | |
+| --- | --- |
+| `/admin/tasks`, `/admin/tasks/main`, `/admin/tasks/errors` | exist (also observed in captures) |
+| `/admin/tasks/profiles`, `/admin/tasks/deprovisioning`, `/admin/tasks/information` | **exist** |
+| grouppush / syncpassword / provisioning / expiring / expired, ~13 name variants | **no route** |
+
+So four detail routes serve nine counters. Since `numGroupPushErrorsTasks` (85) and
+`numExpiredAppInstancesTasks` (1) are non-zero and must render somewhere, those categories
+are presumably parameters on the existing routes rather than routes of their own.
+
+Caveat on the oracle: it discriminates on **path only**. Query strings are not routed, so
+`/admin/tasks?type=profiles` and `/admin/tasks?type=utter-nonsense` both return 302 — a
+`type=` parameter can be neither confirmed nor refuted this way.
+
+### B3. Per-user rows: `GET /admin/tasks/{type}/instance`
+
+Expanding an app row fires:
+
+```
+GET /admin/tasks/errors/instance?taskDate=ALL&instanceId={appInstanceId}&firstResult=0
+```
+
+`text/html`, one `<li>` per affected user. **This is the only place the error reason
+exists** — nothing in the public API carries it (§C).
+
+| Field | Location in the markup |
+| --- | --- |
+| task id | `<li id="errors-user-row-{taskId}">` — `aat…` |
+| app user id | `<span class="hidden-appuser-id">` — `0ua…` |
+| Okta user id | `data-user-id` on the Edit Assignment input — `00u…` |
+| app instance id | `data-instance-id` |
+| category | `data-task-type` (`errors`, presumably `profiles` etc.) |
+| user display name | `<h4>` inside `.user-info` |
+| user email | `<p class="text-light">` inside `.user-info` |
+| **error headline** | `<div class="infobox infobox-error"><h3>` |
+| **error detail** | the `<p>` following that `<h3>` |
+| created timestamp | inline JS: `new Date('2026-07-10 07:37:22.0')` |
+
+Observed error details, showing the granularity available:
+
+```
+Automatic provisioning of user … to app Okta Org2Org failed:
+    Error while creating user …: HTTP 404 Not Found
+    Error while creating user …: Expectation Failed. Errors reported by remote server:
+        Not enough licenses available
+    Error while creating user …: Api validation failed: password (password: Password
+        requirements were not met. …)
+```
+
+**Row counts reconcile with the parent fragment**: Jumbo Org2Org listed 5 → 5 rows returned;
+two single-item apps listed 1 → 1 row each.
+
+There is also a **remediation** path, not just read access. The Edit Assignment form posts to:
+
+```
+POST /app/{appName}/admin/profile/retry/{appUserId}/{taskId}
+     _xsrfToken=…&userName=…&extensibleProfile[…]=…
+```
+
+so retrying a failed assignment is reachable the same way. `{appName}` is the app *type*
+slug (`okta_org2org`, or `{org}_{oinappname}_{n}` for a custom integration), not the
+instance id.
+
+#### The category question this answers
+
+Every row here carries `data-task-type="errors"` with the headline *"An error occurred while
+assigning this app"*. So **`errors` = assignment failures**, definitively. By symmetry the
+profiles category should be `/admin/tasks/profiles/instance?…` with `data-task-type="profiles"`
+and its own headline — unconfirmed, and the single remaining unknown for implementing
+profile-push errors by this route. One expand-a-row capture under *Profile push updates
+encountered errors* settles both the endpoint and whether its rows carry a distinct reason.
+
+### B4. The console also calls the *public* API
 
 Not everything the Tasks page does is internal. The user-picker on that page issues:
 
@@ -163,7 +259,7 @@ Three things worth noting:
   `search_users_by_email` currently use only `?q=` and `?filter=`, which can't express
   this. See E6.
 
-### B4. Auth and transport
+### B5. Auth and transport
 
 - **Cookies**: `sid`, `JSESSIONID`, `xids`, `DT`, `proximity_*`. Session-scoped;
   `srefresh` is re-issued per response with `Max-Age=1800`, and `smax` caps the session.
@@ -298,21 +394,43 @@ expected numbers. Compare API-derived counts against `numGroupPushErrorsTasks` (
 mismatch tells us a "medium confidence" row above is wrong. This is the single
 highest-value check in this document and needs no further captures.
 
-**D4 — the user-row endpoint** (only if §B is pursued). Expand one app row on the Tasks
-page with DevTools open and capture the lazy-load request; that is the one that names the
-affected user, and it wasn't in the capture.
+**D4 — the user-row endpoint.** *Closed* — it is
+`GET /admin/tasks/{type}/instance?taskDate=ALL&instanceId={appId}&firstResult={offset}`,
+documented in §B3. It names the user *and* carries the error reason, and a retry POST exists
+alongside it.
+
+**D5 — the profiles user-row variant.** The one thing still open. Expand an app row under
+*Profile push updates encountered errors* with DevTools on XHR. It confirms
+`/admin/tasks/profiles/instance`, its `data-task-type`, and — the part that matters —
+whether profile-push rows carry a reason distinct from the assignment errors in §B3. If they
+do, the scrape fully subsumes the System Log route for this category; if they don't, the log
+is the only way to tell the two apart.
 
 ## E. Recommendation
 
 **Do not put the internal endpoints in oktalib** — but the reason is narrower than it first
 appears, so it's worth stating precisely.
 
-The HTML-scraping objection only applies to the **detail** endpoints (§B2). The **summary**
-endpoint (§B1) is clean JSON, and with `selectedUserId` it answers the per-user question in
-one request — something the public API genuinely cannot do. If the requirement is "how many
-tasks are outstanding, org-wide or for user X", the internal route is *one JSON GET* and the
-documented route is O(apps × users) requests that may not even be able to answer it (§D1).
-That is a real capability gap, not a stylistic preference.
+The HTML-scraping objection only applies to the **detail** endpoints (§B2, §B3). The
+**summary** endpoint (§B1) is clean JSON, and with `selectedUserId` it answers the per-user
+question in one request — something the public API genuinely cannot do. If the requirement is
+"how many tasks are outstanding, org-wide or for user X", the internal route is *one JSON GET*
+and the documented route is O(apps × users) requests that may not even be able to answer it
+(§D1).
+
+The gap is wider than counts, and §B3 is what settles it. Three things exist only internally:
+
+1. **The error reason.** `AppUser.syncState` is an enum with five values and no reason field;
+   the console shows *"Not enough licenses available"*, *"HTTP 404 Not Found"*,
+   *"Password requirements were not met"*. No public endpoint carries that string.
+2. **Category separation.** `data-task-type` distinguishes assignment failures from profile
+   pushes; `syncState` cannot (§C rows 5–6).
+3. **Remediation.** The retry POST re-drives a failed assignment. The public API has no
+   equivalent "retry this task" call.
+
+So on capability the internal route wins outright, and it is not close. That is worth stating
+plainly rather than burying, because it means the recommendation below is a trade — not a
+case of the documented API being just as good.
 
 What still rules it out for this library is **auth**, not parsing: it needs an interactive
 admin OIDC login (likely MFA), a cookie jar with a 30-minute sliding session, and an XSRF
@@ -334,7 +452,7 @@ and none depends on anything unverified:
 | --- | --- | --- | --- | --- |
 | E3 | `AppKey` / `AppSigningCertificate` entities, `Application.signing_certificates`, `.expiring_signing_certificates(days)`, `Okta.get_expiring_app_certificates(days)` / `.get_expired_app_certificates()` | `entities/apps.py`, `oktalib.py` | small | **done** |
 | E2 | `GroupPushMapping` entity + `Application.group_push_mappings(status=None)` | new entity + `entities/apps.py` | small | todo |
-| E6 | `search=` support (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B3; subsumes a status-only helper | `oktalib.py` | small | todo |
+| E6 | `search=` support (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B4; subsumes a status-only helper | `oktalib.py` | small | todo |
 | E5 | `AgentPool` / `Agent` entities + `Okta.agent_pools` | new entity + `oktalib.py` | small | todo |
 | E1 | `UserAssignment.status` / `.sync_state` / `.scope` / `.last_sync` | `entities/users.py` (entity exists) | trivial | todo |
 | E7 | `User.app_assignments()` via the filter+expand shortcut in §C-bis | `entities/users.py` | small | blocked on the `user.id` filter check |
@@ -383,18 +501,25 @@ incomplete number. If it is ever built, name the pieces for what they are —
 
 ## Note on the capture
 
-The HARs used for §B carried live admin sessions (`sid`, `JSESSIONID`, `xids`, `DT`,
-`proximity_*`) and XSRF tokens, and the §B3 response body included a full user profile —
-among its custom attributes a `tacacsHash` (a `$6$` SHA-512 crypt hash), phone numbers,
-employee number and address. None of that is recorded here or anywhere in the repo: this
-document reproduces only endpoint paths, parameter names, field names and element
-structure. No cookie, token, user id, app instance id, email or profile value appears.
+Four HARs informed §B, each carrying a live admin session (`sid`, `JSESSIONID`, `xids`, `DT`,
+`proximity_*`) and an XSRF token. Beyond the session material they contained real personal
+data: the §B4 user search returned a full profile — including a `tacacsHash` (a `$6$`
+SHA-512 crypt hash), phone numbers, employee number and home-adjacent address — and the §B3
+user rows named affected employees with their email addresses, job titles, managers and
+employee numbers.
 
-Two follow-ups for whoever owns the org, independent of this research:
+None of that is recorded here or anywhere in the repo. This document reproduces only endpoint
+paths, parameter names, field names and element structure. No cookie, token, user id, app
+instance id, email, personal name or profile value appears; the error strings are quoted with
+identifying parts elided. The verified counts (45, 155, 2248, 2452 …) are aggregates.
 
-- Rotate whatever credential `profile.tacacsHash` derives from, and review whether a
-  password hash belongs in an Okta profile attribute that any admin-console user search
-  returns in cleartext JSON.
+Three follow-ups for whoever owns the org, independent of this research:
+
+- Rotate whatever credential `profile.tacacsHash` derives from, and review whether a password
+  hash belongs in an Okta profile attribute that any admin-console user search returns in
+  cleartext JSON.
+- Note that one observed error string echoes the org's **full password policy** back into the
+  task list, where it is readable by anyone with admin console access.
 - Future captures should stay outside the repo, and be scrubbed before pasting anywhere.
 
 ## Sources
@@ -410,4 +535,7 @@ Two follow-ups for whoever owns the org, independent of this research:
 - [Core Okta API](https://developer.okta.com/docs/reference/core-okta-api/)
 - Okta Management API OpenAPI spec 5.1.0, as vendored in [okta-sdk-python](https://github.com/okta/okta-sdk-python)
   (`okta/api/*.py`, `okta/models/*.py`) — endpoint paths, model fields, enums
-- HAR capture of `/admin/tasks` on a live org, 2026-07-29 — §B
+- HAR captures of `/admin/tasks` on a live org — §B:
+  2026-07-29 (page load: `main` + `errors`), 2026-07-29 (user picker + `selectedUserId`),
+  2026-08-07 (`profiles` fragment), 2026-08-07 (`errors/instance` user rows + retry form)
+- Unauthenticated route probing of `/admin/tasks/*` on the same org, 2026-08-07 — §B2
