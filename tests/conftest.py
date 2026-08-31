@@ -1,8 +1,5 @@
 """Reusable test fixtures for oktalib testing."""
 
-import base64
-import contextlib
-import gzip
 import json
 import os
 import time
@@ -20,6 +17,7 @@ from betamax.serializers import JSONSerializer
 from requests import Response, Session
 
 from oktalib import Okta
+from tests.sanitizer import sanitize_interaction
 
 REQUEST_HEADERS_TO_REMOVE = [
     'User-Agent',
@@ -52,58 +50,6 @@ RESPONSE_HEADERS_TO_REMOVE = [
 CASSETTE_DIR = Path(__file__).parent / 'cassettes'
 # Key under which the session start time is stashed for the end-of-session sanitizer.
 _SESSION_START = pytest.StashKey[float]()
-
-
-def _redact_shared_secrets(obj: object) -> object:
-    """Return a copy of ``obj`` with every ``sharedSecret`` value replaced.
-
-    The marker stays valid base32 so pyotp can still parse it on replay (betamax
-    matches on request URL/method, not body, so the passcode value is ignored).
-    """
-    if isinstance(obj, dict):
-        return {
-            key: 'REDACTED' if key == 'sharedSecret' else _redact_shared_secrets(value) for key, value in obj.items()
-        }
-    if isinstance(obj, list):
-        return [_redact_shared_secrets(item) for item in obj]
-    return obj
-
-
-def sanitize_response_body(body: dict, host: str) -> None:
-    """Redact the TOTP ``sharedSecret`` and the real Okta host from a body, in place.
-
-    betamax's placeholders can't reach into gzipped response bodies, so we decode,
-    redact, and re-encode here, preserving the original encoding so replay works.
-
-    Args:
-        body: The ``response['body']`` dict from a betamax cassette interaction.
-        host: The real Okta host to replace with ``example.com`` (e.g.
-            ``schubergphilis.oktapreview.com``); pass an empty string when the
-            host is unknown (e.g. on replay), which skips host redaction.
-
-    """
-    is_base64 = 'base64_string' in body
-    raw = base64.b64decode(body['base64_string']) if is_base64 else body.get('string', '').encode()
-    is_gzip = raw[:2] == b'\x1f\x8b'  # gzip magic bytes
-    try:
-        text = gzip.decompress(raw).decode() if is_gzip else raw.decode()
-    except (OSError, UnicodeDecodeError):
-        return  # binary or corrupt body: not text, so nothing to redact
-
-    redacted = text
-    if 'sharedSecret' in redacted:
-        with contextlib.suppress(ValueError):
-            redacted = json.dumps(_redact_shared_secrets(json.loads(redacted)))
-    if host:
-        redacted = redacted.replace(host, 'example.com')
-    if redacted == text:
-        return
-
-    if is_base64:
-        payload = gzip.compress(redacted.encode(), mtime=0) if is_gzip else redacted.encode()
-        body['base64_string'] = base64.b64encode(payload).decode('ascii')
-    else:
-        body['string'] = redacted
 
 
 def _normalize_host(raw: str) -> str:
@@ -290,11 +236,11 @@ def okta_cassette(
 
 
 def _sanitize_cassette_file(path: Path, host: str) -> None:
-    """Redact the TOTP shared secret and real host from one cassette file, in place."""
+    """Redact secrets, personal data and the real host from one cassette, in place."""
     data = json.loads(path.read_text(encoding='utf-8'))
     original = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False)
     for interaction in data.get('http_interactions', []):
-        sanitize_response_body(interaction['response']['body'], host)
+        sanitize_interaction(interaction, host)
     sanitized = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False)
     if sanitized != original:
         path.write_text(sanitized, encoding='utf-8')
