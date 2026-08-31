@@ -31,7 +31,7 @@ Main code for core.
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from dateutil.parser import parse
@@ -53,6 +53,49 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 LOGGER_BASENAME = 'core'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
+
+
+def parse_epoch_millis(value: Any) -> datetime | None:
+    """Parse a millisecond epoch timestamp into an aware datetime.
+
+    Okta returns most timestamps as ISO 8601 strings, but a few payloads use
+    milliseconds since the epoch instead — the agents of an agent pool report
+    their last connection that way.
+
+    Args:
+        value: The raw value from the API, expected to be a number of
+            milliseconds since the epoch
+
+    Returns:
+        datetime or None: Parsed datetime object in UTC, or None if the value is
+            not a usable epoch timestamp
+
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    try:
+        return datetime.fromtimestamp(value / 1000, tz=UTC)
+    except (OSError, OverflowError, ValueError):
+        return None
+
+
+def parse_datetime(value: Any) -> datetime | None:
+    """Parse an Okta timestamp into a datetime.
+
+    Args:
+        value: The raw value from the API, expected to be a timestamp string
+
+    Returns:
+        datetime or None: Parsed datetime object, or None if the value is not a
+            parseable timestamp
+
+    """
+    if not isinstance(value, str | bytes):
+        return None
+    try:
+        return parse(value)
+    except (ValueError, TypeError):
+        return None
 
 
 class Entity:
@@ -206,13 +249,7 @@ class Entity:
             datetime or None: Parsed datetime object, or None if parsing fails
 
         """
-        value = self._data.get(name)
-        if not isinstance(value, (str, bytes)):
-            return None
-        try:
-            return parse(value)
-        except (ValueError, TypeError):
-            return None
+        return parse_datetime(self._data.get(name))
 
     def _update(self) -> bool:
         """Refresh entity data from the API.
