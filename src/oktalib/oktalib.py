@@ -445,6 +445,46 @@ class Okta:
             self._logger.error(response.text)
         return [User(self, data) for data in response.json()] if response.ok else []
 
+    def search_users_by_query(self, query: str, sort_by: str | None = None) -> Generator[User, None, None]:
+        """Retrieves the users matching a raw search expression.
+
+        The ``search`` parameter is considerably more capable than the ``q`` and
+        ``filter`` parameters the other search methods use: it combines terms
+        with ``and``/``or``, and supports operators such as ``eq``, ``sw``
+        (starts with) and ``gt`` over both top level and ``profile.*``
+        properties. Details are in the
+        [Okta documentation](https://developer.okta.com/docs/reference/core-okta-api/#filter).
+
+        Examples:
+            Every locked out user::
+
+                okta.search_users_by_query('status eq "LOCKED_OUT"')
+
+            Active or suspended users whose name starts with a term::
+
+                okta.search_users_by_query(
+                    '(status eq "ACTIVE" or status eq "SUSPENDED") '
+                    'and (profile.firstName sw "Jo" or profile.lastName sw "Jo")',
+                    sort_by='profile.lastName',
+                )
+
+        Args:
+            query: The Okta search expression to match users with
+            sort_by: Optional property to sort the results by, e.g.
+                ``profile.lastName``
+
+        Returns:
+            generator: A generator of the matching users
+
+        Raises:
+            ServerError: If Okta rejects the search expression or the request
+                otherwise fails.
+
+        """
+        url = f'{self.api}/users'
+        for data in self._get_paginated_url(url, params={'search': query, 'sortBy': sort_by}):
+            yield User(self, data)
+
     def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
         """Retrieves if any, admin roles assigned to the user by id.
 

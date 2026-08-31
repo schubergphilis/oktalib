@@ -1,0 +1,61 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-08-11T09:51:01",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "content-type": [
+            "application/json"
+          ]
+        },
+        "method": "GET",
+        "uri": "https://example.com/api/v1/users?limit=100&search=this+is+not+a+filter"
+      },
+      "response": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"errorCode\": \"E0000031\", \"errorSummary\": \"Invalid search criteria.\", \"errorLink\": \"E0000031\", \"errorId\": \"oaenK9ge5HrTR6lJSEVzMJV0g\", \"errorCauses\": [{\"errorSummary\": \"Invalid search syntax.\"}]}"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 400,
+          "message": "Bad Request"
+        },
+        "url": "https://example.com/api/v1/users?limit=100&search=this+is+not+a+filter"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

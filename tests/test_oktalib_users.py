@@ -10,6 +10,7 @@ import pytest
 from requests import Response
 
 from oktalib.entities import User, UserAssignment, UserAssignmentTask
+from oktalib.oktalibexceptions import ServerError
 
 
 @pytest.mark.parametrize(
@@ -105,6 +106,74 @@ def test_assignment_fields_follow_a_refresh(assignment, monkeypatch):
     assert assignment.last_sync.month == 8
 
 
+def make_users_response(payload, next_url=None):
+    """Build an ok Response of users, optionally advertising a next page."""
+    response = Response()
+    response.status_code = 200
+    response._content = json.dumps(payload).encode()
+    if next_url:
+        response.headers['Link'] = f'<{next_url}>; rel="next"'
+    return response
+
+
+def test_search_users_by_query_sends_the_expression(okta_service, monkeypatch):
+    """The raw search expression is passed through as the search parameter."""
+    requested = {}
+
+    def record(url=None, params=None, **_kwargs):
+        requested['url'] = url
+        requested['params'] = params
+        return make_users_response([{'id': '00u1'}, {'id': '00u2'}])
+
+    monkeypatch.setattr(okta_service.session, 'get', record)
+    found = list(okta_service.search_users_by_query('status eq "LOCKED_OUT"'))
+    assert [user.id for user in found] == ['00u1', '00u2']
+    assert requested['url'] == f'{okta_service.api}/users'
+    assert requested['params']['search'] == 'status eq "LOCKED_OUT"'
+
+
+def test_search_users_by_query_sorts(okta_service, monkeypatch):
+    """A sort property is sent as sortBy, and omitted entirely when not given."""
+    requested = []
+
+    def record(url=None, params=None, **_kwargs):
+        requested.append(params)
+        return make_users_response([])
+
+    monkeypatch.setattr(okta_service.session, 'get', record)
+    list(okta_service.search_users_by_query('status eq "ACTIVE"', sort_by='profile.lastName'))
+    list(okta_service.search_users_by_query('status eq "ACTIVE"'))
+    assert requested[0]['sortBy'] == 'profile.lastName'
+    assert 'sortBy' not in requested[1]
+
+
+def test_search_users_by_query_follows_every_page(okta_service, monkeypatch):
+    """Every match is yielded, since a truncated status query is worse than none."""
+    second_page = f'{okta_service.api}/users?after=00u2'
+    pages = {
+        None: make_users_response([{'id': '00u1'}, {'id': '00u2'}], next_url=second_page),
+        second_page: make_users_response([{'id': '00u3'}]),
+    }
+
+    def record(url=None, **_kwargs):
+        return pages.get(url if url in pages else None)
+
+    monkeypatch.setattr(okta_service.session, 'get', record)
+    found = list(okta_service.search_users_by_query('status eq "LOCKED_OUT"'))
+    assert [user.id for user in found] == ['00u1', '00u2', '00u3']
+
+
+def test_search_users_by_query_raises_on_a_rejected_expression(okta_service, monkeypatch):
+    """A malformed expression surfaces Okta's reason instead of an empty result."""
+    response = Response()
+    response.status_code = 400
+    response._content = json.dumps({'errorSummary': 'Invalid search expression'}).encode()
+    monkeypatch.setattr(okta_service.session, 'get', lambda *a, **k: response)
+
+    with pytest.raises(ServerError, match='Invalid search expression'):
+        list(okta_service.search_users_by_query('nonsense'))
+
+
 @pytest.fixture
 def task_data():
     """The provisioning task Okta embeds in an app user read with expand=task."""
@@ -183,6 +252,41 @@ def assigned_app_id():
     Override to re-record against a different org.
     """
     return os.environ.get('OKTALIB_ASSIGNED_APP_ID', '0oapibfoozclBDPRc0h7')
+
+
+def test_live_search_by_status(okta_cassette, okta_service):
+    """Real call: a status search returns users, and only the matching status.
+
+    Only the first few are taken, which proves the generator is lazy: one page is
+    fetched rather than every user in the org.
+    """
+    with okta_cassette():
+        users = list(islice(okta_service.search_users_by_query('status eq "ACTIVE"'), 3))
+
+    assert len(users) == 3
+    for user in users:
+        assert user.id
+        assert user.status == 'ACTIVE'
+
+
+def test_live_search_with_sorting(okta_cassette, okta_service):
+    """Real call: Okta accepts the sortBy parameter alongside the expression."""
+    with okta_cassette():
+        users = list(islice(okta_service.search_users_by_query('status eq "ACTIVE"', sort_by='profile.lastName'), 3))
+
+    assert len(users) == 3
+
+
+def test_live_search_with_no_matches(okta_cassette, okta_service):
+    """Real call: a search matching nobody yields nothing rather than failing."""
+    with okta_cassette():
+        assert not list(okta_service.search_users_by_query('status eq "LOCKED_OUT"'))
+
+
+def test_live_search_rejects_a_bad_expression(okta_cassette, okta_service):
+    """Real call: Okta's own rejection reaches the caller as a ServerError."""
+    with okta_cassette(), pytest.raises(ServerError):
+        list(okta_service.search_users_by_query('this is not a filter'))
 
 
 @pytest.fixture
