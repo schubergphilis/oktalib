@@ -43,7 +43,7 @@ from oktalib.oktalibexceptions import UnableToUpdate
 
 from . import groups
 from .adminrole import AdminRole
-from .core import Entity
+from .core import Entity, parse_datetime
 
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
@@ -720,6 +720,60 @@ class UserAssignment(Entity):
         if not response.ok:
             self._logger.error(response.text)
         return groups.Group(self._okta, response.json())
+
+    @property
+    def status(self) -> str | None:
+        """The status of the assignment.
+
+        This is the status of the app user, not of the Okta user it refers to;
+        ``self.user.status`` is a different value from a different enum.
+
+        Returns:
+            status (str): The status of the assignment, one of ACTIVE, APPROVED,
+                DEPROVISIONED, IMPLICIT, IMPORTED, INACTIVE, MATCHED, PENDING,
+                PROVISIONED, REVOKED, STAGED, SUSPENDED or UNASSIGNED. None if
+                absent.
+
+        """
+        return self._user_assignment_data.get('status')
+
+    @property
+    def sync_state(self) -> str | None:
+        """The provisioning synchronisation state of the assignment.
+
+        This is what the admin console's "Application assignments encountered
+        errors" and "Profile push updates encountered errors" tasks are built
+        on. Note that it carries no reason for the failure, and does not
+        distinguish an assignment error from a profile push error.
+
+        Returns:
+            sync_state (str): The sync state of the assignment, one of DISABLED,
+                ERROR, OUT_OF_SYNC, SYNCHRONIZED or SYNCING. None if absent.
+
+        """
+        return self._user_assignment_data.get('syncState')
+
+    @property
+    def scope(self) -> str | None:
+        """Whether the assignment is individual or inherited from a group.
+
+        Returns:
+            scope (str): USER for an assignment made to the user directly,
+                GROUP for one inherited from a group assignment. None if absent.
+
+        """
+        return self._user_assignment_data.get('scope')
+
+    @property
+    def last_sync(self) -> datetime | None:
+        """The date and time of the last provisioning synchronisation.
+
+        Returns:
+            last_sync (datetime): The datetime of the last sync, None if the
+                assignment has never been synced or the field is absent.
+
+        """
+        return parse_datetime(self._user_assignment_data.get('lastSync'))
 
     @property
     def email(self) -> str | None:
