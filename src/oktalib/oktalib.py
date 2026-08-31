@@ -44,6 +44,7 @@ from .entities import (
     Application,
     ApplicationType,
     AppSigningCertificate,
+    DirectoryIntegrationsAgentPool,
     Group,
     SAMLApplication,
     SAMLMetadata,
@@ -813,6 +814,72 @@ class Okta:
 
         """
         yield from self.get_expiring_app_certificates(days=0)
+
+    @property
+    def directory_integrations_agent_pools(self) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
+        """The Directory Integrations agent pools configured in okta.
+
+        Returns:
+            generator: The generator of agent pools configured in okta
+
+        """
+        url = f'{self.api}/agentPools'
+        for data in self._get_paginated_url(url):
+            yield DirectoryIntegrationsAgentPool(self, data)
+
+    def get_directory_integrations_agent_pools_by_type(
+        self, pool_type: str
+    ) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
+        """Retrieves the Directory Integrations agent pools of one type.
+
+        Okta applies this filter itself, so it costs no more than listing them all.
+
+        Args:
+            pool_type: The type of pool to retrieve, e.g. AD or LDAP
+
+        Returns:
+            generator: The generator of agent pools of that type
+
+        Raises:
+            ServerError: If Okta rejects the pool type.
+
+        """
+        url = f'{self.api}/agentPools'
+        for data in self._get_paginated_url(url, params={'poolType': pool_type}):
+            yield DirectoryIntegrationsAgentPool(self, data)
+
+    def get_directory_integrations_agent_pool_by_id(self, pool_id: str) -> DirectoryIntegrationsAgentPool | None:
+        """Retrieves a Directory Integrations agent pool by id.
+
+        Okta answers 405 for a single pool, so this searches the listing rather than
+        addressing the pool directly. Orgs have few pools, so the listing is cheap.
+
+        Args:
+            pool_id: The id of the agent pool to retrieve
+
+        Returns:
+            DirectoryIntegrationsAgentPool: The pool if a match is found else None
+
+        """
+        return next(
+            (pool for pool in self.directory_integrations_agent_pools if pool.id == pool_id),
+            None,
+        )
+
+    def get_directory_integrations_agent_pool_by_name(self, name: str) -> DirectoryIntegrationsAgentPool | None:
+        """Retrieves a Directory Integrations agent pool by name.
+
+        Args:
+            name: The name of the agent pool to retrieve
+
+        Returns:
+            DirectoryIntegrationsAgentPool: The pool if a match is found else None
+
+        """
+        return next(
+            (pool for pool in self.directory_integrations_agent_pools if (pool.name or '').lower() == name.lower()),
+            None,
+        )
 
     def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
         """Retrieves an application's SAML metadata by id.

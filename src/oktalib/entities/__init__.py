@@ -45,6 +45,7 @@ from .apps import (
     SAMLMetadata,
     SingleSignOnService,
 )
+from .directoryintegrations import DirectoryIntegrationsAgent, DirectoryIntegrationsAgentPool
 from .groups import Group, GroupAssignment, GroupPushMapping
 from .users import User, UserAssignment, UserAssignmentTask
 
@@ -66,6 +67,8 @@ __all__ = [
     'AppSigningCertificate',
     'ClientRole',
     'ClientSecret',
+    'DirectoryIntegrationsAgent',
+    'DirectoryIntegrationsAgentPool',
     'Group',
     'GroupAssignment',
     'GroupPushMapping',
