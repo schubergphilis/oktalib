@@ -451,14 +451,125 @@ and none depends on anything unverified:
 | | Change | Where | Size | Status |
 | --- | --- | --- | --- | --- |
 | E3 | `AppKey` / `AppSigningCertificate` entities, `Application.signing_certificates`, `.expiring_signing_certificates(days)`, `Okta.get_expiring_app_certificates(days)` / `.get_expired_app_certificates()` | `entities/apps.py`, `oktalib.py` | small | **done** |
-| E2 | `GroupPushMapping` entity + `Application.group_push_mappings(status=None)` | new entity + `entities/apps.py` | small | todo |
-| E6 | `search=` support (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B4; subsumes a status-only helper | `oktalib.py` | small | todo |
-| E5 | `AgentPool` / `Agent` entities + `Okta.agent_pools` | new entity + `oktalib.py` | small | todo |
-| E1 | `UserAssignment.status` / `.sync_state` / `.scope` / `.last_sync` | `entities/users.py` (entity exists) | trivial | todo |
+| E2 | `GroupPushMapping` entity + `Application.group_push_mappings(status=None)` | `entities/groups.py`, `entities/apps.py` | small | **done** |
+| E6 | `search=` support (`status eq`, `profile.* sw`, `sortBy`) — syntax proven in §B4; subsumes a status-only helper | `oktalib.py` | small | **done** |
+| E5 | `DirectoryIntegrationsAgentPool` / `DirectoryIntegrationsAgent` entities, `Okta.directory_integrations_agent_pools`, plus `get_directory_integrations_agent_pool_by_id` / `_by_name` and `get_directory_integrations_agent_pools_by_type` | `entities/directoryintegrations.py`, `oktalib.py` | small | **done** |
+| E1 | `UserAssignment.status` / `.sync_state` / `.scope` / `.last_sync` | `entities/users.py` (entity exists) | trivial | **done** |
 | E7 | `User.app_assignments()` via the filter+expand shortcut in §C-bis | `entities/users.py` | small | blocked on the `user.id` filter check |
 
 E6 is the most broadly useful of the remainder: `search=` is strictly more capable than the
 `?q=` the library uses today. E1 is trivial and unblocks callers writing their own scans.
+
+### What shipping E1, E2, E5 and E6 settled
+
+Three decisions worth recording, since none of them were obvious from the table:
+
+**E5 is named for the console, not the endpoint.** The API path is `/api/v1/agentPools` and
+the spec model is `AgentPool`, but a bare `Okta.agent_pools` says nothing about *which*
+agents — the admin console files these under **Directory > Directory Integrations**. So the
+entities are `DirectoryIntegrationsAgentPool` / `DirectoryIntegrationsAgent` and the accessor
+is `Okta.directory_integrations_agent_pools`. Verbose, and deliberately so: it names what a
+reader will recognise from the UI. `pool.down_agents` is the "Agent down" task directly, and
+costs no request beyond the listing because pools embed their agents.
+
+**E6 paginates where its siblings do not.** `search_users`, `search_users_by_email` and
+`search_groups_by_query` all return the first page as a list. `search_users_by_query` yields
+a generator over *every* page instead, because its whole point is org-wide status queries —
+and a first-page-only answer to "how many users are locked out" is exactly the quietly
+incomplete number §E warns against. It raises `ServerError` on a rejected expression rather
+than returning `[]`, so a typo in the search syntax surfaces Okta's own reason.
+
+**E1 reads the live payload, not the constructor data.** `UserAssignment` keeps its refreshed
+payload in `_user_assignment_data` and only `_update()` rebinds it, leaving the inherited
+`_data` stale. `Entity._get_date_from_key` reads `_data`, so `last_sync` could not use it;
+`core.parse_datetime` was split out of that method so the new properties parse from the live
+payload. The four properties are plain dict reads and make no request, so they cost nothing
+for callers who ignore them.
+
+Naming note on E1: the field is `status`, matching Okta's `AppUser.status`, even though
+`UserAssignment.user.status` is a different value from a different enum. The docstring says
+so explicitly, since that is a genuine trap.
+
+### What the live org corrected (2026-08-11)
+
+The four primitives were then exercised against a real org (`sbp-preview`) and recorded as
+betamax cassettes. **Spec 5.1.0 was wrong, or at least incomplete, on two counts** — both of
+which unit tests built from the spec had happily confirmed:
+
+**`GroupPushMapping.errorSummary` does not exist in practice.** A mapping observed with
+`status: ERROR` returned exactly `created, id, lastPush, lastUpdated, sourceGroupId, status,
+targetGroupId` — no `errorSummary`, despite the spec listing one. So the public API tells you
+*that* a group push failed, never *why*. This strengthens §E rather than weakening it: the
+error reason is internal-only for **every** category, group push included. The property is
+kept (other orgs or future versions may populate it) with a docstring saying not to rely on it.
+
+**Agent `lastConnection` is epoch milliseconds, not ISO 8601.** Okta sends
+`1783348010000`, an `int`. `Entity._get_date_from_key` only parses strings, so
+`last_connection` silently returned `None` for every agent — a real bug that only a real
+response could expose. Fixed with `core.parse_epoch_millis`. The AD agents also carry no
+`updateStatus`/`updateMessage` at all (the spec lists both), and instead report
+`isLatestGAedVersion`, `latestGAedVersion` and `isHidden`; note `latestGAedVersion` is a
+**bool**, not the version string its name suggests.
+
+**There is no per-pool GET.** `GET /api/v1/agentPools/{poolId}` answers **405**, not 404 — the
+path is routed (it carries update operations) but cannot be retrieved. So
+`AgentPool.url` identifies a pool without being fetchable, and the inherited
+`Entity._update()` silently returned False; it now refreshes by finding the pool in the
+listing again. The same limitation is why `get_directory_integrations_agent_pool_by_id`
+searches the collection instead of addressing the pool. Filtering by type, on the other hand,
+*is* server-side: `?poolType=AD` returned 1, `LDAP` 0, and an unknown value 400.
+
+Confirmed as designed, on the other hand:
+
+| Claim | Result |
+| --- | --- |
+| `/agentPools` returns a bare JSON array | yes — the pagination assumption holds |
+| `?status=ERROR` filters group push mappings server side | yes — 1 of 2 returned, §C row 1 stands |
+| Pool counts reconcile with the embedded agent list | yes — 3 agents = 2 operational + 1 inactive |
+| `search=` with `status eq` and `sortBy` | yes, with a `next` link, so E6's pagination is real |
+| App-user `status` / `syncState` / `scope` spellings | yes — `ACTIVE` / `DISABLED` / `USER` observed |
+| App-user `lastSync` | **absent** from every assignment seen, so treat it as optional |
+
+This closes the E1/E2/E5/E6 half of **D3**: the reconstructions do return what the endpoints
+promise. What it does *not* close is agreement with the console's numbers, which still needs a
+same-moment comparison against a `/admin/tasks/main` capture (§B1).
+
+### Recording the cassettes
+
+`tests/sanitizer.py` redacts every recorded body before it lands in the repo, and
+`tests/test_sanitizer.py` covers it. Profiles are handled by **allowlist**, not denylist,
+because Okta profiles are extensible — the recording org alone carried custom attributes for
+team membership, hardware tokens, directory OUs and numbered extension attributes, none of
+which a list of known-bad names would have anticipated. That is also why no org-specific
+attribute name appears in the sanitizer: an unrecognised key is redacted by default, so
+naming one buys nothing.
+
+Re-record with a Vault-backed tenant:
+
+```
+OKTA_CUSTOMER=sbp-preview direnv exec . pytest -k live
+```
+
+Three traps worth knowing.
+
+**A run without credentials poisons the cassettes.** The client falls back to
+`https://example.com`, which is a live domain, so betamax records its HTML as a legitimate 200
+and every later replay serves that page. Delete the affected cassettes and re-record. Never
+filter direnv's stderr while recording either — a Vault bail-out is silent otherwise and looks
+exactly like a code failure.
+
+**Request URIs cannot be sanitized.** betamax matches on method and URI, so a rewritten URI is
+an unmatchable cassette. Keep identifying values out of URIs when writing a recorded test;
+bodies are cleaned for you, URIs are not.
+
+**Replay only works with `OKTA_HOST` unset.** The sanitizer has to bake `example.com` into
+bodies, because betamax's placeholders cannot reach inside a gzipped body, while betamax
+substitutes its placeholder in the *URI* at load time using whatever `base_url` currently is.
+With credentials exported those two disagree: a test that follows a link out of a body — as
+`Application.user_assignments` does via `_links.users.href` — asks for `example.com` while the
+cassette's URIs have been rewritten to the real host, and betamax raises. Tests that build
+their urls from `Okta.api` are unaffected, which is why only one test shows it. So export
+credentials to *record* (after deleting the cassette), and run with them unset to replay.
 
 ### Two design decisions worth recording (E3)
 
@@ -480,8 +591,9 @@ distinction is that x509 signing certificates expire while the JSON Web Keys use
 `AppSigningCertificate` adds `expires_at` / `is_expired` / `expires_within` / `x509_chain` /
 `thumbprint`. A future `AppJsonWebKey` slots in beside it.
 
-Suggested order for the rest: **D3 first** (it validates or kills E2 before any code), then
-E6 → E2 → E5 → E1, with E7 after the `user.id` filter check.
+What remains is verification, not code: **D3** is now the only thing standing between these
+primitives and a trustworthy answer, and it needs a live org rather than another capture.
+E7 stays parked behind the `user.id` filter check.
 
 An aggregating `Okta.tasks` façade over E1–E5 is tempting but will never match the console
 (§C rows 7–12 are partly or wholly unavailable), so it invites trust in a quietly
