@@ -46,7 +46,7 @@ from .apps import (
     SingleSignOnService,
 )
 from .groups import Group, GroupAssignment
-from .users import User, UserAssignment
+from .users import User, UserAssignment, UserAssignmentTask
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
@@ -74,4 +74,5 @@ __all__ = [
     'SingleSignOnService',
     'User',
     'UserAssignment',
+    'UserAssignmentTask',
 ]

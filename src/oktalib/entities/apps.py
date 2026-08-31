@@ -868,6 +868,29 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield users.UserAssignment(self._okta, data)
 
+    def user_assignments_with_tasks(self) -> Generator[UserAssignment, None, None]:
+        """The user assignments to the application, each carrying its provisioning task.
+
+        This reads the same documented endpoint as :attr:`user_assignments` with the
+        undocumented ``expand=task`` parameter, so the task arrives embedded and
+        costs no extra request. It is the only way the public API exposes *why* an
+        assignment failed; ``sync_state`` reports only that something is wrong.
+
+        Okta attaches a task to the failing assignments only, so
+        :attr:`~oktalib.entities.users.UserAssignment.task` is None for the healthy
+        ones. To list the failures::
+
+            [a for a in application.user_assignments_with_tasks()
+             if a.task and a.task.has_error]
+
+        Returns:
+            generator: A generator of user assignments with their task embedded
+
+        """
+        url = self._data.get('_links', {}).get('users', {}).get('href')
+        for data in self._okta._get_paginated_url(url, params={'expand': 'task'}):  # noqa: SLF001
+            yield users.UserAssignment(self._okta, data)
+
     def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
         """Retrieves a user assignment by a user email.
 

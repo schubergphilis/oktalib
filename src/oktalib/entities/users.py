@@ -682,6 +682,106 @@ class User(Entity):
         return _create_factor_from_data(self._okta, self._data, response.json())
 
 
+class UserAssignmentTask(Entity):
+    """Models the provisioning task attached to an application assignment.
+
+    These are the items behind the admin console's "Application assignments
+    encountered errors" and provisioning to-do tasks, and the ``aat`` id matches
+    the one the console uses. Unlike :attr:`UserAssignment.sync_state`, the task
+    carries the reason the assignment failed.
+
+    Okta embeds it in an app user read with ``expand=task``; there is no endpoint
+    serving a task on its own, so this entity has no url of its own.
+    """
+
+    @property
+    def status(self) -> str | None:
+        """The status of the task.
+
+        Do not read this as "did it fail": a task with status COMPLETED was
+        observed still carrying an :attr:`error_string`. Use :attr:`has_error`.
+
+        Returns:
+            status (str): The status of the task, e.g. PROVISIONING_FAILED or
+                COMPLETED. None if absent.
+
+        """
+        return self._data.get('status')
+
+    @property
+    def error_string(self) -> str | None:
+        """The reason the provisioning action failed.
+
+        This is the only place the public API exposes it — ``sync_state`` reports
+        that something is wrong without saying what. The text names the affected
+        user and the app, e.g. "Automatic provisioning of user ... to app ...
+        failed: The object already exists."
+
+        Returns:
+            error_string (str): The failure reason, None when the task records no
+                error
+
+        """
+        return self._data.get('errorString')
+
+    @property
+    def has_error(self) -> bool:
+        """Whether the task records a failure.
+
+        Returns:
+            bool: True if the task carries a reason, False otherwise
+
+        """
+        return bool(self.error_string)
+
+    @property
+    def assignment_type(self) -> str | None:
+        """How the assignment that produced this task was made.
+
+        Returns:
+            assignment_type (str): GROUP when the assignment comes from a group,
+                USER for an individual one. None if absent.
+
+        """
+        return self._data.get('assignmentType')
+
+    @property
+    def group_id(self) -> str | None:
+        """The id of the group the assignment came from.
+
+        Returns:
+            group_id (str): The id of the source group, None for an individual
+                assignment or when absent
+
+        """
+        return self._data.get('groupId')
+
+    @property
+    def created_at(self) -> datetime | None:
+        """The date and time the task was created.
+
+        The task payload spells this ``createdDate`` rather than the ``created``
+        the rest of the API uses, so the inherited implementation cannot read it.
+
+        Returns:
+            datetime: The datetime the task was created, None if absent
+
+        """
+        return self._get_date_from_key('createdDate')
+
+    @property
+    def last_updated_at(self) -> datetime | None:
+        """The date and time the task was last updated.
+
+        The task payload spells this ``lastUpdate``, not ``lastUpdated``.
+
+        Returns:
+            datetime: The datetime the task was last updated, None if absent
+
+        """
+        return self._get_date_from_key('lastUpdate')
+
+
 class UserAssignment(Entity):
     """Models the user assignment object of okta for apps."""
 
@@ -763,6 +863,25 @@ class UserAssignment(Entity):
 
         """
         return self._user_assignment_data.get('scope')
+
+    @property
+    def task(self) -> UserAssignmentTask | None:
+        """The provisioning task attached to this assignment.
+
+        Only present when the assignment was read with ``expand=task``, which
+        :meth:`oktalib.entities.apps.Application.user_assignments_with_tasks`
+        does; the plain assignment listing carries no task and this returns None.
+        Okta attaches a task to the failing assignments only, so a None here on an
+        expanded read means the assignment is healthy.
+
+        Returns:
+            task (UserAssignmentTask): The task if one is embedded, None otherwise
+
+        """
+        data = self._user_assignment_data.get('_embedded', {}).get('task')
+        if not isinstance(data, dict):
+            return None
+        return UserAssignmentTask(self._okta, data)
 
     @property
     def last_sync(self) -> datetime | None:
