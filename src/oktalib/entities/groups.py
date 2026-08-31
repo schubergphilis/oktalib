@@ -355,3 +355,107 @@ class GroupAssignment(Group):
     def profile_saml_roles(self) -> list[str]:
         """Profile saml roles."""
         return self._group_assignment_data.get('profile', {}).get('samlRoles', [])
+
+
+class GroupPushMapping(Entity):
+    """Models a group push mapping of an application.
+
+    A mapping pushes the membership of an Okta group to a group in the
+    application. The ones with an ERROR status are the admin console's "Group
+    push mapping encountered errors" tasks.
+    """
+
+    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+        """Initialize a GroupPushMapping instance.
+
+        Args:
+            okta_instance: The Okta instance
+            app_data: The application data the mapping belongs to
+            data: The mapping data from the API response
+
+        """
+        super().__init__(okta_instance, data)
+        self._app_data = app_data
+
+    @property
+    def url(self) -> str:
+        """The url of the mapping.
+
+        Returns:
+            string: The url of the mapping
+
+        """
+        return f'{self._okta.api}/apps/{self._app_data.get("id")}/group-push/mappings/{self.id}'
+
+    @property
+    def status(self) -> str | None:
+        """The status of the mapping.
+
+        Returns:
+            string: The status of the mapping, one of ACTIVE, ERROR or INACTIVE.
+                None if absent.
+
+        """
+        return self._data.get('status')
+
+    @property
+    def error_summary(self) -> str | None:
+        """The reason the last push failed, when Okta supplies one.
+
+        Do not count on this. The field is documented in the API spec, but a
+        mapping observed with an ERROR status on a real org carried no
+        ``errorSummary`` at all — so a failing mapping generally tells you *that*
+        it failed, not why. Diagnosing the cause still means the admin console.
+
+        Returns:
+            string: The error summary of the mapping, None when Okta omits it,
+                which includes failing mappings
+
+        """
+        return self._data.get('errorSummary')
+
+    @property
+    def source_group_id(self) -> str | None:
+        """The id of the Okta group whose membership is pushed.
+
+        Returns:
+            string: The id of the source group, None if absent
+
+        """
+        return self._data.get('sourceGroupId')
+
+    @property
+    def target_group_id(self) -> str | None:
+        """The id of the group in the application that is pushed to.
+
+        Returns:
+            string: The id of the target group, None if absent
+
+        """
+        return self._data.get('targetGroupId')
+
+    @property
+    def source_group(self) -> Group | None:
+        """The Okta group whose membership is pushed.
+
+        This resolves the group with a request of its own, so callers filtering
+        on status should filter before reaching for it.
+
+        Returns:
+            Group: The source group if it can be retrieved, None otherwise
+
+        """
+        if not self.source_group_id:
+            return None
+        return self._okta.get_group_by_id(self.source_group_id)
+
+    @property
+    def last_push(self) -> datetime | None:
+        """The date and time of the last push.
+
+        Returns:
+            datetime: The datetime of the last push, None if the mapping has
+                never been pushed or the field is absent
+
+        """
+        return self._get_date_from_key('lastPush')

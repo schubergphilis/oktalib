@@ -45,7 +45,7 @@ from .apps import (
     SAMLMetadata,
     SingleSignOnService,
 )
-from .groups import Group, GroupAssignment
+from .groups import Group, GroupAssignment, GroupPushMapping
 from .users import User, UserAssignment, UserAssignmentTask
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
@@ -68,6 +68,7 @@ __all__ = [
     'ClientSecret',
     'Group',
     'GroupAssignment',
+    'GroupPushMapping',
     'OAuthApplicationGrant',
     'SAMLApplication',
     'SAMLMetadata',

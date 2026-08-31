@@ -49,7 +49,7 @@ from .core import Entity
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
 
-    from .groups import Group, GroupAssignment
+    from .groups import Group, GroupAssignment, GroupPushMapping
     from .users import User, UserAssignment
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
@@ -775,6 +775,27 @@ class Application(Entity):
         for certificate in self.signing_certificates:
             if certificate.expires_within(days):
                 yield certificate
+
+    def group_push_mappings(self, status: str | None = None) -> Generator[GroupPushMapping, None, None]:
+        """The group push mappings of the application.
+
+        Okta applies the status filter itself, so asking for the failed mappings
+        only pages through the failures rather than through every mapping::
+
+            application.group_push_mappings(status='ERROR')
+
+        Args:
+            status: Optional status to filter on, one of ACTIVE, ERROR or
+                INACTIVE. All mappings are returned when omitted.
+
+        Returns:
+            generator: A generator of GroupPushMapping objects for the
+                application
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/group-push/mappings'
+        for data in self._okta._get_paginated_url(url, params={'status': status}):  # noqa: SLF001
+            yield groups.GroupPushMapping(self._okta, self._data, data)
 
     def delete(self) -> bool:
         """Deletes the application from okta.
