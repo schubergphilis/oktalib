@@ -285,18 +285,29 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    def _get_paginated_url(self, url: str, result_limit: int = 100) -> Generator[dict[str, Any], None, None]:
+    def _get_paginated_url(
+        self,
+        url: str,
+        result_limit: int = 100,
+        params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         """Gets the paginated data from a url.
 
         Args:
             url: The url to get the data from
             result_limit: The number of results to get per page, defaults to 100
+            params: Optional extra query parameters for the first request. Entries
+                with a None value are dropped, so callers can pass optional
+                filters through directly. Subsequent pages are followed by the
+                link Okta returns, which already carries these parameters.
 
         Returns:
             generator: A generator of the data from the url
 
         """
-        response = self._validate_response(url, {'limit': result_limit})
+        query: dict[str, Any] = {'limit': result_limit}
+        query.update({key: value for key, value in (params or {}).items() if value is not None})
+        response = self._validate_response(url, query)
         yield from response.json()
         next_link = response.links.get('next', {}).get('url')
         while next_link:
