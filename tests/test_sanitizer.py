@@ -12,6 +12,8 @@ import pytest
 
 from tests.sanitizer import (
     REDACTED,
+    host_aliases,
+    redact_text,
     sanitize_body,
     sanitize_interaction,
     sanitize_payload,
@@ -315,3 +317,29 @@ def test_an_interaction_without_bodies_is_tolerated():
     """A HEAD or 204 interaction has no body to redact."""
     interaction = {'request': {}, 'response': {'body': None}}
     sanitize_interaction(interaction, host='')  # must not raise
+
+
+def test_host_aliases_include_the_admin_console_host():
+    """An app's help link points at the admin host, which is not the org host."""
+    assert host_aliases('anorg.oktapreview.com') == [
+        'anorg-admin.oktapreview.com',
+        'anorg.oktapreview.com',
+    ]
+
+
+def test_host_aliases_are_empty_without_a_host():
+    """Replay runs with no host configured, and must not redact on an empty string."""
+    assert host_aliases('') == []
+
+
+def test_host_aliases_of_a_bare_name():
+    """A hostname with no domain part has no admin variant to derive."""
+    assert host_aliases('localhost') == ['localhost']
+
+
+def test_the_admin_host_is_redacted_from_a_body():
+    """A help link to the admin console is redacted like any other host reference."""
+    body = json.dumps({'_links': {'help': {'href': 'https://anorg-admin.oktapreview.com/app/x'}}})
+    redacted = redact_text(body, 'anorg.oktapreview.com')
+    assert 'anorg-admin' not in redacted
+    assert 'example.com/app/x' in redacted

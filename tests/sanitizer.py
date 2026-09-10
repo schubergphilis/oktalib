@@ -192,6 +192,31 @@ def sanitize_payload(payload: Any) -> Any:
     return payload
 
 
+def host_aliases(host: str) -> list[str]:
+    """Every hostname of the recording org that a body can carry.
+
+    An app's ``_links.help`` points at the admin console, which lives on a
+    separate ``{org}-admin.{domain}`` host rather than the org host the library
+    talks to. Redacting only the configured host leaves that one behind.
+
+    Longest first, so replacing them in order cannot leave a fragment of the
+    admin host behind after the org host has been substituted out of it.
+
+    Args:
+        host: The bare org hostname, or an empty string when it is unknown
+
+    Returns:
+        list: The hostnames to redact, empty when no host was given
+
+    """
+    if not host:
+        return []
+    subdomain, _, domain = host.partition('.')
+    if not domain:
+        return [host]
+    return sorted({host, f'{subdomain}-admin.{domain}'}, key=len, reverse=True)
+
+
 def redact_text(text: str, host: str) -> str:
     """Redact a decoded body, whether or not it is JSON.
 
@@ -210,8 +235,8 @@ def redact_text(text: str, host: str) -> str:
     redacted = text
     with contextlib.suppress(ValueError):
         redacted = json.dumps(sanitize_payload(json.loads(redacted)))
-    if host:
-        redacted = redacted.replace(host, PSEUDONYM_DOMAIN)
+    for name in host_aliases(host):
+        redacted = redacted.replace(name, PSEUDONYM_DOMAIN)
     return redacted
 
 
