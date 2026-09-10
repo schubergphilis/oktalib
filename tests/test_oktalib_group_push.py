@@ -135,7 +135,7 @@ def test_omitted_status_sends_no_filter(application, monkeypatch):
     """Without a status, no status parameter is sent at all."""
     requested = {}
 
-    def record(url=None, params=None, **_kwargs):
+    def record(params=None, **_kwargs):
         requested['params'] = params
         return make_json_response([])
 
@@ -148,7 +148,7 @@ def test_expand_task_is_requested(application, monkeypatch):
     """The task expansion is sent, since the plain listing carries no task."""
     requested = {}
 
-    def record(url=None, params=None, **_kwargs):
+    def record(params=None, **_kwargs):
         requested['params'] = params
         return make_json_response([])
 

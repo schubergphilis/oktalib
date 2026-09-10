@@ -3,6 +3,7 @@
 The sanitizer is what stands between a recorded org and the repository, so it is
 tested directly rather than only through the cassettes it produces.
 """
+# pylint: disable=redefined-outer-name
 
 import base64
 import gzip

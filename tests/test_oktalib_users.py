@@ -136,7 +136,7 @@ def test_search_users_by_query_sorts(okta_service, monkeypatch):
     """A sort property is sent as sortBy, and omitted entirely when not given."""
     requested = []
 
-    def record(url=None, params=None, **_kwargs):
+    def record(params=None, **_kwargs):
         requested.append(params)
         return make_users_response([])
 
