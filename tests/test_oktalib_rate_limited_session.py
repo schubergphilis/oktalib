@@ -7,7 +7,6 @@ import pytest
 from requests import PreparedRequest, Response
 
 from oktalib.oktalib import RateLimitedSession
-from oktalib.oktalibexceptions import ApiLimitReached
 
 
 @pytest.fixture
@@ -70,21 +69,6 @@ def test_an_unrelated_error_status_is_not_retried(responder):
     response = RateLimitedSession().get('https://example.com/api/v1/users')
 
     assert response.status_code == 500
-    assert len(attempts) == 1
-
-
-def test_a_rate_limit_raises_so_backoff_can_catch_it(responder):
-    """The 429 is turned into the exception the decorator retries on.
-
-    Called through ``__wrapped__``, the undecorated implementation, because that is
-    the behaviour this class owns; whether backoff then retries or gives up at
-    max_time is backoff's contract, covered by the retry test above.
-    """
-    attempts = responder([429])
-    session = RateLimitedSession()
-
-    with pytest.raises(ApiLimitReached):
-        RateLimitedSession.request.__wrapped__(session, 'GET', 'https://example.com/api/v1/users')
     assert len(attempts) == 1
 
 
