@@ -37,6 +37,7 @@ from .oktalibexceptions import (
     AuthFailed,
     InvalidApplication,
     InvalidGroup,
+    InvalidLifecycle,
     InvalidUser,
     ServerError,
 )
@@ -55,6 +56,7 @@ __all__ = [
     'InvalidGroup',
     'InvalidUser',
     'InvalidApplication',
+    'InvalidLifecycle',
     'ApiLimitReached',
     'ServerError',
     'Okta',

@@ -2,7 +2,6 @@
 
 import json
 import os
-import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -47,12 +46,13 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'Content-Length',
 ]
 
-CASSETTE_DIR = Path(__file__).parent / 'cassettes'
-# Key under which the session start time is stashed for the end-of-session sanitizer.
-_SESSION_START = pytest.StashKey[float]()
+# Paths of cassettes that received a new recording this session (populated by the
+# before_record hook). Only these are sanitized at session end, so replayed /
+# already-clean cassettes are never re-processed.
+recorded_cassettes: set[str] = set()
 
 
-def _normalize_host(raw: str) -> str:
+def normalize_host(raw: str) -> str:
     """Add an https scheme (if missing) and strip a trailing slash.
 
     An empty string is returned unchanged, so callers can distinguish
@@ -63,14 +63,14 @@ def _normalize_host(raw: str) -> str:
     return raw.rstrip('/')
 
 
-def _okta_base_url() -> str:
+def okta_base_url() -> str:
     """Full base URL for the Okta client, defaulting to the placeholder host."""
-    return _normalize_host(os.environ.get('OKTA_HOST', 'https://example.com'))
+    return normalize_host(os.environ.get('OKTA_HOST', 'https://example.com'))
 
 
-def _okta_hostname() -> str:
+def okta_hostname() -> str:
     """Bare host to redact from cassettes (e.g. 'schubergphilis.oktapreview.com'), or ''."""
-    return urlparse(_normalize_host(os.environ.get('OKTA_HOST', ''))).hostname or ''
+    return urlparse(normalize_host(os.environ.get('OKTA_HOST', ''))).hostname or ''
 
 
 def configure_betamax(token: str, base_url: str | None = None) -> None:
@@ -112,9 +112,12 @@ def configure_betamax(token: str, base_url: str | None = None) -> None:
         # Strip both request and response headers in one callback
         def strip_sensitive_headers(
             interaction: Interaction,
-            cassette: Cassette,  # noqa: ARG001
+            cassette: Cassette,
         ) -> None:
-            # pylint: disable='unused-argument'
+            # this hook only fires when an interaction is recorded (never on
+            # replay), so it marks exactly the cassettes needing sanitization.
+            recorded_cassettes.add(cassette.cassette_path)
+
             # Create lowercase sets for case-insensitive comparison
             req_headers_lower = {h.lower() for h in REQUEST_HEADERS_TO_REMOVE}
             resp_headers_lower = {h.lower() for h in RESPONSE_HEADERS_TO_REMOVE}
@@ -204,18 +207,18 @@ def get_cassette(request: SubRequest, recorder: Betamax) -> Callable[[], Abstrac
 @pytest.fixture(scope='session')
 def okta_service() -> Okta:
     """Return a library instance with an authenticated session."""
-    host = _okta_base_url()
+    host = okta_base_url()
     token = os.environ.get('OKTA_API_KEY', 'fake_api_key')
     if token == 'fake_api_key':
 
-        def _get_authenticated_session(
+        def get_authenticated_session(
             self,
         ) -> Session:  # noqa: ARG001
             # pylint: disable='unused-argument'
             """Create an authenticated session without actual authentication."""
             return Session()
 
-        Okta._setup_session = _get_authenticated_session
+        Okta._setup_session = get_authenticated_session
     configure_betamax(token=token, base_url=host)
     return Okta(host=host, token=token)
 
@@ -235,7 +238,7 @@ def okta_cassette(
     return get_cassette(request=request, recorder=okta_recorder)
 
 
-def _sanitize_cassette_file(path: Path, host: str) -> None:
+def sanitize_cassette_file(path: Path, host: str) -> None:
     """Redact secrets, personal data and the real host from one cassette, in place."""
     data = json.loads(path.read_text(encoding='utf-8'))
     original = json.dumps(data, sort_keys=True, indent=2, ensure_ascii=False)
@@ -246,24 +249,19 @@ def _sanitize_cassette_file(path: Path, host: str) -> None:
         path.write_text(sanitized, encoding='utf-8')
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:
-    """Record when the session started so we only sanitize cassettes written during it."""
-    session.stash[_SESSION_START] = time.time()
+def pytest_sessionfinish() -> None:
+    """Sanitize the cassettes that were (re)recorded during this session.
 
-
-def pytest_sessionfinish(session: pytest.Session) -> None:
-    """Sanitize every cassette recorded or updated during this session.
-
-    Runs once after all tests and fixture teardowns, so it covers cassettes made
-    through any path (okta_cassette, raw betamax, module-scoped fixtures) without
-    interfering with the live recording flow. Redaction is a no-op on unchanged
-    files, so this never rewrites already-clean cassettes.
+    Only cassettes captured by the before_record hook are processed, so replayed
+    or already-clean cassettes are never touched. Recording happens through the
+    global betamax config, so this covers every path (okta_cassette, raw betamax,
+    module-scoped fixtures) without interfering with the live recording flow.
     """
-    started = session.stash.get(_SESSION_START, 0.0)
-    host = _okta_hostname()
-    for path in CASSETTE_DIR.glob('*.json'):
-        if path.stat().st_mtime >= started:
-            _sanitize_cassette_file(path, host)
+    host = okta_hostname()
+    for path in recorded_cassettes:
+        cassette = Path(path)
+        if cassette.exists():
+            sanitize_cassette_file(cassette, host)
 
 
 def make_error_response(status: int = 502, body: bytes = b'<html>502 Bad Gateway</html>') -> Response:

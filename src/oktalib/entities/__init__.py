@@ -46,6 +46,7 @@ from .apps import (
     SingleSignOnService,
 )
 from .directoryintegrations import DirectoryIntegrationsAgent, DirectoryIntegrationsAgentPool
+from .features import Feature
 from .groups import Group, GroupAssignment, GroupPushMapping
 from .users import User, UserAssignment, UserAssignmentTask
 
@@ -69,6 +70,7 @@ __all__ = [
     'ClientSecret',
     'DirectoryIntegrationsAgent',
     'DirectoryIntegrationsAgentPool',
+    'Feature',
     'Group',
     'GroupAssignment',
     'GroupPushMapping',

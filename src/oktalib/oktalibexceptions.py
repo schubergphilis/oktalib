@@ -57,6 +57,10 @@ class InvalidApplication(Exception):
     """The application provided is invalid."""
 
 
+class InvalidLifecycle(Exception):
+    """The lifecycle action provided is invalid."""
+
+
 class ApiLimitReached(Exception):
     """The api limits are close to being reached."""
 
