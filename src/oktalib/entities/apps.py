@@ -912,6 +912,51 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url, params={'expand': 'task'}):  # noqa: SLF001
             yield users.UserAssignment(self._okta, data)
 
+    def failed_user_assignments(self, task_status: str | None = None) -> Generator[UserAssignment, None, None]:
+        """The assignments the admin console lists under its task categories.
+
+        These are the rows behind *Application assignments encountered errors* and
+        *Profile push updates encountered errors*, and each one carries the same
+        sentence the console shows, through
+        :attr:`~oktalib.entities.users.UserAssignmentTask.error_string`.
+
+        The task's status is what separates the categories; ``sync_state`` does
+        not. A single ``sync_state`` value can cover both profile push and
+        provisioning failures, and a provisioning failure is not confined to
+        ERROR, so filtering on it gets the categories wrong in both directions.
+
+        Args:
+            task_status: The task status to return, matching the console category.
+                ``PROVISIONING_FAILED`` for assignment errors, ``PROFILE_PUSH_FAILED``
+                for profile push errors; ``VALIDATION_FAILED`` also occurs. None,
+                the default, returns every failing assignment whatever the status.
+
+        Returns:
+            generator: A generator of the failing assignments, each with its task
+                embedded.
+
+        Example:
+            Reproduce one console category, with its reasons::
+
+                for assignment in application.failed_user_assignments(
+                        task_status='PROFILE_PUSH_FAILED'):
+                    print(assignment.email, assignment.task.error_string)
+
+        Note:
+            Okta offers no server side predicate for this, so the filtering is
+            done here over the app's full assignment listing. The cost is the
+            same as :meth:`user_assignments_with_tasks`, one page of app users at
+            a time.
+
+        """
+        for assignment in self.user_assignments_with_tasks():
+            task = assignment.task
+            if task is None or not task.has_failed:
+                continue
+            if task_status is not None and task.status != task_status:
+                continue
+            yield assignment
+
     def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
         """Retrieves a user assignment by a user email.
 

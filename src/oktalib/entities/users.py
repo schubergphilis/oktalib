@@ -63,6 +63,12 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'users'
 
+# Provisioning task statuses that are not an outstanding failure. COMPLETED is done;
+# PROVISIONING is Okta still working, and was observed on a task moments after an
+# assignment was re-driven. Treating an in-flight task as a failure makes a caller
+# act on work that is already running.
+NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})
+
 
 class User(Entity):
     """Models the user object of okta."""
@@ -773,6 +779,25 @@ class UserAssignmentTask(Entity):
 
         """
         return bool(self.error_string)
+
+    @property
+    def has_failed(self) -> bool:
+        """Whether the task is one the admin console counts as outstanding.
+
+        This is not the same question as :attr:`has_error`. Okta leaves the reason
+        on a task after it succeeds, so a COMPLETED task usually still carries one.
+        Counting by reason therefore over-reports heavily; only :attr:`status`
+        matches the console.
+
+        A status this library has not seen counts as a failure, so a new one
+        surfaces rather than being silently dropped.
+
+        Returns:
+            bool: True when the task is in a failure status, False when it has
+                completed, is still running, or reports no status at all.
+
+        """
+        return bool(self.status) and self.status not in NON_FAILURE_TASK_STATUSES
 
     @property
     def assignment_type(self) -> str | None:
