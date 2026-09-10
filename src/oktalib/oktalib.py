@@ -81,6 +81,48 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
+class RateLimitedSession(Session):
+    """A requests session that backs off when Okta reports its rate limit.
+
+    Okta answers 429 when an endpoint's budget is exhausted. Overriding ``request``
+    covers every verb, because ``Session.get`` and friends all route through it.
+    """
+
+    def __init__(self, logger: logging.Logger | None = None) -> None:
+        """Initialize the session.
+
+        Args:
+            logger: Where to report backing off; defaults to this module's logger.
+
+        """
+        super().__init__()
+        self._logger = logger or LOGGER
+
+    @backoff.on_exception(backoff.expo, ApiLimitReached, max_time=60)
+    def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:  # type: ignore[override]
+        """Make a request, retrying with exponential backoff on a rate limit.
+
+        Args:
+            method: HTTP verb.
+            url: The url to request.
+            args: Positional arguments passed through to requests.
+            kwargs: Keyword arguments passed through to requests.
+
+        Raises:
+            ApiLimitReached: The endpoint answered 429. Caught by the backoff
+                decorator, which retries; it escapes only once max_time is spent.
+
+        Returns:
+            Response: The response.
+
+        """
+        response = super().request(method, url, *args, **kwargs)
+        if response.status_code == 429:
+            self._logger.warning('Api is exhausted for endpoint, backing off.')
+            raise ApiLimitReached
+        return response
+
+
 class Okta:
     """Models the api of okta."""
 
@@ -98,7 +140,6 @@ class Okta:
         self.api = f'{host}/api/v1'
         self.token = token
         self.session = self._setup_session()
-        self._monkey_patch_session()
 
     def _setup_session(self) -> Session:
         """Sets up the session for the Okta object.
@@ -107,7 +148,7 @@ class Okta:
             Session: The session object with the correct headers and authentication.
 
         """
-        session = Session()
+        session = RateLimitedSession(logger=self._logger)
         session.get(self.host)
         session.headers.update(
             {
@@ -121,41 +162,6 @@ class Okta:
         if not response.ok:
             raise AuthFailed(response.content)
         return session
-
-    def _monkey_patch_session(self) -> None:
-        """Gets original request method and overrides it with the patched one.
-
-        Returns:
-            Response: Response instance.
-
-        """
-        self.session.original_request = self.session.request  # type: ignore[attr-defined]
-        self.session.request = self._patched_request  # type: ignore[assignment]
-
-    @backoff.on_exception(backoff.expo, ApiLimitReached, max_time=60)
-    def _patched_request(self, method: str, url: str, **kwargs: Any) -> Response:
-        """Patch the original request method from requests.Sessions library.
-
-        Args:
-            method (str): HTTP verb as string.
-            url (str): string.
-            kwargs: keyword arguments.
-
-        Raises:
-            ApiLimitReached: Raised when the Okta API limit is reached.
-
-        Returns:
-            Response: Response instance.
-
-        """
-        self._logger.debug(f'Using patched request for method {method}, url {url}, kwargs {kwargs}')
-        response = self.session.original_request(  # type: ignore[attr-defined]
-            method, url, **kwargs
-        )
-        if response.status_code == 429:
-            self._logger.warning('Api is exhausted for endpoint, backing off.')
-            raise ApiLimitReached
-        return response
 
     @property
     def features(self) -> Generator[Feature, None, None]:

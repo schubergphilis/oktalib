@@ -16,6 +16,7 @@ from betamax.serializers import JSONSerializer
 from requests import Response, Session
 
 from oktalib import Okta
+from oktalib.oktalib import RateLimitedSession
 from tests.sanitizer import sanitize_interaction
 
 REQUEST_HEADERS_TO_REMOVE = [
@@ -216,7 +217,7 @@ def okta_service() -> Okta:
         ) -> Session:  # noqa: ARG001
             # pylint: disable='unused-argument'
             """Create an authenticated session without actual authentication."""
-            return Session()
+            return RateLimitedSession()
 
         Okta._setup_session = get_authenticated_session
     configure_betamax(token=token, base_url=host)
