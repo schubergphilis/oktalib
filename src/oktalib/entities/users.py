@@ -29,8 +29,6 @@ User-related entities.
 
 """
 
-from __future__ import annotations
-
 import json
 import logging
 from collections.abc import Generator
@@ -440,7 +438,7 @@ class User(Entity):
             yield AdminRole(self._okta, data)
 
     @property
-    def groups(self) -> Generator[Group, None, None]:
+    def groups(self) -> 'Generator[Group, None, None]':
         """Lists the groups the user is a member of.
 
         Returns:
@@ -637,7 +635,7 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
-    def app_assignments(self) -> Generator[UserAssignment, None, None]:
+    def app_assignments(self) -> 'Generator[UserAssignment, None, None]':
         """The user's application assignments, one request per page rather than a scan.
 
         Okta lets ``/api/v1/apps`` be filtered by user and asked to embed that
@@ -675,7 +673,7 @@ class User(Entity):
             if assignment:
                 yield UserAssignment(self._okta, assignment, application_data=data)
 
-    def enrolled_factors(self) -> Generator[UserFactor, None, None]:
+    def enrolled_factors(self) -> 'Generator[UserFactor, None, None]':
         """Lists the factors the user is enrolled in.
 
         Returns:
@@ -685,9 +683,9 @@ class User(Entity):
         """
         url = f'{self._okta.api}/users/{self.id}/factors'
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield _create_factor_from_data(self._okta, self._data, data)
+            yield create_factor_from_data(self._okta, self._data, data)
 
-    def supported_factors(self) -> Generator[UserSupportedFactor, None, None]:
+    def supported_factors(self) -> 'Generator[UserSupportedFactor, None, None]':
         """Lists all the supported factors that can be enrolled for the
         specified user that are included in the highest priority
         authenticator enrollment policy that applies to the user.
@@ -704,7 +702,7 @@ class User(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield UserSupportedFactor(self._okta, self._data, data)
 
-    def enroll_factor(self, factor_type: str, provider: str, query: dict[str, Any]) -> UserFactor | None:
+    def enroll_factor(self, factor_type: str, provider: str, query: dict[str, Any]) -> 'UserFactor | None':
         """Enrolls the user in a new factor.
 
         Args:
@@ -724,7 +722,7 @@ class User(Entity):
         if not response.ok:
             self._logger.error(response.text)
             return None
-        return _create_factor_from_data(self._okta, self._data, response.json())
+        return create_factor_from_data(self._okta, self._data, response.json())
 
 
 class UserAssignmentTask(Entity):
@@ -851,7 +849,7 @@ class UserAssignment(Entity):
 
     def __init__(
         self,
-        okta_instance: Okta,
+        okta_instance: 'Okta',
         data: dict[str, Any],
         application_data: dict[str, Any] | None = None,
     ) -> None:
@@ -889,7 +887,7 @@ class UserAssignment(Entity):
         return User(self._okta, self._get_user_data())
 
     @property
-    def group(self) -> Group:
+    def group(self) -> 'Group':
         """The group that the user assignment refers to.
 
         Returns:
@@ -903,7 +901,7 @@ class UserAssignment(Entity):
         return groups.Group(self._okta, response.json())
 
     @property
-    def application(self) -> Application | None:
+    def application(self) -> 'Application | None':
         """The application the assignment is to.
 
         Costs a request unless the assignment came from a listing that already
@@ -1067,11 +1065,11 @@ class UserAssignment(Entity):
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-def _create_factor_from_data(
-    okta_instance: Okta,
+def create_factor_from_data(
+    okta_instance: 'Okta',
     user_data: dict[str, Any],
     factor_data: dict[str, Any],
-) -> UserFactor:
+) -> 'UserFactor':
     """Create a UserFactor instance based on the factor type and provider.
 
     Uses pattern matching to determine the factor type from factorType and provider
@@ -1099,7 +1097,7 @@ def _create_factor_from_data(
 class UserFactor(Entity):
     """Models the user factor object of okta."""
 
-    def __init__(self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', user_data: dict[str, Any], data: dict[str, Any]) -> None:
         super().__init__(okta_instance, data)
         self._user_data = user_data
 
@@ -1252,7 +1250,7 @@ class UserSupportedFactor:
     They represent factor types that can be enrolled for a user.
     """
 
-    def __init__(self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', user_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize UserSupportedFactor.
 
         Args:

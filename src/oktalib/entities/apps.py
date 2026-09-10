@@ -29,8 +29,6 @@ Application-related entities (OAuth, SAML metadata).
 
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import xml.etree.ElementTree as ET
@@ -90,7 +88,7 @@ class SingleSignOnService:
 class OAuthApplicationGrant(Entity):
     """Models an OAuth application grant (API scope grant) for an application."""
 
-    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize an OAuthApplicationGrant instance.
 
         Args:
@@ -219,7 +217,7 @@ class OAuthApplicationGrant(Entity):
 class ClientSecret(Entity):
     """Models an OAuth client secret for an application."""
 
-    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a ClientSecret instance.
 
         Args:
@@ -328,7 +326,7 @@ class AppKey(Entity):
     reads a non-existent ``id`` field.
     """
 
-    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize an AppKey instance.
 
         Args:
@@ -454,7 +452,7 @@ class AppSigningCertificate(AppKey):
 class ClientRole(Entity):
     """Models an OAuth client role (admin role assigned to an OAuth client)."""
 
-    def __init__(self, okta_instance: Okta, client_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', client_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a ClientRole instance.
 
         Args:
@@ -776,7 +774,7 @@ class Application(Entity):
             if certificate.expires_within(days):
                 yield certificate
 
-    def group_push_mappings(self, status: str | None = None) -> Generator[GroupPushMapping, None, None]:
+    def group_push_mappings(self, status: str | None = None) -> 'Generator[GroupPushMapping, None, None]':
         """The group push mappings of the application.
 
         Okta applies the status filter itself, so asking for the failed mappings
@@ -829,7 +827,7 @@ class Application(Entity):
         return self._data.get('settings', {}).get('notifications')
 
     @property
-    def users(self) -> Generator[User, None, None]:
+    def users(self) -> 'Generator[User, None, None]':
         """The users of the application.
 
         Returns:
@@ -841,7 +839,7 @@ class Application(Entity):
             yield users.User(self._okta, data)
 
     @property
-    def groups(self) -> Generator[Group | None, None, None]:
+    def groups(self) -> 'Generator[Group | None, None, None]':
         """The groups of the application.
 
         Returns:
@@ -853,7 +851,7 @@ class Application(Entity):
             yield self._okta.get_group_by_id(group.get('id', ''))
 
     @property
-    def group_assignments(self) -> Generator[GroupAssignment, None, None]:
+    def group_assignments(self) -> 'Generator[GroupAssignment, None, None]':
         """The group assignments to the application.
 
         Returns:
@@ -864,7 +862,7 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield groups.GroupAssignment(self._okta, data)
 
-    def get_group_assignment_by_group_name(self, name: str) -> GroupAssignment | None:
+    def get_group_assignment_by_group_name(self, name: str) -> 'GroupAssignment | None':
         """Retrieves a group assignment by a group name.
 
         Args:
@@ -878,7 +876,7 @@ class Application(Entity):
         return next((group for group in self.group_assignments if group.name == name), None)
 
     @property
-    def user_assignments(self) -> Generator[UserAssignment, None, None]:
+    def user_assignments(self) -> 'Generator[UserAssignment, None, None]':
         """The user assignments to the application.
 
         Returns:
@@ -889,7 +887,7 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield users.UserAssignment(self._okta, data)
 
-    def user_assignments_with_tasks(self) -> Generator[UserAssignment, None, None]:
+    def user_assignments_with_tasks(self) -> 'Generator[UserAssignment, None, None]':
         """The user assignments to the application, each carrying its provisioning task.
 
         This reads the same documented endpoint as :attr:`user_assignments` with the
@@ -912,7 +910,7 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url, params={'expand': 'task'}):  # noqa: SLF001
             yield users.UserAssignment(self._okta, data)
 
-    def failed_user_assignments(self, task_status: str | None = None) -> Generator[UserAssignment, None, None]:
+    def failed_user_assignments(self, task_status: str | None = None) -> 'Generator[UserAssignment, None, None]':
         """The assignments the admin console lists under its task categories.
 
         These are the rows behind *Application assignments encountered errors* and
@@ -954,7 +952,7 @@ class Application(Entity):
             if task is not None and task.has_failed and (task_status is None or task.status == task_status):
                 yield assignment
 
-    def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
+    def get_user_assignment_by_email(self, email: str) -> 'UserAssignment | None':
         """Retrieves a user assignment by a user email.
 
         Args:

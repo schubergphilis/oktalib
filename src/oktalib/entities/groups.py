@@ -29,8 +29,6 @@ Group-related entities.
 
 """
 
-from __future__ import annotations
-
 import json
 from collections.abc import Generator
 from datetime import datetime
@@ -63,7 +61,7 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 class Group(Entity):
     """Models the group object of okta."""
 
-    def __init__(self, okta_instance: Okta, data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', data: dict[str, Any]) -> None:
         self._validate_fields(
             data=data,
             required_fields={'id': ('id',), 'profile.name': ('profile', 'name')},
@@ -172,7 +170,7 @@ class Group(Entity):
         return tuple(str(item) for item in value)
 
     @property
-    def users(self) -> Generator[User, None, None]:
+    def users(self) -> 'Generator[User, None, None]':
         """The users of the group.
 
         Returns:
@@ -184,7 +182,7 @@ class Group(Entity):
             yield users.User(self._okta, data)
 
     @property
-    def applications(self) -> Generator[Application, None, None]:
+    def applications(self) -> 'Generator[Application, None, None]':
         """The applications of the group.
 
         Returns:
@@ -314,7 +312,7 @@ class Group(Entity):
 class GroupAssignment(Group):
     """Models the group assignment object of okta for apps."""
 
-    def __init__(self, okta_instance: Okta, data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', data: dict[str, Any]) -> None:
         self._okta = okta_instance
         self._group_assignment_data = data
         group_data = self._get_group_data()
@@ -365,7 +363,7 @@ class GroupPushMapping(Entity):
     push mapping encountered errors" tasks.
     """
 
-    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a GroupPushMapping instance.
 
         Args:

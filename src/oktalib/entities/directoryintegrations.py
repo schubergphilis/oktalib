@@ -32,8 +32,6 @@ Integrations, which Okta's API exposes as agent pools.
 
 """
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -67,7 +65,7 @@ class DirectoryIntegrationsAgent(Entity):
     console's "Agent down" task.
     """
 
-    def __init__(self, okta_instance: Okta, pool_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', pool_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a DirectoryIntegrationsAgent instance.
 
         Args:
