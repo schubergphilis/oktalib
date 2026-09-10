@@ -48,6 +48,7 @@ from .core import Entity, parse_datetime
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
 
+    from .apps import Application
     from .groups import Group
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
@@ -630,6 +631,45 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
+    def app_assignments(self) -> Generator[UserAssignment, None, None]:
+        """The user's application assignments, one request per page rather than a scan.
+
+        Okta lets ``/api/v1/apps`` be filtered by user and asked to embed that
+        user's app user in the same call, so the whole answer arrives with the
+        application listing::
+
+            GET /api/v1/apps?filter=user.id eq "{userId}"&expand=user/{userId}
+
+        That is the documented equivalent of the admin console's per-user task
+        view. Reaching the same answer through
+        :attr:`~oktalib.entities.apps.Application.user_assignments` would mean
+        listing every application and paging its users.
+
+        The two parameters are a pair: ``expand`` is rejected with 400 unless the
+        filter names the same user, and the filter without the expand returns the
+        applications with no assignment embedded. A user id that matches nothing
+        yields no applications rather than an error, so an unknown user and a user
+        with no assignments are indistinguishable here.
+
+        ``expand`` cannot also carry ``task``, so these assignments have no
+        :attr:`~UserAssignment.task` and report a failure through
+        :attr:`~UserAssignment.sync_state` without its reason. Use
+        :meth:`~oktalib.entities.apps.Application.user_assignments_with_tasks` on
+        the application for that.
+
+        Returns:
+            generator: A generator of the user's assignments, each carrying the
+                application it is to.
+
+        """
+        url = f'{self._okta.api}/apps'
+        params = {'filter': f'user.id eq "{self.id}"', 'expand': f'user/{self.id}'}
+        for data in self._okta._get_paginated_url(url, params=params):  # noqa: SLF001
+            assignment = data.get('_embedded', {}).get('user')
+            if not assignment:
+                continue
+            yield UserAssignment(self._okta, assignment, application_data=data)
+
     def enrolled_factors(self) -> Generator[UserFactor, None, None]:
         """Lists the factors the user is enrolled in.
 
@@ -785,9 +825,26 @@ class UserAssignmentTask(Entity):
 class UserAssignment(Entity):
     """Models the user assignment object of okta for apps."""
 
-    def __init__(self, okta_instance: Okta, data: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        okta_instance: Okta,
+        data: dict[str, Any],
+        application_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize a user assignment.
+
+        Args:
+            okta_instance: The Okta API client instance.
+            data: The app user payload.
+            application_data: The payload of the application the assignment is
+                to, when the caller already has it. Reading it from a listing of
+                applications, as :meth:`User.app_assignments` does, saves
+                :attr:`application` a request.
+
+        """
         super().__init__(okta_instance, data)
         self._user_assignment_data = self._data
+        self._application_data = application_data
 
     def _get_user_data(self) -> dict[str, Any]:
         """The parent user data that the user assignment refers to.
@@ -820,6 +877,29 @@ class UserAssignment(Entity):
         if not response.ok:
             self._logger.error(response.text)
         return groups.Group(self._okta, response.json())
+
+    @property
+    def application(self) -> Application | None:
+        """The application the assignment is to.
+
+        Costs a request unless the assignment came from a listing that already
+        carried the application, as :meth:`User.app_assignments` does.
+
+        Returns:
+            application (Application): The application, or None when the payload
+                carries no link to one.
+
+        """
+        if self._application_data is None:
+            url = self._user_assignment_data.get('_links', {}).get('app', {}).get('href')
+            if not url:
+                return None
+            response = self._okta.session.get(url)
+            if not response.ok:
+                self._logger.error(response.text)
+                return None
+            self._application_data = response.json()
+        return self._okta._create_application_from_data(self._application_data)  # noqa: SLF001
 
     @property
     def status(self) -> str | None:
