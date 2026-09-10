@@ -238,13 +238,12 @@ class DirectoryIntegrationsAgentPool(Entity):
             bool: True if the pool was found and refreshed, False otherwise
 
         """
-        url = f'{self._okta.api}/agentPools'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            if data.get('id') == self.id:
-                self._data = data
-                return True
-        self._logger.error(f'Agent pool {self.id} is no longer in the listing.')
-        return False
+        pool = self._okta.get_directory_integrations_agent_pool_by_id(self.id)
+        if pool is None:
+            self._logger.error(f'Agent pool {self.id} is no longer in the listing.')
+            return False
+        self._data = pool._data  # noqa: SLF001
+        return True
 
     @property
     def name(self) -> str | None:
