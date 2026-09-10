@@ -923,10 +923,9 @@ class Okta:
 
         """
         for application in self.applications:
-            if application.sign_on_mode not in SIGNING_SIGN_ON_MODES:
-                continue
-            for certificate in application.expiring_signing_certificates(days):
-                yield application, certificate
+            if application.sign_on_mode in SIGNING_SIGN_ON_MODES:
+                for certificate in application.expiring_signing_certificates(days):
+                    yield application, certificate
 
     def get_expired_app_certificates(self) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
         """Retrieves the app signing certificates that have already expired.

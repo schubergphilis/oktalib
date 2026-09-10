@@ -672,9 +672,8 @@ class User(Entity):
         params = {'filter': f'user.id eq "{self.id}"', 'expand': f'user/{self.id}'}
         for data in self._okta._get_paginated_url(url, params=params):  # noqa: SLF001
             assignment = data.get('_embedded', {}).get('user')
-            if not assignment:
-                continue
-            yield UserAssignment(self._okta, assignment, application_data=data)
+            if assignment:
+                yield UserAssignment(self._okta, assignment, application_data=data)
 
     def enrolled_factors(self) -> Generator[UserFactor, None, None]:
         """Lists the factors the user is enrolled in.

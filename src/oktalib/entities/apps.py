@@ -951,11 +951,8 @@ class Application(Entity):
         """
         for assignment in self.user_assignments_with_tasks():
             task = assignment.task
-            if task is None or not task.has_failed:
-                continue
-            if task_status is not None and task.status != task_status:
-                continue
-            yield assignment
+            if task is not None and task.has_failed and (task_status is None or task.status == task_status):
+                yield assignment
 
     def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
         """Retrieves a user assignment by a user email.
