@@ -1017,9 +1017,12 @@ class UserAssignment(Entity):
                 the status does not match.
 
         """
-        if self.task is None or not self.task.has_failed:
+        # Bound once: task builds a new entity on every access, and this would
+        # otherwise construct three of them for every assignment examined.
+        task = self.task
+        if task is None or not task.has_failed:
             return False
-        return task_status is None or self.task.status == task_status
+        return task_status is None or task.status == task_status
 
     @property
     def last_sync(self) -> datetime | None:
