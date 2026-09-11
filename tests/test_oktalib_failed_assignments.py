@@ -2,13 +2,14 @@
 # pylint: disable=redefined-outer-name
 
 import json
+import logging
 import os
 
 import pytest
 from requests import Response
 
 from oktalib.entities.apps import Application
-from oktalib.entities.users import UserAssignmentTask
+from oktalib.entities.users import UserAssignment, UserAssignmentTask
 
 PROVISIONING_FAILED = 'PROVISIONING_FAILED'
 PROFILE_PUSH_FAILED = 'PROFILE_PUSH_FAILED'
@@ -210,3 +211,67 @@ def test_in_flight_assignments_are_not_returned(application, monkeypatch):
 
     assert len(failing) == 1
     assert failing[0].task.status == PROVISIONING_FAILED
+
+
+def test_has_failed_task_is_false_without_a_task(okta_service):
+    """An assignment Okta attached no task to is healthy, not failing."""
+    assert UserAssignment(okta_service, make_assignment()).has_failed_task() is False
+
+
+def test_has_failed_task_is_false_for_a_completed_task(okta_service):
+    """A COMPLETED task keeps its reason, so the reason cannot be the test."""
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task('COMPLETED')))
+    assert assignment.task.has_error is True
+    assert assignment.has_failed_task() is False
+
+
+def test_has_failed_task_is_false_while_still_provisioning(okta_service):
+    """A task Okta is still working is not an outstanding failure."""
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task('PROVISIONING')))
+    assert assignment.has_failed_task() is False
+
+
+@pytest.mark.parametrize('status', [PROVISIONING_FAILED, PROFILE_PUSH_FAILED, 'VALIDATION_FAILED'])
+def test_has_failed_task_accepts_any_failure_without_a_status(okta_service, status):
+    """Omitting the status accepts every failure category."""
+    assert UserAssignment(okta_service, make_assignment(task=make_task(status))).has_failed_task() is True
+
+
+def test_has_failed_task_matches_one_status(okta_service):
+    """Naming a status selects a single console category."""
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task(PROFILE_PUSH_FAILED)))
+    assert assignment.has_failed_task(PROFILE_PUSH_FAILED) is True
+    assert assignment.has_failed_task(PROVISIONING_FAILED) is False
+
+
+@pytest.mark.parametrize(
+    ('payload', 'reason'),
+    [
+        ({'id': '00u1'}, 'no _embedded at all'),
+        ({'id': '00u1', '_embedded': None}, 'Okta sent an explicit null'),
+        ({'id': '00u1', '_embedded': {}}, 'nothing embedded'),
+        ({'id': '00u1', '_embedded': {'task': None}}, 'task is null'),
+    ],
+)
+def test_task_is_none_when_nothing_is_embedded(okta_service, payload, reason):
+    """A missing or null task means a healthy assignment, and must never raise.
+
+    The null cases matter because a ``get`` default only applies to an absent key;
+    a key present with a null value returns that null, and chaining onto it raises.
+    """
+    assert UserAssignment(okta_service, payload).task is None, reason
+
+
+def test_a_malformed_task_is_logged_rather_than_silently_dropped(okta_service, caplog):
+    """A task that is not an object is discarded, but said out loud first.
+
+    Discarding it quietly would make a broken payload indistinguishable from a
+    healthy assignment, so a failure would vanish from failed_user_assignments
+    with nothing in the log to explain it.
+    """
+    payload = {'id': '00u1', '_embedded': {'task': 'not-an-object'}}
+    with caplog.at_level(logging.ERROR):
+        task = UserAssignment(okta_service, payload).task
+
+    assert task is None
+    assert any('Malformed task' in record.message for record in caplog.records)

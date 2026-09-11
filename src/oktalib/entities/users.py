@@ -976,14 +976,50 @@ class UserAssignment(Entity):
         Okta attaches a task to the failing assignments only, so a None here on an
         expanded read means the assignment is healthy.
 
+        ``_embedded`` is read with ``or {}`` rather than a ``get`` default, because
+        the default only applies to an absent key: Okta sends explicit nulls freely,
+        and a ``"_embedded": null`` would otherwise be handed to ``.get`` and raise.
+
+        The two ways of having no task are kept apart on purpose. No task is the
+        ordinary case and says the assignment is healthy. A task that is present but
+        malformed is not, and is logged before being discarded, because callers read
+        a None here as "nothing wrong with this assignment" -- silently swallowing a
+        broken payload would hide a failure rather than report it.
+
         Returns:
             task (UserAssignmentTask): The task if one is embedded, None otherwise
 
         """
-        data = self._user_assignment_data.get('_embedded', {}).get('task')
+        data = (self._user_assignment_data.get('_embedded') or {}).get('task')
+        if data is None:
+            return None
         if not isinstance(data, dict):
+            self._logger.error(f'Malformed task on assignment {self.id}, ignoring it: {data!r}')
             return None
         return UserAssignmentTask(self._okta, data)
+
+    def has_failed_task(self, task_status: str | None = None) -> bool:
+        """Whether the assignment carries a failing task, optionally of one status.
+
+        This is the question the admin console's task lists ask, in one call: the
+        assignment must have been read with ``expand=task``, that task must be in a
+        failure status rather than completed or still running, and it must match the
+        category being listed.
+
+        Args:
+            task_status: The task status to match, naming one console category.
+                ``PROVISIONING_FAILED`` for assignment errors, ``PROFILE_PUSH_FAILED``
+                for profile push errors. None, the default, accepts any failure.
+
+        Returns:
+            bool: True when the assignment has a failing task the filter accepts,
+                False when it has no task, its task is healthy or still running, or
+                the status does not match.
+
+        """
+        if self.task is None or not self.task.has_failed:
+            return False
+        return task_status is None or self.task.status == task_status
 
     @property
     def last_sync(self) -> datetime | None:

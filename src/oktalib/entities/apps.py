@@ -899,8 +899,12 @@ class Application(Entity):
         :attr:`~oktalib.entities.users.UserAssignment.task` is None for the healthy
         ones. To list the failures::
 
-            [a for a in application.user_assignments_with_tasks()
-             if a.task and a.task.has_error]
+            [a for a in application.user_assignments_with_tasks() if a.has_failed_task()]
+
+        Filter on the task's *status* through
+        :meth:`~oktalib.entities.users.UserAssignment.has_failed_task`, never on
+        whether it carries a reason: Okta leaves the reason on a task after it
+        succeeds, so counting by reason over-reports heavily.
 
         Returns:
             generator: A generator of user assignments with their task embedded
@@ -947,10 +951,9 @@ class Application(Entity):
             a time.
 
         """
-        for assignment in self.user_assignments_with_tasks():
-            task = assignment.task
-            if task is not None and task.has_failed and (task_status is None or task.status == task_status):
-                yield assignment
+        yield from (
+            assignment for assignment in self.user_assignments_with_tasks() if assignment.has_failed_task(task_status)
+        )
 
     def get_user_assignment_by_email(self, email: str) -> 'UserAssignment | None':
         """Retrieves a user assignment by a user email.
