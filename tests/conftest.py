@@ -16,6 +16,7 @@ from betamax.serializers import JSONSerializer
 from requests import Response, Session
 
 from oktalib import Okta
+from oktalib.entities import users
 from tests.sanitizer import sanitize_interaction
 
 REQUEST_HEADERS_TO_REMOVE = [
@@ -283,3 +284,11 @@ def okta_with_error(okta_service, monkeypatch):  # pylint: disable=redefined-out
     for verb in ('get', 'post', 'put', 'delete'):
         monkeypatch.setattr(okta_service.session, verb, lambda *a, **k: error)
     return okta_service
+
+
+@pytest.fixture(autouse=True)
+def forget_reported_task_statuses():
+    """Reset the warn-once record so status warnings do not leak between tests."""
+    users.reported_unknown_task_statuses.clear()
+    yield
+    users.reported_unknown_task_statuses.clear()

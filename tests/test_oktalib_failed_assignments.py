@@ -143,12 +143,44 @@ def test_the_reason_is_the_console_sentence(application, monkeypatch):
     assert next(iter(application.failed_user_assignments())).task.error_string == reason
 
 
-def test_an_unknown_status_matches_nothing(application, monkeypatch):
-    """An unrecognised status is filtered client side, so it simply returns nothing."""
+def test_an_unknown_status_matches_nothing_but_says_so(application, monkeypatch, caplog):
+    """A typo still matches nothing, but no longer passes for "no failures".
+
+    Returning an empty list quietly is the dangerous outcome: it reads as a clean
+    app. The filter is not rejected, because Okta may add a status this library has
+    not seen, so the caller is warned rather than blocked.
+    """
     payload = [make_assignment(task=make_task(PROVISIONING_FAILED))]
     monkeypatch.setattr(application._okta.session, 'get', lambda *a, **k: make_json_response(payload))
 
-    assert not list(application.failed_user_assignments(task_status='NOT_A_STATUS'))
+    with caplog.at_level(logging.WARNING):
+        assert not list(application.failed_user_assignments(task_status='NOT_A_STATUS'))
+
+    assert any('unrecognised task status' in record.message.lower() for record in caplog.records)
+
+
+def test_an_unknown_status_from_okta_is_still_treated_as_a_failure(okta_service, caplog):
+    """A status Okta added is counted as outstanding, and reported once.
+
+    Under-reporting is the dangerous direction, so an unrecognised status counts as a
+    failure. The warning is what makes a benign new status noticeable rather than
+    silently inflating every count.
+    """
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task('SOMETHING_NEW')))
+    with caplog.at_level(logging.WARNING):
+        assert assignment.has_failed_task() is True
+
+    assert any('treating as a failure' in record.message for record in caplog.records)
+
+
+def test_an_unknown_status_is_reported_only_once(okta_service, caplog):
+    """A renamed status must not log once per assignment on a large app."""
+    with caplog.at_level(logging.WARNING):
+        for _ in range(5):
+            UserAssignment(okta_service, make_assignment(task=make_task('SEEN_REPEATEDLY'))).has_failed_task()
+
+    warnings = [r for r in caplog.records if 'SEEN_REPEATEDLY' in r.getMessage()]
+    assert len(warnings) == 1
 
 
 @pytest.fixture

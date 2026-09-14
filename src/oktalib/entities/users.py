@@ -67,6 +67,35 @@ LOGGER_BASENAME = 'users'
 # act on work that is already running.
 NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})
 
+# Every task status observed from Okta. Used only to notice drift, never to reject:
+# Okta can add a status at any time, and refusing to work with one would block a
+# caller until this library shipped again. An unrecognised status is reported once
+# and then handled normally.
+KNOWN_TASK_STATUSES = NON_FAILURE_TASK_STATUSES | {
+    'PROVISIONING_FAILED',
+    'PROFILE_PUSH_FAILED',
+    'VALIDATION_FAILED',
+}
+
+# Statuses already reported as unrecognised. Without this, a status Okta renamed
+# would log once per assignment examined -- thousands of lines on a large app.
+reported_unknown_task_statuses: set[str] = set()
+
+
+def warn_once_per_unknown_status(logger: logging.Logger, status: str, message: str) -> None:
+    """Log an unrecognised task status the first time this process sees it.
+
+    Args:
+        logger: The logger to report on.
+        status: The unrecognised status.
+        message: A logging format string taking the status as its only argument.
+
+    """
+    if status in KNOWN_TASK_STATUSES or status in reported_unknown_task_statuses:
+        return
+    reported_unknown_task_statuses.add(status)
+    logger.warning(message, status)
+
 
 class User(Entity):
     """Models the user object of okta."""
@@ -794,7 +823,15 @@ class UserAssignmentTask(Entity):
                 completed, is still running, or reports no status at all.
 
         """
-        return bool(self.status) and self.status not in NON_FAILURE_TASK_STATUSES
+        if not self.status:
+            return False
+        warn_once_per_unknown_status(
+            self._logger,
+            self.status,
+            'Unknown task status %r from Okta, treating as a failure. Add it to '
+            'NON_FAILURE_TASK_STATUSES if it does not mean the task failed.',
+        )
+        return self.status not in NON_FAILURE_TASK_STATUSES
 
     @property
     def assignment_type(self) -> str | None:
@@ -1019,6 +1056,13 @@ class UserAssignment(Entity):
         """
         # Bound once: task builds a new entity on every access, and this would
         # otherwise construct three of them for every assignment examined.
+        if task_status is not None:
+            warn_once_per_unknown_status(
+                self._logger,
+                task_status,
+                'Filtering on unrecognised task status %r, which matches nothing '
+                'unless Okta has added it since this library was released.',
+            )
         task = self.task
         if task is None or not task.has_failed:
             return False
