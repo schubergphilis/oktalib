@@ -10,6 +10,7 @@ from requests import Response
 
 from oktalib.entities.apps import Application
 from oktalib.entities.users import UserAssignment, UserAssignmentTask
+from oktalib.oktalibexceptions import InvalidTaskStatus
 
 PROVISIONING_FAILED = 'PROVISIONING_FAILED'
 PROFILE_PUSH_FAILED = 'PROFILE_PUSH_FAILED'
@@ -116,73 +117,6 @@ def test_the_status_selects_one_console_category(application, monkeypatch):
     assert len(list(application.failed_user_assignments())) == 3
 
 
-def test_sync_state_does_not_select_the_category(application, monkeypatch):
-    """Both categories can share a sync state, so only the task separates them."""
-    payload = [
-        make_assignment(sync_state='ERROR', task=make_task(PROVISIONING_FAILED)),
-        make_assignment(sync_state='ERROR', task=make_task(PROFILE_PUSH_FAILED)),
-        make_assignment(sync_state='OUT_OF_SYNC', task=make_task(PROVISIONING_FAILED)),
-    ]
-    monkeypatch.setattr(application._okta.session, 'get', lambda *a, **k: make_json_response(payload))
-
-    provisioning = list(application.failed_user_assignments(task_status=PROVISIONING_FAILED))
-
-    assert {assignment.sync_state for assignment in provisioning} == {'ERROR', 'OUT_OF_SYNC'}
-
-
-def test_the_reason_is_the_console_sentence(application, monkeypatch):
-    """The failing assignment carries the text the console shows, unchanged."""
-    reason = (
-        'Automatic provisioning of user A Name to app Okta Org2Org failed: Error while '
-        'trying to push profile update for someone@example.com: Operation failed because '
-        'user profile is mastered under another system'
-    )
-    payload = [make_assignment(task=make_task(PROVISIONING_FAILED, error_string=reason))]
-    monkeypatch.setattr(application._okta.session, 'get', lambda *a, **k: make_json_response(payload))
-
-    assert next(iter(application.failed_user_assignments())).task.error_string == reason
-
-
-def test_an_unknown_status_matches_nothing_but_says_so(application, monkeypatch, caplog):
-    """A typo still matches nothing, but no longer passes for "no failures".
-
-    Returning an empty list quietly is the dangerous outcome: it reads as a clean
-    app. The filter is not rejected, because Okta may add a status this library has
-    not seen, so the caller is warned rather than blocked.
-    """
-    payload = [make_assignment(task=make_task(PROVISIONING_FAILED))]
-    monkeypatch.setattr(application._okta.session, 'get', lambda *a, **k: make_json_response(payload))
-
-    with caplog.at_level(logging.WARNING):
-        assert not list(application.failed_user_assignments(task_status='NOT_A_STATUS'))
-
-    assert any('unrecognised task status' in record.message.lower() for record in caplog.records)
-
-
-def test_an_unknown_status_from_okta_is_still_treated_as_a_failure(okta_service, caplog):
-    """A status Okta added is counted as outstanding, and reported once.
-
-    Under-reporting is the dangerous direction, so an unrecognised status counts as a
-    failure. The warning is what makes a benign new status noticeable rather than
-    silently inflating every count.
-    """
-    assignment = UserAssignment(okta_service, make_assignment(task=make_task('SOMETHING_NEW')))
-    with caplog.at_level(logging.WARNING):
-        assert assignment.has_failed_task() is True
-
-    assert any('treating as a failure' in record.message for record in caplog.records)
-
-
-def test_an_unknown_status_is_reported_only_once(okta_service, caplog):
-    """A renamed status must not log once per assignment on a large app."""
-    with caplog.at_level(logging.WARNING):
-        for _ in range(5):
-            UserAssignment(okta_service, make_assignment(task=make_task('SEEN_REPEATEDLY'))).has_failed_task()
-
-    warnings = [r for r in caplog.records if 'SEEN_REPEATEDLY' in r.getMessage()]
-    assert len(warnings) == 1
-
-
 @pytest.fixture
 def failing_app_id():
     """A small app in the recording org that has a failing task.
@@ -224,11 +158,6 @@ def test_live_healthy_assignments_are_left_out(okta_cassette, okta_service, fail
 def test_an_in_flight_task_has_not_failed(okta_service):
     """A task Okta is still working is not an outstanding failure."""
     assert UserAssignmentTask(okta_service, make_task('PROVISIONING')).has_failed is False
-
-
-def test_an_unknown_status_counts_as_failed(okta_service):
-    """An unrecognised status surfaces rather than being silently dropped."""
-    assert UserAssignmentTask(okta_service, make_task('SOME_NEW_STATUS')).has_failed is True
 
 
 def test_in_flight_assignments_are_not_returned(application, monkeypatch):
@@ -307,3 +236,40 @@ def test_a_malformed_task_is_logged_rather_than_silently_dropped(okta_service, c
 
     assert task is None
     assert any('Malformed task' in record.message for record in caplog.records)
+
+
+def test_an_unknown_status_from_okta_raises(okta_service):
+    """A status Okta added or renamed is refused, not folded into a bucket.
+
+    Either guess is wrong in a way nobody would notice: counting it as a failure
+    inflates every total, counting it as healthy hides a real one.
+    """
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task('SOMETHING_NEW')))
+    with pytest.raises(InvalidTaskStatus, match='SOMETHING_NEW'):
+        assignment.has_failed_task()
+
+
+def test_filtering_on_an_unknown_status_raises(okta_service):
+    """A typo'd filter is refused rather than quietly reporting nothing."""
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task(PROVISIONING_FAILED)))
+    with pytest.raises(InvalidTaskStatus, match='NOT_A_STATUS'):
+        assignment.has_failed_task('NOT_A_STATUS')
+
+
+def test_the_error_names_the_statuses_it_would_accept(okta_service):
+    """Whoever hits this needs to know what to write instead, or what to add."""
+    assignment = UserAssignment(okta_service, make_assignment(task=make_task(PROVISIONING_FAILED)))
+    with pytest.raises(InvalidTaskStatus) as raised:
+        assignment.has_failed_task('NOT_A_STATUS')
+
+    assert PROVISIONING_FAILED in str(raised.value)
+    assert PROFILE_PUSH_FAILED in str(raised.value)
+
+
+def test_a_scan_raises_rather_than_returning_a_partial_list(application, monkeypatch):
+    """An unknown status stops the scan, so no caller reads a short list as complete."""
+    payload = [make_assignment(task=make_task(PROVISIONING_FAILED)), make_assignment(task=make_task('SOMETHING_NEW'))]
+    monkeypatch.setattr(application._okta.session, 'get', lambda *a, **k: make_json_response(payload))
+
+    with pytest.raises(InvalidTaskStatus):
+        list(application.failed_user_assignments())

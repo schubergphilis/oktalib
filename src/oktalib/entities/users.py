@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any
 
 from cachetools import TTLCache, cached
 
-from oktalib.oktalibexceptions import UnableToUpdate
+from oktalib.oktalibexceptions import InvalidTaskStatus, UnableToUpdate
 
 from . import groups
 from .adminrole import AdminRole
@@ -67,34 +67,16 @@ LOGGER_BASENAME = 'users'
 # act on work that is already running.
 NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})
 
-# Every task status observed from Okta. Used only to notice drift, never to reject:
-# Okta can add a status at any time, and refusing to work with one would block a
-# caller until this library shipped again. An unrecognised status is reported once
-# and then handled normally.
+# Every task status this library knows how to interpret. Anything else raises
+# rather than being guessed at: a status Okta added or renamed changes what the
+# counts mean, and silently folding it into one bucket or the other would make
+# every number built on it untrustworthy. Add the new status here, deliberately,
+# once its meaning is known.
 KNOWN_TASK_STATUSES = NON_FAILURE_TASK_STATUSES | {
     'PROVISIONING_FAILED',
     'PROFILE_PUSH_FAILED',
     'VALIDATION_FAILED',
 }
-
-# Statuses already reported as unrecognised. Without this, a status Okta renamed
-# would log once per assignment examined -- thousands of lines on a large app.
-reported_unknown_task_statuses: set[str] = set()
-
-
-def warn_once_per_unknown_status(logger: logging.Logger, status: str, message: str) -> None:
-    """Log an unrecognised task status the first time this process sees it.
-
-    Args:
-        logger: The logger to report on.
-        status: The unrecognised status.
-        message: A logging format string taking the status as its only argument.
-
-    """
-    if status in KNOWN_TASK_STATUSES or status in reported_unknown_task_statuses:
-        return
-    reported_unknown_task_statuses.add(status)
-    logger.warning(message, status)
 
 
 class User(Entity):
@@ -815,22 +797,27 @@ class UserAssignmentTask(Entity):
         Counting by reason therefore over-reports heavily; only :attr:`status`
         matches the console.
 
-        A status this library has not seen counts as a failure, so a new one
-        surfaces rather than being silently dropped.
+        A status this library does not know raises rather than being folded into
+        one bucket or the other. Guessing would make every count built on this
+        untrustworthy, and there is no safe direction to guess in: reading a new
+        status as a failure inflates the numbers, reading it as healthy hides one.
 
         Returns:
             bool: True when the task is in a failure status, False when it has
                 completed, is still running, or reports no status at all.
 
+        Raises:
+            InvalidTaskStatus: Okta returned a status this library does not know.
+
         """
         if not self.status:
             return False
-        warn_once_per_unknown_status(
-            self._logger,
-            self.status,
-            'Unknown task status %r from Okta, treating as a failure. Add it to '
-            'NON_FAILURE_TASK_STATUSES if it does not mean the task failed.',
-        )
+        if self.status not in KNOWN_TASK_STATUSES:
+            raise InvalidTaskStatus(
+                f'Okta returned task status {self.status!r}, which this library does not know how to '
+                f'interpret. Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add it to '
+                f'KNOWN_TASK_STATUSES, and to NON_FAILURE_TASK_STATUSES if it does not mean the task failed.'
+            )
         return self.status not in NON_FAILURE_TASK_STATUSES
 
     @property
@@ -1053,15 +1040,17 @@ class UserAssignment(Entity):
                 False when it has no task, its task is healthy or still running, or
                 the status does not match.
 
+        Raises:
+            InvalidTaskStatus: The requested status is not one this library knows,
+                so the filter could not be honoured.
+
         """
         # Bound once: task builds a new entity on every access, and this would
         # otherwise construct three of them for every assignment examined.
-        if task_status is not None:
-            warn_once_per_unknown_status(
-                self._logger,
-                task_status,
-                'Filtering on unrecognised task status %r, which matches nothing '
-                'unless Okta has added it since this library was released.',
+        if task_status is not None and task_status not in KNOWN_TASK_STATUSES:
+            raise InvalidTaskStatus(
+                f'Cannot filter on task status {task_status!r}. Known statuses are '
+                f'{", ".join(sorted(KNOWN_TASK_STATUSES))}, or omit it to accept every failure.'
             )
         task = self.task
         if task is None or not task.has_failed:
