@@ -43,6 +43,8 @@ from .entities import (
     APIServiceApp,
     Application,
     ApplicationType,
+    AppSigningCertificate,
+    DirectoryIntegrationsAgentPool,
     Feature,
     Group,
     SAMLApplication,
@@ -66,6 +68,12 @@ __license__ = 'MIT'
 __maintainer__ = 'Costas Tyfoxylos'
 __email__ = '<ctyfoxylos@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
+
+# The sign-on modes whose applications sign assertions, and so hold signing certificates.
+SIGNING_SIGN_ON_MODES = (
+    ApplicationType.SAML_2_0.value,
+    ApplicationType.WS_FEDERATION.value,
+)
 
 # This is the main prefix used for logging
 LOGGER_BASENAME = 'oktalib'
@@ -359,18 +367,29 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    def _get_paginated_url(self, url: str, result_limit: int = 100) -> Generator[dict[str, Any], None, None]:
+    def _get_paginated_url(
+        self,
+        url: str,
+        result_limit: int = 100,
+        params: dict[str, Any] | None = None,
+    ) -> Generator[dict[str, Any], None, None]:
         """Gets the paginated data from a url.
 
         Args:
             url: The url to get the data from
             result_limit: The number of results to get per page, defaults to 100
+            params: Optional extra query parameters for the first request. Entries
+                with a None value are dropped, so callers can pass optional
+                filters through directly. Subsequent pages are followed by the
+                link Okta returns, which already carries these parameters.
 
         Returns:
             generator: A generator of the data from the url
 
         """
-        response = self._validate_response(url, {'limit': result_limit})
+        query: dict[str, Any] = {'limit': result_limit}
+        query.update({key: value for key, value in (params or {}).items() if value is not None})
+        response = self._validate_response(url, query)
         yield from response.json()
         next_link = response.links.get('next', {}).get('url')
         while next_link:
@@ -508,6 +527,46 @@ class Okta:
             self._logger.error(response.text)
             return []
         return [User(self, data) for data in response.json()]
+
+    def search_users_by_query(self, query: str, sort_by: str | None = None) -> Generator[User, None, None]:
+        """Retrieves the users matching a raw search expression.
+
+        The ``search`` parameter is considerably more capable than the ``q`` and
+        ``filter`` parameters the other search methods use: it combines terms
+        with ``and``/``or``, and supports operators such as ``eq``, ``sw``
+        (starts with) and ``gt`` over both top level and ``profile.*``
+        properties. Details are in the
+        [Okta documentation](https://developer.okta.com/docs/reference/core-okta-api/#filter).
+
+        Examples:
+            Every locked out user::
+
+                okta.search_users_by_query('status eq "LOCKED_OUT"')
+
+            Active or suspended users whose name starts with a term::
+
+                okta.search_users_by_query(
+                    '(status eq "ACTIVE" or status eq "SUSPENDED") '
+                    'and (profile.firstName sw "Jo" or profile.lastName sw "Jo")',
+                    sort_by='profile.lastName',
+                )
+
+        Args:
+            query: The Okta search expression to match users with
+            sort_by: Optional property to sort the results by, e.g.
+                ``profile.lastName``
+
+        Returns:
+            generator: A generator of the matching users
+
+        Raises:
+            ServerError: If Okta rejects the search expression or the request
+                otherwise fails.
+
+        """
+        url = f'{self.api}/users'
+        for data in self._get_paginated_url(url, params={'search': query, 'sortBy': sort_by}):
+            yield User(self, data)
 
     def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
         """Retrieves if any, admin roles assigned to the user by id.
@@ -842,6 +901,107 @@ class Okta:
                 for app in self.applications
                 if app.sign_on_mode and sign_on_mode and app.sign_on_mode.lower() == sign_on_mode.lower()
             ),
+            None,
+        )
+
+    def get_expiring_app_certificates(
+        self, days: int = 30
+    ) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
+        """Retrieves the app signing certificates expiring within a window.
+
+        Only applications whose sign-on mode signs assertions are inspected, so
+        the sign-on mode already present in the application listing keeps this
+        to one extra request per signing application rather than one per
+        application. Already expired certificates are included.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            generator: A generator of (Application, AppSigningCertificate)
+                tuples for every certificate expiring within the window
+
+        """
+        yield from (
+            (application, certificate)
+            for application in self.applications
+            if application.sign_on_mode in SIGNING_SIGN_ON_MODES
+            for certificate in application.expiring_signing_certificates(days)
+        )
+
+    def get_expired_app_certificates(self) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
+        """Retrieves the app signing certificates that have already expired.
+
+        Returns:
+            generator: A generator of (Application, AppSigningCertificate)
+                tuples for every expired certificate
+
+        """
+        yield from self.get_expiring_app_certificates(days=0)
+
+    @property
+    def directory_integrations_agent_pools(self) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
+        """The Directory Integrations agent pools configured in okta.
+
+        Returns:
+            generator: The generator of agent pools configured in okta
+
+        """
+        url = f'{self.api}/agentPools'
+        for data in self._get_paginated_url(url):
+            yield DirectoryIntegrationsAgentPool(self, data)
+
+    def get_directory_integrations_agent_pools_by_type(
+        self, pool_type: str
+    ) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
+        """Retrieves the Directory Integrations agent pools of one type.
+
+        Okta applies this filter itself, so it costs no more than listing them all.
+
+        Args:
+            pool_type: The type of pool to retrieve, e.g. AD or LDAP
+
+        Returns:
+            generator: The generator of agent pools of that type
+
+        Raises:
+            ServerError: If Okta rejects the pool type.
+
+        """
+        url = f'{self.api}/agentPools'
+        for data in self._get_paginated_url(url, params={'poolType': pool_type}):
+            yield DirectoryIntegrationsAgentPool(self, data)
+
+    def get_directory_integrations_agent_pool_by_id(self, pool_id: str) -> DirectoryIntegrationsAgentPool | None:
+        """Retrieves a Directory Integrations agent pool by id.
+
+        Okta answers 405 for a single pool, so this searches the listing rather than
+        addressing the pool directly. Orgs have few pools, so the listing is cheap.
+
+        Args:
+            pool_id: The id of the agent pool to retrieve
+
+        Returns:
+            DirectoryIntegrationsAgentPool: The pool if a match is found else None
+
+        """
+        return next(
+            (pool for pool in self.directory_integrations_agent_pools if pool.id == pool_id),
+            None,
+        )
+
+    def get_directory_integrations_agent_pool_by_name(self, name: str) -> DirectoryIntegrationsAgentPool | None:
+        """Retrieves a Directory Integrations agent pool by name.
+
+        Args:
+            name: The name of the agent pool to retrieve
+
+        Returns:
+            DirectoryIntegrationsAgentPool: The pool if a match is found else None
+
+        """
+        return next(
+            (pool for pool in self.directory_integrations_agent_pools if (pool.name or '').lower() == name.lower()),
             None,
         )
 

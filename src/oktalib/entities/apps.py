@@ -29,14 +29,13 @@ Application-related entities (OAuth, SAML metadata).
 
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Generator
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -48,7 +47,7 @@ from .core import Entity
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
 
-    from .groups import Group, GroupAssignment
+    from .groups import Group, GroupAssignment, GroupPushMapping
     from .users import User, UserAssignment
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
@@ -89,7 +88,7 @@ class SingleSignOnService:
 class OAuthApplicationGrant(Entity):
     """Models an OAuth application grant (API scope grant) for an application."""
 
-    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize an OAuthApplicationGrant instance.
 
         Args:
@@ -218,7 +217,7 @@ class OAuthApplicationGrant(Entity):
 class ClientSecret(Entity):
     """Models an OAuth client secret for an application."""
 
-    def __init__(self, okta_instance: Okta, app_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a ClientSecret instance.
 
         Args:
@@ -318,10 +317,142 @@ class ClientSecret(Entity):
         return response.ok
 
 
+class AppKey(Entity):
+    """Models a key credential of an application.
+
+    Okta identifies these by ``kid`` rather than ``id``, so :attr:`id` is
+    overridden to expose the ``kid``. Without that, every key would hash to the
+    same value and compare equal to every other key, since the base entity
+    reads a non-existent ``id`` field.
+    """
+
+    def __init__(self, okta_instance: 'Okta', app_data: dict[str, Any], data: dict[str, Any]) -> None:
+        """Initialize an AppKey instance.
+
+        Args:
+            okta_instance: The Okta instance
+            app_data: The application data the key belongs to
+            data: The key data from the API response
+
+        """
+        super().__init__(okta_instance, data)
+        self._app_data = app_data
+
+    @property
+    def id(self) -> str:
+        """The kid, which is how Okta identifies this key.
+
+        Returns:
+            string: The key id (``kid``) of the key
+
+        """
+        return self._data.get('kid', '')
+
+    @property
+    def url(self) -> str:
+        """The url of the key.
+
+        Returns:
+            string: The url of the key
+
+        """
+        return f'{self._okta.api}/apps/{self._app_data.get("id")}/credentials/keys/{self.id}'
+
+    @property
+    def key_type(self) -> str | None:
+        """The cryptographic algorithm family of the key.
+
+        Returns:
+            string: The key type (``kty``), e.g. RSA
+
+        """
+        return self._data.get('kty')
+
+    @property
+    def use(self) -> str | None:
+        """The intended use of the key.
+
+        Returns:
+            string: The use of the key, e.g. sig
+
+        """
+        return self._data.get('use')
+
+
+class AppSigningCertificate(AppKey):
+    """Models an x509 signing certificate of an application.
+
+    These are the certificates behind the admin console's "Renew your SAML app
+    certificates" tasks. Unlike the JSON Web Keys used for private_key_jwt
+    client authentication, they carry an expiry.
+    """
+
+    @property
+    def expires_at(self) -> datetime | None:
+        """The date and time the certificate expires.
+
+        Returns:
+            datetime: The datetime the certificate expires, None if absent
+
+        """
+        return self._get_date_from_key('expiresAt')
+
+    @property
+    def x509_chain(self) -> list[str]:
+        """The x509 certificate chain.
+
+        Returns:
+            list: The base64 encoded certificate chain, empty list if absent
+
+        """
+        return self._data.get('x5c', [])
+
+    @property
+    def thumbprint(self) -> str | None:
+        """The SHA-256 thumbprint of the certificate.
+
+        Returns:
+            string: The thumbprint of the certificate, None if absent
+
+        """
+        return self._data.get('x5t#S256')
+
+    @property
+    def is_expired(self) -> bool:
+        """Whether the certificate has already expired.
+
+        A certificate without an expiry date is never reported as expired.
+
+        Returns:
+            bool: True if the certificate expired, False otherwise
+
+        """
+        return self.expires_within(0)
+
+    def expires_within(self, days: int) -> bool:
+        """Whether the certificate expires within the provided number of days.
+
+        Already expired certificates satisfy any window, so a caller asking for
+        the certificates expiring in the next 30 days also sees the ones that
+        lapsed last month.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            bool: True if the certificate expires within the window, False
+                otherwise or when the certificate has no expiry date
+
+        """
+        if self.expires_at is None:
+            return False
+        return self.expires_at <= datetime.now(tz=self.expires_at.tzinfo) + timedelta(days=days)
+
+
 class ClientRole(Entity):
     """Models an OAuth client role (admin role assigned to an OAuth client)."""
 
-    def __init__(self, okta_instance: Okta, client_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', client_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize a ClientRole instance.
 
         Args:
@@ -608,6 +739,62 @@ class Application(Entity):
         """
         return self._data.get('credentials', {})
 
+    @property
+    def signing_certificates(self) -> Generator[AppSigningCertificate, None, None]:
+        """The x509 signing certificates of the application.
+
+        Returns:
+            generator: A generator of AppSigningCertificate objects for the
+                application, empty on failure
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/credentials/keys'
+        response = self._okta.session.get(url)
+        if not response.ok:
+            self._logger.error(f'Retrieving signing certificates failed. Response: {response.text}')
+            return
+        for data in response.json():
+            yield AppSigningCertificate(self._okta, self._data, data)
+
+    def expiring_signing_certificates(self, days: int = 30) -> Generator[AppSigningCertificate, None, None]:
+        """The signing certificates of the application expiring within a window.
+
+        Already expired certificates are included, since they need renewing at
+        least as urgently as the ones about to lapse.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            generator: A generator of AppSigningCertificate objects expiring
+                within the window
+
+        """
+        for certificate in self.signing_certificates:
+            if certificate.expires_within(days):
+                yield certificate
+
+    def group_push_mappings(self, status: str | None = None) -> 'Generator[GroupPushMapping, None, None]':
+        """The group push mappings of the application.
+
+        Okta applies the status filter itself, so asking for the failed mappings
+        only pages through the failures rather than through every mapping::
+
+            application.group_push_mappings(status='ERROR')
+
+        Args:
+            status: Optional status to filter on, one of ACTIVE, ERROR or
+                INACTIVE. All mappings are returned when omitted.
+
+        Returns:
+            generator: A generator of GroupPushMapping objects for the
+                application
+
+        """
+        url = f'{self._okta.api}/apps/{self.id}/group-push/mappings'
+        for data in self._okta._get_paginated_url(url, params={'status': status}):  # noqa: SLF001
+            yield groups.GroupPushMapping(self._okta, self._data, data)
+
     def delete(self) -> bool:
         """Deletes the application from okta.
 
@@ -640,7 +827,7 @@ class Application(Entity):
         return self._data.get('settings', {}).get('notifications')
 
     @property
-    def users(self) -> Generator[User, None, None]:
+    def users(self) -> 'Generator[User, None, None]':
         """The users of the application.
 
         Returns:
@@ -652,7 +839,7 @@ class Application(Entity):
             yield users.User(self._okta, data)
 
     @property
-    def groups(self) -> Generator[Group | None, None, None]:
+    def groups(self) -> 'Generator[Group | None, None, None]':
         """The groups of the application.
 
         Returns:
@@ -664,7 +851,7 @@ class Application(Entity):
             yield self._okta.get_group_by_id(group.get('id', ''))
 
     @property
-    def group_assignments(self) -> Generator[GroupAssignment, None, None]:
+    def group_assignments(self) -> 'Generator[GroupAssignment, None, None]':
         """The group assignments to the application.
 
         Returns:
@@ -675,7 +862,7 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield groups.GroupAssignment(self._okta, data)
 
-    def get_group_assignment_by_group_name(self, name: str) -> GroupAssignment | None:
+    def get_group_assignment_by_group_name(self, name: str) -> 'GroupAssignment | None':
         """Retrieves a group assignment by a group name.
 
         Args:
@@ -689,7 +876,7 @@ class Application(Entity):
         return next((group for group in self.group_assignments if group.name == name), None)
 
     @property
-    def user_assignments(self) -> Generator[UserAssignment, None, None]:
+    def user_assignments(self) -> 'Generator[UserAssignment, None, None]':
         """The user assignments to the application.
 
         Returns:
@@ -700,7 +887,75 @@ class Application(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield users.UserAssignment(self._okta, data)
 
-    def get_user_assignment_by_email(self, email: str) -> UserAssignment | None:
+    def user_assignments_with_tasks(self) -> 'Generator[UserAssignment, None, None]':
+        """The user assignments to the application, each carrying its provisioning task.
+
+        This reads the same documented endpoint as :attr:`user_assignments` with the
+        undocumented ``expand=task`` parameter, so the task arrives embedded and
+        costs no extra request. It is the only way the public API exposes *why* an
+        assignment failed; ``sync_state`` reports only that something is wrong.
+
+        Okta attaches a task to the failing assignments only, so
+        :attr:`~oktalib.entities.users.UserAssignment.task` is None for the healthy
+        ones. To list the failures::
+
+            [a for a in application.user_assignments_with_tasks() if a.has_failed_task()]
+
+        Filter on the task's *status* through
+        :meth:`~oktalib.entities.users.UserAssignment.has_failed_task`, never on
+        whether it carries a reason: Okta leaves the reason on a task after it
+        succeeds, so counting by reason over-reports heavily.
+
+        Returns:
+            generator: A generator of user assignments with their task embedded
+
+        """
+        url = self._data.get('_links', {}).get('users', {}).get('href')
+        for data in self._okta._get_paginated_url(url, params={'expand': 'task'}):  # noqa: SLF001
+            yield users.UserAssignment(self._okta, data)
+
+    def failed_user_assignments(self, task_status: str | None = None) -> 'Generator[UserAssignment, None, None]':
+        """The assignments the admin console lists under its task categories.
+
+        These are the rows behind *Application assignments encountered errors* and
+        *Profile push updates encountered errors*, and each one carries the same
+        sentence the console shows, through
+        :attr:`~oktalib.entities.users.UserAssignmentTask.error_string`.
+
+        The task's status is what separates the categories; ``sync_state`` does
+        not. A single ``sync_state`` value can cover both profile push and
+        provisioning failures, and a provisioning failure is not confined to
+        ERROR, so filtering on it gets the categories wrong in both directions.
+
+        Args:
+            task_status: The task status to return, matching the console category.
+                ``PROVISIONING_FAILED`` for assignment errors, ``PROFILE_PUSH_FAILED``
+                for profile push errors; ``VALIDATION_FAILED`` also occurs. None,
+                the default, returns every failing assignment whatever the status.
+
+        Returns:
+            generator: A generator of the failing assignments, each with its task
+                embedded.
+
+        Example:
+            Reproduce one console category, with its reasons::
+
+                for assignment in application.failed_user_assignments(
+                        task_status='PROFILE_PUSH_FAILED'):
+                    print(assignment.email, assignment.task.error_string)
+
+        Note:
+            Okta offers no server side predicate for this, so the filtering is
+            done here over the app's full assignment listing. The cost is the
+            same as :meth:`user_assignments_with_tasks`, one page of app users at
+            a time.
+
+        """
+        yield from (
+            assignment for assignment in self.user_assignments_with_tasks() if assignment.has_failed_task(task_status)
+        )
+
+    def get_user_assignment_by_email(self, email: str) -> 'UserAssignment | None':
         """Retrieves a user assignment by a user email.
 
         Args:

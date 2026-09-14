@@ -29,8 +29,6 @@ Feature-related entities.
 
 """
 
-from __future__ import annotations
-
 from collections.abc import Generator
 from typing import Any
 
@@ -132,7 +130,7 @@ class Feature(Entity):
         """
         return self.stage.get('value')
 
-    def dependencies(self) -> Generator[Feature, None, None]:
+    def dependencies(self) -> Generator['Feature', None, None]:
         """The dependencies of the feature.
 
         Returns:
@@ -141,7 +139,7 @@ class Feature(Entity):
         """
         return self._okta.get_feature_dependencies_by_id(self.id)
 
-    def dependents(self) -> Generator[Feature, None, None]:
+    def dependents(self) -> Generator['Feature', None, None]:
         """The dependents of the feature.
 
         Returns:

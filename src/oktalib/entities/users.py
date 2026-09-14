@@ -29,8 +29,6 @@ User-related entities.
 
 """
 
-from __future__ import annotations
-
 import json
 import logging
 from collections.abc import Generator
@@ -39,15 +37,16 @@ from typing import TYPE_CHECKING, Any
 
 from cachetools import TTLCache, cached
 
-from oktalib.oktalibexceptions import UnableToUpdate
+from oktalib.oktalibexceptions import InvalidTaskStatus, UnableToUpdate
 
 from . import groups
 from .adminrole import AdminRole
-from .core import Entity
+from .core import Entity, parse_datetime
 
 if TYPE_CHECKING:
     from oktalib.oktalib import Okta
 
+    from .apps import Application
     from .groups import Group
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
@@ -61,6 +60,9 @@ __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'users'
+FAILURE_TASK_STATUSES = frozenset({'PROVISIONING_FAILED', 'PROFILE_PUSH_FAILED', 'VALIDATION_FAILED'})
+NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})  # PROVISIONING means Okta is still working on it.
+KNOWN_TASK_STATUSES = FAILURE_TASK_STATUSES | NON_FAILURE_TASK_STATUSES
 
 
 class User(Entity):
@@ -433,7 +435,7 @@ class User(Entity):
             yield AdminRole(self._okta, data)
 
     @property
-    def groups(self) -> Generator[Group, None, None]:
+    def groups(self) -> 'Generator[Group, None, None]':
         """Lists the groups the user is a member of.
 
         Returns:
@@ -630,7 +632,45 @@ class User(Entity):
             self._logger.error(response.text)
         return response.ok
 
-    def enrolled_factors(self) -> Generator[UserFactor, None, None]:
+    def app_assignments(self) -> 'Generator[UserAssignment, None, None]':
+        """The user's application assignments, one request per page rather than a scan.
+
+        Okta lets ``/api/v1/apps`` be filtered by user and asked to embed that
+        user's app user in the same call, so the whole answer arrives with the
+        application listing::
+
+            GET /api/v1/apps?filter=user.id eq "{userId}"&expand=user/{userId}
+
+        That is the documented equivalent of the admin console's per-user task
+        view. Reaching the same answer through
+        :attr:`~oktalib.entities.apps.Application.user_assignments` would mean
+        listing every application and paging its users.
+
+        The two parameters are a pair: ``expand`` is rejected with 400 unless the
+        filter names the same user, and the filter without the expand returns the
+        applications with no assignment embedded. A user id that matches nothing
+        yields no applications rather than an error, so an unknown user and a user
+        with no assignments are indistinguishable here.
+
+        ``expand`` cannot also carry ``task``, so these assignments have no
+        :attr:`~UserAssignment.task` and report a failure through
+        :attr:`~UserAssignment.sync_state` without its reason. Use
+        :meth:`~oktalib.entities.apps.Application.user_assignments_with_tasks` on
+        the application for that.
+
+        Returns:
+            generator: A generator of the user's assignments, each carrying the
+                application it is to.
+
+        """
+        url = f'{self._okta.api}/apps'
+        params = {'filter': f'user.id eq "{self.id}"', 'expand': f'user/{self.id}'}
+        for data in self._okta._get_paginated_url(url, params=params):  # noqa: SLF001
+            assignment = data.get('_embedded', {}).get('user')
+            if assignment:
+                yield UserAssignment(self._okta, assignment, application_data=data)
+
+    def enrolled_factors(self) -> 'Generator[UserFactor, None, None]':
         """Lists the factors the user is enrolled in.
 
         Returns:
@@ -640,9 +680,9 @@ class User(Entity):
         """
         url = f'{self._okta.api}/users/{self.id}/factors'
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
-            yield _create_factor_from_data(self._okta, self._data, data)
+            yield create_factor_from_data(self._okta, self._data, data)
 
-    def supported_factors(self) -> Generator[UserSupportedFactor, None, None]:
+    def supported_factors(self) -> 'Generator[UserSupportedFactor, None, None]':
         """Lists all the supported factors that can be enrolled for the
         specified user that are included in the highest priority
         authenticator enrollment policy that applies to the user.
@@ -659,7 +699,7 @@ class User(Entity):
         for data in self._okta._get_paginated_url(url):  # noqa: SLF001
             yield UserSupportedFactor(self._okta, self._data, data)
 
-    def enroll_factor(self, factor_type: str, provider: str, query: dict[str, Any]) -> UserFactor | None:
+    def enroll_factor(self, factor_type: str, provider: str, query: dict[str, Any]) -> 'UserFactor | None':
         """Enrolls the user in a new factor.
 
         Args:
@@ -679,15 +719,190 @@ class User(Entity):
         if not response.ok:
             self._logger.error(response.text)
             return None
-        return _create_factor_from_data(self._okta, self._data, response.json())
+        return create_factor_from_data(self._okta, self._data, response.json())
+
+
+class UserAssignmentTask(Entity):
+    """Models the provisioning task attached to an application assignment.
+
+    These are the items behind the admin console's "Application assignments
+    encountered errors" and provisioning to-do tasks, and the ``aat`` id matches
+    the one the console uses. Unlike :attr:`UserAssignment.sync_state`, the task
+    carries the reason the assignment failed.
+
+    Okta embeds it in an app user read with ``expand=task``; there is no endpoint
+    serving a task on its own, so this entity has no url of its own.
+
+    A task whose status this library cannot interpret is refused at construction
+    rather than handed over half-read, so every instance that exists has a status
+    :attr:`has_failed` can answer for.
+    """
+
+    def __init__(self, okta_instance: 'Okta', data: dict[str, Any]) -> None:
+        """Initialize a task, refusing one whose status cannot be interpreted.
+
+        Args:
+            okta_instance: The Okta API client instance.
+            data: The task payload Okta embedded in the app user.
+
+        Raises:
+            InvalidTaskStatus: The payload carries a status this library does not
+                know, or none at all.
+
+        """
+        super().__init__(okta_instance, data)
+        self._validate_status()
+
+    def _validate_status(self) -> None:
+        """Refuse a payload whose status this library cannot interpret.
+
+        Raises:
+            InvalidTaskStatus: The payload carries an unknown status, or none.
+
+        """
+        if self.status in KNOWN_TASK_STATUSES:
+            return
+        found = f'status {self.status!r}' if self.status else 'no status'
+        on_task = f' on task {self.id}' if self.id else ''
+        raise InvalidTaskStatus(
+            f'Okta returned {found}{on_task}, which this library does not know how to interpret. '
+            f'Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add the new status to '
+            f'FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES.'
+        )
+
+    @property
+    def status(self) -> str | None:
+        """The status of the task.
+
+        Do not read this as "did it fail": a task with status COMPLETED was
+        observed still carrying an :attr:`error_string`. Use :attr:`has_error`.
+
+        Returns:
+            status (str): The status of the task, e.g. PROVISIONING_FAILED or
+                COMPLETED. None if absent.
+
+        """
+        return self._data.get('status')
+
+    @property
+    def error_string(self) -> str | None:
+        """The reason the provisioning action failed.
+
+        This is the only place the public API exposes it — ``sync_state`` reports
+        that something is wrong without saying what. The text names the affected
+        user and the app, e.g. "Automatic provisioning of user ... to app ...
+        failed: The object already exists."
+
+        Returns:
+            error_string (str): The failure reason, None when the task records no
+                error
+
+        """
+        return self._data.get('errorString')
+
+    @property
+    def has_error(self) -> bool:
+        """Whether the task records a failure.
+
+        Returns:
+            bool: True if the task carries a reason, False otherwise
+
+        """
+        return bool(self.error_string)
+
+    @property
+    def has_failed(self) -> bool:
+        """Whether the task is one the admin console counts as outstanding.
+
+        This is not the same question as :attr:`has_error`. Okta leaves the reason
+        on a task after it succeeds, so a COMPLETED task usually still carries one.
+        Counting by reason therefore over-reports heavily; only :attr:`status`
+        matches the console.
+
+        A status this library does not know raises rather than being folded into
+        one bucket or the other. Guessing would make every count built on this
+        untrustworthy, and there is no safe direction to guess in: reading a new
+        status as a failure inflates the numbers, reading it as healthy hides one.
+
+        Returns:
+            bool: True when the task is in a failure status, False when it has
+                completed or is still running. A task with a status neither this
+                nor the other set knows cannot exist, since construction refuses it.
+
+        """
+        return self.status in FAILURE_TASK_STATUSES
+
+    @property
+    def assignment_type(self) -> str | None:
+        """How the assignment that produced this task was made.
+
+        Returns:
+            assignment_type (str): GROUP when the assignment comes from a group,
+                USER for an individual one. None if absent.
+
+        """
+        return self._data.get('assignmentType')
+
+    @property
+    def group_id(self) -> str | None:
+        """The id of the group the assignment came from.
+
+        Returns:
+            group_id (str): The id of the source group, None for an individual
+                assignment or when absent
+
+        """
+        return self._data.get('groupId')
+
+    @property
+    def created_at(self) -> datetime | None:
+        """The date and time the task was created.
+
+        The task payload spells this ``createdDate`` rather than the ``created``
+        the rest of the API uses, so the inherited implementation cannot read it.
+
+        Returns:
+            datetime: The datetime the task was created, None if absent
+
+        """
+        return self._get_date_from_key('createdDate')
+
+    @property
+    def last_updated_at(self) -> datetime | None:
+        """The date and time the task was last updated.
+
+        The task payload spells this ``lastUpdate``, not ``lastUpdated``.
+
+        Returns:
+            datetime: The datetime the task was last updated, None if absent
+
+        """
+        return self._get_date_from_key('lastUpdate')
 
 
 class UserAssignment(Entity):
     """Models the user assignment object of okta for apps."""
 
-    def __init__(self, okta_instance: Okta, data: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        okta_instance: 'Okta',
+        data: dict[str, Any],
+        application_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Initialize a user assignment.
+
+        Args:
+            okta_instance: The Okta API client instance.
+            data: The app user payload.
+            application_data: The payload of the application the assignment is
+                to, when the caller already has it. Reading it from a listing of
+                applications, as :meth:`User.app_assignments` does, saves
+                :attr:`application` a request.
+
+        """
         super().__init__(okta_instance, data)
         self._user_assignment_data = self._data
+        self._application_data = application_data
 
     def _get_user_data(self) -> dict[str, Any]:
         """The parent user data that the user assignment refers to.
@@ -708,7 +923,7 @@ class UserAssignment(Entity):
         return User(self._okta, self._get_user_data())
 
     @property
-    def group(self) -> Group:
+    def group(self) -> 'Group':
         """The group that the user assignment refers to.
 
         Returns:
@@ -720,6 +935,142 @@ class UserAssignment(Entity):
         if not response.ok:
             self._logger.error(response.text)
         return groups.Group(self._okta, response.json())
+
+    @property
+    def application(self) -> 'Application | None':
+        """The application the assignment is to.
+
+        Costs a request unless the assignment came from a listing that already
+        carried the application, as :meth:`User.app_assignments` does.
+
+        Returns:
+            application (Application): The application, or None when the payload
+                carries no link to one.
+
+        """
+        if self._application_data is None:
+            url = self._user_assignment_data.get('_links', {}).get('app', {}).get('href')
+            if not url:
+                return None
+            response = self._okta.session.get(url)
+            if not response.ok:
+                self._logger.error(response.text)
+                return None
+            self._application_data = response.json()
+        return self._okta._create_application_from_data(self._application_data)  # noqa: SLF001
+
+    @property
+    def status(self) -> str | None:
+        """The status of the assignment.
+
+        This is the status of the app user, not of the Okta user it refers to;
+        ``self.user.status`` is a different value from a different enum.
+
+        Returns:
+            status (str): The status of the assignment, one of ACTIVE, APPROVED,
+                DEPROVISIONED, IMPLICIT, IMPORTED, INACTIVE, MATCHED, PENDING,
+                PROVISIONED, REVOKED, STAGED, SUSPENDED or UNASSIGNED. None if
+                absent.
+
+        """
+        return self._user_assignment_data.get('status')
+
+    @property
+    def sync_state(self) -> str | None:
+        """The provisioning synchronisation state of the assignment.
+
+        This is what the admin console's "Application assignments encountered
+        errors" and "Profile push updates encountered errors" tasks are built
+        on. Note that it carries no reason for the failure, and does not
+        distinguish an assignment error from a profile push error.
+
+        Returns:
+            sync_state (str): The sync state of the assignment, one of DISABLED,
+                ERROR, OUT_OF_SYNC, SYNCHRONIZED or SYNCING. None if absent.
+
+        """
+        return self._user_assignment_data.get('syncState')
+
+    @property
+    def scope(self) -> str | None:
+        """Whether the assignment is individual or inherited from a group.
+
+        Returns:
+            scope (str): USER for an assignment made to the user directly,
+                GROUP for one inherited from a group assignment. None if absent.
+
+        """
+        return self._user_assignment_data.get('scope')
+
+    @property
+    def task(self) -> UserAssignmentTask | None:
+        """The provisioning task attached to this assignment.
+
+        Only present when the assignment was read with ``expand=task``, which
+        :meth:`oktalib.entities.apps.Application.user_assignments_with_tasks`
+        does; the plain assignment listing carries no task and this returns None.
+        Okta attaches a task to the failing assignments only, so a None here on an
+        expanded read means the assignment is healthy.
+
+        ``_embedded`` is read with ``or {}`` rather than a ``get`` default, because
+        the default only applies to an absent key: Okta sends explicit nulls freely,
+        and a ``"_embedded": null`` would otherwise be handed to ``.get`` and raise.
+
+        None means the assignment is healthy, so it is only returned when Okta
+        embedded no task at all. A task that is present but unreadable is refused by
+        :class:`UserAssignmentTask` rather than flattened to None here, since
+        reporting an unreadable payload as "nothing wrong" would hide a failure.
+
+        Returns:
+            task (UserAssignmentTask): The task if one is embedded, None otherwise
+
+        """
+        data = (self._user_assignment_data.get('_embedded') or {}).get('task')
+        return None if data is None else UserAssignmentTask(self._okta, data)
+
+    def has_failed_task(self, task_status: str | None = None) -> bool:
+        """Whether the assignment carries a failing task, optionally of one status.
+
+        This is the question the admin console's task lists ask, in one call: the
+        assignment must have been read with ``expand=task``, that task must be in a
+        failure status rather than completed or still running, and it must match the
+        category being listed.
+
+        Args:
+            task_status: The task status to match, naming one console category.
+                ``PROVISIONING_FAILED`` for assignment errors, ``PROFILE_PUSH_FAILED``
+                for profile push errors. None, the default, accepts any failure.
+
+        Returns:
+            bool: True when the assignment has a failing task the filter accepts,
+                False when it has no task, its task is healthy or still running, or
+                the status does not match.
+
+        Raises:
+            InvalidTaskStatus: The requested status is not one this library knows,
+                so the filter could not be honoured.
+
+        """
+        if task_status is not None and task_status not in KNOWN_TASK_STATUSES:
+            raise InvalidTaskStatus(
+                f'Cannot filter on task status {task_status!r}. Known statuses are '
+                f'{", ".join(sorted(KNOWN_TASK_STATUSES))}, or omit it to accept every failure.'
+            )
+        task = self.task
+        if task is None or not task.has_failed:
+            return False
+        return task_status is None or task.status == task_status
+
+    @property
+    def last_sync(self) -> datetime | None:
+        """The date and time of the last provisioning synchronisation.
+
+        Returns:
+            last_sync (datetime): The datetime of the last sync, None if the
+                assignment has never been synced or the field is absent.
+
+        """
+        return parse_datetime(self._user_assignment_data.get('lastSync'))
 
     @property
     def email(self) -> str | None:
@@ -790,11 +1141,11 @@ class UserAssignment(Entity):
         return self._user_assignment_data.get('profile', {}).get('samlRoles', [])
 
 
-def _create_factor_from_data(
-    okta_instance: Okta,
+def create_factor_from_data(
+    okta_instance: 'Okta',
     user_data: dict[str, Any],
     factor_data: dict[str, Any],
-) -> UserFactor:
+) -> 'UserFactor':
     """Create a UserFactor instance based on the factor type and provider.
 
     Uses pattern matching to determine the factor type from factorType and provider
@@ -822,7 +1173,7 @@ def _create_factor_from_data(
 class UserFactor(Entity):
     """Models the user factor object of okta."""
 
-    def __init__(self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', user_data: dict[str, Any], data: dict[str, Any]) -> None:
         super().__init__(okta_instance, data)
         self._user_data = user_data
 
@@ -975,7 +1326,7 @@ class UserSupportedFactor:
     They represent factor types that can be enrolled for a user.
     """
 
-    def __init__(self, okta_instance: Okta, user_data: dict[str, Any], data: dict[str, Any]) -> None:
+    def __init__(self, okta_instance: 'Okta', user_data: dict[str, Any], data: dict[str, Any]) -> None:
         """Initialize UserSupportedFactor.
 
         Args:

@@ -34,8 +34,10 @@ Import all parts from entities here
 from .adminrole import AdminRole
 from .apps import (
     APIServiceApp,
+    AppKey,
     Application,
     ApplicationType,
+    AppSigningCertificate,
     ClientRole,
     ClientSecret,
     OAuthApplicationGrant,
@@ -43,9 +45,10 @@ from .apps import (
     SAMLMetadata,
     SingleSignOnService,
 )
+from .directoryintegrations import DirectoryIntegrationsAgent, DirectoryIntegrationsAgentPool
 from .features import Feature
-from .groups import Group, GroupAssignment
-from .users import User, UserAssignment
+from .groups import Group, GroupAssignment, GroupPushMapping
+from .users import User, UserAssignment, UserAssignmentTask
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
@@ -59,17 +62,23 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 __all__ = [
     'AdminRole',
     'APIServiceApp',
+    'AppKey',
     'Application',
     'ApplicationType',
+    'AppSigningCertificate',
     'ClientRole',
     'ClientSecret',
+    'DirectoryIntegrationsAgent',
+    'DirectoryIntegrationsAgentPool',
     'Feature',
     'Group',
     'GroupAssignment',
+    'GroupPushMapping',
     'OAuthApplicationGrant',
     'SAMLApplication',
     'SAMLMetadata',
     'SingleSignOnService',
     'User',
     'UserAssignment',
+    'UserAssignmentTask',
 ]

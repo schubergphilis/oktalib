@@ -61,6 +61,10 @@ class InvalidLifecycle(Exception):
     """The lifecycle action provided is invalid."""
 
 
+class InvalidTaskStatus(Exception):
+    """A provisioning task status this library does not know about."""
+
+
 class ApiLimitReached(Exception):
     """The api limits are close to being reached."""
 

@@ -216,3 +216,9 @@ cython_debug/
 *.ori
 *.orig
 *.tmp
+
+### OMC operational state
+
+**/.omc/**
+!**/.omc/skills/
+!**/.omc/skills/**
