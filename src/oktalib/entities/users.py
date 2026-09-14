@@ -807,8 +807,8 @@ class UserAssignmentTask(Entity):
         if self.status not in KNOWN_TASK_STATUSES:
             raise InvalidTaskStatus(
                 f'Okta returned task status {self.status!r}, which this library does not know how to '
-                f'interpret. Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add it to '
-                f'FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES, depending on what it means.'
+                f'interpret. Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. '
+                f'Add the new status to FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES.'
             )
         return self.status in FAILURE_TASK_STATUSES
 
