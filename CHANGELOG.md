@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.6.0](https://github.com/schubergphilis/oktalib/compare/v3.5.0...v3.6.0) (2026-09-14)
+
+
+### Features
+
+* add app signing certificate entities and expiry lookups ([90b1582](https://github.com/schubergphilis/oktalib/commit/90b158251a4be1d1b44a6885cb32d50cef6fe45a))
+* add Directory Integrations agent pools ([ea42066](https://github.com/schubergphilis/oktalib/commit/ea4206613b0ce6274b0793e7b25ce9e93ecf7a8d))
+* add group push mappings ([01f3a54](https://github.com/schubergphilis/oktalib/commit/01f3a54c1fc2c912cba0cdbe7b47bbc7f5278f1e))
+* add Okta feature-flag management with tests ([74c5a18](https://github.com/schubergphilis/oktalib/commit/74c5a181d13bd6262c9f33b9f1f13f5356352eb9))
+* add search expression support to user search ([280df51](https://github.com/schubergphilis/oktalib/commit/280df5177a175317ed328bcd7223111f42304a41))
+* expose the provisioning state of an application assignment ([f7be3a0](https://github.com/schubergphilis/oktalib/commit/f7be3a04120132a2e51ba7b23d7ab7134812ec4f))
+* list a user's app assignments in one filtered call ([28356b6](https://github.com/schubergphilis/oktalib/commit/28356b6fd0d0f3f5faa5e3fea039af347d9d8d9f))
+* list the assignments behind the console's task categories ([aeea578](https://github.com/schubergphilis/oktalib/commit/aeea578667b30bfbf0c8ac41b2dd2a7820bfa206))
+* Okta feature-flag management (Feature entity + endpoints) ([6ef9393](https://github.com/schubergphilis/oktalib/commit/6ef939350dbc4e59a4eddb171372e93d4bb9828b))
+* raise InvalidLifecycle for invalid feature lifecycle actions ([71e18b8](https://github.com/schubergphilis/oktalib/commit/71e18b83ba52f67610981cbe0690acb1edbd7776))
+* read provisioning failure reasons through expand=task ([b701a59](https://github.com/schubergphilis/oktalib/commit/b701a599440caefadeb1cf9702afab5daca50c1b))
+
+
+### Bug Fixes
+
+* answer the review on failed_user_assignments and the task lookup ([fc317c7](https://github.com/schubergphilis/oktalib/commit/fc317c77d3ab9073e40b0b1fe0f9b7bc5b97dc53))
+* don't raise on non-JSON API error bodies ([4e5e1af](https://github.com/schubergphilis/oktalib/commit/4e5e1af66ffa01778c9895ca1e5a220cbb0116ee))
+* match feature names case-insensitively in get_feature_by_name ([287eab9](https://github.com/schubergphilis/oktalib/commit/287eab90ad72b40c6b861b8e4e2fdd57130a94d7))
+* redact the admin console host from cassettes ([f769e92](https://github.com/schubergphilis/oktalib/commit/f769e928f815a2fd011126c5c0a83aeec5b8e8b6))
+* refuse a task that cannot be read instead of presenting one ([bbfe1e1](https://github.com/schubergphilis/oktalib/commit/bbfe1e14c1a38da56465fff7b28dfb5d4cbf18d6))
+* refuse an unknown task status instead of guessing at it ([4eb8735](https://github.com/schubergphilis/oktalib/commit/4eb87355daeb696d4d73b961af9e2cb6580550bf))
+* report unrecognised task statuses instead of matching nothing quietly ([988f6a9](https://github.com/schubergphilis/oktalib/commit/988f6a9d65c5552b678ab6a0e58de10fd1329b8e))
+
+
+### Performance Improvements
+
+* build the embedded task once per has_failed_task call ([38209a8](https://github.com/schubergphilis/oktalib/commit/38209a889490b466cefb6fc0b9e8f05532443bd4))
+
+
+### Documentation
+
+* add second-capture findings to the Okta Tasks research ([fd4ac84](https://github.com/schubergphilis/oktalib/commit/fd4ac8430071fafd6b9523246b91e602937fbad7))
+* move the Okta Tasks research out of the tree ([ca6d05e](https://github.com/schubergphilis/oktalib/commit/ca6d05e8bc6955bce06b097e41523632114d5d63))
+* record the per-user task endpoint, route map and count drift ([3c31e5c](https://github.com/schubergphilis/oktalib/commit/3c31e5c546a313dbc563ecab8ec7796105122a04))
+* record what shipping E1, E2, E5 and E6 settled ([cf5d347](https://github.com/schubergphilis/oktalib/commit/cf5d347db676070736f1a9fdd0f1b7b0e51b809f))
+* research what implementing Okta Tasks would take ([a7ef933](https://github.com/schubergphilis/oktalib/commit/a7ef933f6bedd8583967bc8907d400186b8c8443))
+
 ## [3.5.0](https://github.com/schubergphilis/oktalib/compare/v3.4.0...v3.5.0) (2026-07-23)
 
 
