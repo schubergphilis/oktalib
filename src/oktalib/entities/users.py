@@ -738,7 +738,33 @@ class UserAssignmentTask(Entity):
 
     Okta embeds it in an app user read with ``expand=task``; there is no endpoint
     serving a task on its own, so this entity has no url of its own.
+
+    A task whose status this library cannot interpret is refused at construction
+    rather than handed over half-read, so every instance that exists has a status
+    :attr:`has_failed` can answer for.
     """
+
+    def __init__(self, okta_instance: 'Okta', data: dict[str, Any]) -> None:
+        """Initialize a task, refusing one whose status cannot be interpreted.
+
+        Args:
+            okta_instance: The Okta API client instance.
+            data: The task payload Okta embedded in the app user.
+
+        Raises:
+            InvalidTaskStatus: The payload carries a status this library does not
+                know, or none at all.
+
+        """
+        super().__init__(okta_instance, data)
+        if self.status not in KNOWN_TASK_STATUSES:
+            found = f'status {self.status!r}' if self.status else 'no status'
+            on_task = f' on task {self.id}' if self.id else ''
+            raise InvalidTaskStatus(
+                f'Okta returned {found}{on_task}, which this library does not know how to interpret. '
+                f'Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add the new status to '
+                f'FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES.'
+            )
 
     @property
     def status(self) -> str | None:
@@ -796,20 +822,10 @@ class UserAssignmentTask(Entity):
 
         Returns:
             bool: True when the task is in a failure status, False when it has
-                completed, is still running, or reports no status at all.
-
-        Raises:
-            InvalidTaskStatus: Okta returned a status this library does not know.
+                completed or is still running. A task with a status neither this
+                nor the other set knows cannot exist, since construction refuses it.
 
         """
-        if not self.status:
-            return False
-        if self.status not in KNOWN_TASK_STATUSES:
-            raise InvalidTaskStatus(
-                f'Okta returned task status {self.status!r}, which this library does not know how to '
-                f'interpret. Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. '
-                f'Add the new status to FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES.'
-            )
         return self.status in FAILURE_TASK_STATUSES
 
     @property
@@ -996,23 +1012,17 @@ class UserAssignment(Entity):
         the default only applies to an absent key: Okta sends explicit nulls freely,
         and a ``"_embedded": null`` would otherwise be handed to ``.get`` and raise.
 
-        The two ways of having no task are kept apart on purpose. No task is the
-        ordinary case and says the assignment is healthy. A task that is present but
-        malformed is not, and is logged before being discarded, because callers read
-        a None here as "nothing wrong with this assignment" -- silently swallowing a
-        broken payload would hide a failure rather than report it.
+        None means the assignment is healthy, so it is only returned when Okta
+        embedded no task at all. A task that is present but unreadable is refused by
+        :class:`UserAssignmentTask` rather than flattened to None here, since
+        reporting an unreadable payload as "nothing wrong" would hide a failure.
 
         Returns:
             task (UserAssignmentTask): The task if one is embedded, None otherwise
 
         """
         data = (self._user_assignment_data.get('_embedded') or {}).get('task')
-        if data is None:
-            return None
-        if not isinstance(data, dict):
-            self._logger.error(f'Malformed task on assignment {self.id}, ignoring it: {data!r}')
-            return None
-        return UserAssignmentTask(self._okta, data)
+        return None if data is None else UserAssignmentTask(self._okta, data)
 
     def has_failed_task(self, task_status: str | None = None) -> bool:
         """Whether the assignment carries a failing task, optionally of one status.

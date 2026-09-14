@@ -10,7 +10,7 @@ import pytest
 from requests import Response
 
 from oktalib.entities import User, UserAssignment, UserAssignmentTask
-from oktalib.oktalibexceptions import ServerError
+from oktalib.oktalibexceptions import InvalidTaskStatus, ServerError
 
 
 @pytest.mark.parametrize(
@@ -239,10 +239,15 @@ def test_assignment_without_an_expanded_task(assignment):
     assert assignment.task is None
 
 
-def test_assignment_ignores_a_malformed_embedded_task(okta_service, assignment_data):
-    """A task that is not an object is ignored rather than blowing up."""
+def test_assignment_refuses_a_malformed_embedded_task(okta_service, assignment_data):
+    """A task that is not an object is refused rather than read as no task at all.
+
+    Returning None would report the assignment as healthy on the strength of a
+    payload nobody could read.
+    """
     assignment = UserAssignment(okta_service, {**assignment_data, '_embedded': {'task': 'nonsense'}})
-    assert assignment.task is None
+    with pytest.raises(InvalidTaskStatus):
+        _ = assignment.task
 
 
 @pytest.fixture

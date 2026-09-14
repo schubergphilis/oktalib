@@ -2,7 +2,6 @@
 # pylint: disable=redefined-outer-name
 
 import json
-import logging
 import os
 
 import pytest
@@ -70,9 +69,28 @@ def test_a_completed_task_has_not_failed(okta_service):
     assert task.has_failed is False
 
 
-def test_a_task_without_a_status_has_not_failed(okta_service):
-    """A payload with no status is not evidence of a failure."""
-    assert UserAssignmentTask(okta_service, {'id': 'aat1'}).has_failed is False
+@pytest.mark.parametrize(
+    'task',
+    [
+        pytest.param({}, id='empty task object'),
+        pytest.param({'id': 'aat1'}, id='no status key'),
+        pytest.param({'id': 'aat1', 'status': None}, id='null status'),
+        pytest.param({'id': 'aat1', 'errorString': 'something went wrong'}, id='a reason but no status'),
+    ],
+)
+def test_a_task_with_no_usable_status_raises(okta_service, task):
+    """A task that says nothing is not evidence that the assignment is healthy.
+
+    Reporting False here would hide a failure behind a payload nobody can read,
+    which is the same silent under-reporting an unknown status would cause.
+    """
+    with pytest.raises(InvalidTaskStatus):
+        _ = UserAssignmentTask(okta_service, task).has_failed
+
+
+def test_an_assignment_with_no_task_at_all_is_still_healthy(okta_service):
+    """The ordinary case is untouched: no task means nothing is wrong."""
+    assert UserAssignment(okta_service, make_assignment()).has_failed_task() is False
 
 
 @pytest.mark.parametrize('status', [PROVISIONING_FAILED, PROFILE_PUSH_FAILED, 'VALIDATION_FAILED'])
@@ -223,19 +241,11 @@ def test_task_is_none_when_nothing_is_embedded(okta_service, payload, reason):
     assert UserAssignment(okta_service, payload).task is None, reason
 
 
-def test_a_malformed_task_is_logged_rather_than_silently_dropped(okta_service, caplog):
-    """A task that is not an object is discarded, but said out loud first.
-
-    Discarding it quietly would make a broken payload indistinguishable from a
-    healthy assignment, so a failure would vanish from failed_user_assignments
-    with nothing in the log to explain it.
-    """
+def test_a_task_that_is_not_an_object_is_refused(okta_service):
+    """A string where a task should be is not a task, and not a healthy assignment."""
     payload = {'id': '00u1', '_embedded': {'task': 'not-an-object'}}
-    with caplog.at_level(logging.ERROR):
-        task = UserAssignment(okta_service, payload).task
-
-    assert task is None
-    assert any('Malformed task' in record.message for record in caplog.records)
+    with pytest.raises(InvalidTaskStatus):
+        _ = UserAssignment(okta_service, payload).task
 
 
 def test_an_unknown_status_from_okta_raises(okta_service):
