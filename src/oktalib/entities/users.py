@@ -61,22 +61,29 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'users'
 
-# Provisioning task statuses that are not an outstanding failure. COMPLETED is done;
-# PROVISIONING is Okta still working, and was observed on a task moments after an
-# assignment was re-driven. Treating an in-flight task as a failure makes a caller
-# act on work that is already running.
+# The provisioning task statuses that mean an outstanding failure. These are the
+# rows the admin console lists as tasks: PROVISIONING_FAILED under "Application
+# assignments encountered errors", PROFILE_PUSH_FAILED under "Profile push updates
+# encountered errors", and VALIDATION_FAILED, which is rarer and uncategorised.
+FAILURE_TASK_STATUSES = frozenset(
+    {
+        'PROVISIONING_FAILED',
+        'PROFILE_PUSH_FAILED',
+        'VALIDATION_FAILED',
+    }
+)
+
+# The ones that are not. COMPLETED is done; PROVISIONING is Okta still working, and
+# was observed on a task moments after an assignment was re-driven. Treating an
+# in-flight task as a failure makes a caller act on work that is already running.
 NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})
 
-# Every task status this library knows how to interpret. Anything else raises
+# Everything this library knows how to interpret, derived so that the two halves
+# above stay the only place a status is written down. Anything outside this raises
 # rather than being guessed at: a status Okta added or renamed changes what the
-# counts mean, and silently folding it into one bucket or the other would make
-# every number built on it untrustworthy. Add the new status here, deliberately,
-# once its meaning is known.
-KNOWN_TASK_STATUSES = NON_FAILURE_TASK_STATUSES | {
-    'PROVISIONING_FAILED',
-    'PROFILE_PUSH_FAILED',
-    'VALIDATION_FAILED',
-}
+# counts mean, and folding it into either half silently would make every number
+# built on it untrustworthy while still looking fine.
+KNOWN_TASK_STATUSES = FAILURE_TASK_STATUSES | NON_FAILURE_TASK_STATUSES
 
 
 class User(Entity):
@@ -816,9 +823,9 @@ class UserAssignmentTask(Entity):
             raise InvalidTaskStatus(
                 f'Okta returned task status {self.status!r}, which this library does not know how to '
                 f'interpret. Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add it to '
-                f'KNOWN_TASK_STATUSES, and to NON_FAILURE_TASK_STATUSES if it does not mean the task failed.'
+                f'FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES, depending on what it means.'
             )
-        return self.status not in NON_FAILURE_TASK_STATUSES
+        return self.status in FAILURE_TASK_STATUSES
 
     @property
     def assignment_type(self) -> str | None:
