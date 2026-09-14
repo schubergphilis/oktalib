@@ -1044,7 +1044,7 @@ class UserAssignment(Entity):
                 f'Cannot filter on task status {task_status!r}. Known statuses are '
                 f'{", ".join(sorted(KNOWN_TASK_STATUSES))}, or omit it to accept every failure.'
             )
-        task = self.task  # bound once: the property builds a new entity per access
+        task = self.task
         if task is None or not task.has_failed:
             return False
         return task_status is None or task.status == task_status
