@@ -61,7 +61,6 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'users'
 
-# The admin console's task categories, plus a rarer uncategorised one.
 FAILURE_TASK_STATUSES = frozenset({'PROVISIONING_FAILED', 'PROFILE_PUSH_FAILED', 'VALIDATION_FAILED'})
 
 # PROVISIONING is Okta still working, not something to act on.
