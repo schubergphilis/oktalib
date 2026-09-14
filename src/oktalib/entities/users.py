@@ -60,13 +60,8 @@ __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'users'
-
 FAILURE_TASK_STATUSES = frozenset({'PROVISIONING_FAILED', 'PROFILE_PUSH_FAILED', 'VALIDATION_FAILED'})
-
-# PROVISIONING is Okta still working, not something to act on.
-NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})
-
-# Anything outside these raises rather than being guessed at; see has_failed.
+NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})  # PROVISIONING means Okta is still working on it.
 KNOWN_TASK_STATUSES = FAILURE_TASK_STATUSES | NON_FAILURE_TASK_STATUSES
 
 
