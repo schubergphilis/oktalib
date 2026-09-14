@@ -1047,8 +1047,6 @@ class UserAssignment(Entity):
                 so the filter could not be honoured.
 
         """
-        # Bound once: task builds a new entity on every access, and this would
-        # otherwise construct three of them for every assignment examined.
         if task_status is not None and task_status not in KNOWN_TASK_STATUSES:
             raise InvalidTaskStatus(
                 f'Cannot filter on task status {task_status!r}. Known statuses are '
