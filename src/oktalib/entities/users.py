@@ -61,28 +61,13 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'users'
 
-# The provisioning task statuses that mean an outstanding failure. These are the
-# rows the admin console lists as tasks: PROVISIONING_FAILED under "Application
-# assignments encountered errors", PROFILE_PUSH_FAILED under "Profile push updates
-# encountered errors", and VALIDATION_FAILED, which is rarer and uncategorised.
-FAILURE_TASK_STATUSES = frozenset(
-    {
-        'PROVISIONING_FAILED',
-        'PROFILE_PUSH_FAILED',
-        'VALIDATION_FAILED',
-    }
-)
+# The admin console's task categories, plus a rarer uncategorised one.
+FAILURE_TASK_STATUSES = frozenset({'PROVISIONING_FAILED', 'PROFILE_PUSH_FAILED', 'VALIDATION_FAILED'})
 
-# The ones that are not. COMPLETED is done; PROVISIONING is Okta still working, and
-# was observed on a task moments after an assignment was re-driven. Treating an
-# in-flight task as a failure makes a caller act on work that is already running.
+# PROVISIONING is Okta still working, not something to act on.
 NON_FAILURE_TASK_STATUSES = frozenset({'COMPLETED', 'PROVISIONING'})
 
-# Everything this library knows how to interpret, derived so that the two halves
-# above stay the only place a status is written down. Anything outside this raises
-# rather than being guessed at: a status Okta added or renamed changes what the
-# counts mean, and folding it into either half silently would make every number
-# built on it untrustworthy while still looking fine.
+# Anything outside these raises rather than being guessed at; see has_failed.
 KNOWN_TASK_STATUSES = FAILURE_TASK_STATUSES | NON_FAILURE_TASK_STATUSES
 
 
@@ -1059,7 +1044,7 @@ class UserAssignment(Entity):
                 f'Cannot filter on task status {task_status!r}. Known statuses are '
                 f'{", ".join(sorted(KNOWN_TASK_STATUSES))}, or omit it to accept every failure.'
             )
-        task = self.task
+        task = self.task  # bound once: the property builds a new entity per access
         if task is None or not task.has_failed:
             return False
         return task_status is None or task.status == task_status
