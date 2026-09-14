@@ -751,14 +751,24 @@ class UserAssignmentTask(Entity):
 
         """
         super().__init__(okta_instance, data)
-        if self.status not in KNOWN_TASK_STATUSES:
-            found = f'status {self.status!r}' if self.status else 'no status'
-            on_task = f' on task {self.id}' if self.id else ''
-            raise InvalidTaskStatus(
-                f'Okta returned {found}{on_task}, which this library does not know how to interpret. '
-                f'Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add the new status to '
-                f'FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES.'
-            )
+        self._validate_status()
+
+    def _validate_status(self) -> None:
+        """Refuse a payload whose status this library cannot interpret.
+
+        Raises:
+            InvalidTaskStatus: The payload carries an unknown status, or none.
+
+        """
+        if self.status in KNOWN_TASK_STATUSES:
+            return
+        found = f'status {self.status!r}' if self.status else 'no status'
+        on_task = f' on task {self.id}' if self.id else ''
+        raise InvalidTaskStatus(
+            f'Okta returned {found}{on_task}, which this library does not know how to interpret. '
+            f'Known statuses are {", ".join(sorted(KNOWN_TASK_STATUSES))}. Add the new status to '
+            f'FAILURE_TASK_STATUSES or NON_FAILURE_TASK_STATUSES.'
+        )
 
     @property
     def status(self) -> str | None:
