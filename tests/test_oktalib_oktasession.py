@@ -16,7 +16,6 @@ from oktalib.oktasession import (
     DEFAULT_TIMEOUT,
     IDEMPOTENT_METHODS,
     LOGGER_BASENAME,
-    RATE_LIMIT_STATUS,
     RETRY_TOTAL,
     SERVER_ERROR_STATUSES,
     OktaRetry,
@@ -230,8 +229,8 @@ def test_a_rate_limit_is_retryable_on_every_verb():
     """The policy exempts 429 from allowed_methods; everything else obeys it."""
     retry = OktaRetry(status_forcelist=SERVER_ERROR_STATUSES, allowed_methods=IDEMPOTENT_METHODS)
 
-    assert retry.is_retry('POST', RATE_LIMIT_STATUS)
-    assert retry.is_retry('GET', RATE_LIMIT_STATUS)
+    assert retry.is_retry('POST', 429)
+    assert retry.is_retry('GET', 429)
     assert not retry.is_retry('POST', 503)
     assert retry.is_retry('GET', 503)
 

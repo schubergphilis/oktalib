@@ -37,6 +37,7 @@ interprets payloads; it never assembles a url or decides how to retry.
 
 import logging
 from collections.abc import Generator
+from http import HTTPStatus
 from typing import Any
 
 from requests import Response, Session
@@ -59,12 +60,16 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 DEFAULT_TIMEOUT = (5, 30)  # (connect, read)
-RATE_LIMIT_STATUS = 429
 RETRY_TOTAL = 3
 RETRY_BACKOFF_FACTOR = 1.0
 RETRY_BACKOFF_JITTER = 0.5
 RETRY_BACKOFF_MAX = 60
-SERVER_ERROR_STATUSES = (500, 502, 503, 504)
+SERVER_ERROR_STATUSES = (
+    HTTPStatus.INTERNAL_SERVER_ERROR,
+    HTTPStatus.BAD_GATEWAY,
+    HTTPStatus.SERVICE_UNAVAILABLE,
+    HTTPStatus.GATEWAY_TIMEOUT,
+)
 IDEMPOTENT_METHODS = frozenset({'DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT'})
 DEFAULT_PAGE_SIZE = 100
 
@@ -95,7 +100,7 @@ class OktaRetry(Retry):
             bool: True if the request should be retried.
 
         """
-        if status_code == RATE_LIMIT_STATUS:
+        if status_code == HTTPStatus.TOO_MANY_REQUESTS:
             return True
         return super().is_retry(method, status_code, has_retry_after)
 
@@ -177,7 +182,7 @@ class RateLimitedSession(Session):
         """
         kwargs.setdefault('timeout', self.timeout)
         response = super().request(method, url, *args, **kwargs)
-        if response.status_code == RATE_LIMIT_STATUS:
+        if response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
             self._logger.warning('Api is still exhausted for endpoint after retrying, giving up.')
             raise ApiLimitReached
         return response
