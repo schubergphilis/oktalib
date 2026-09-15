@@ -68,7 +68,7 @@ def test_same_kid_is_the_same_certificate(okta_service):
 def test_url_is_built_from_the_parent_app(okta_service):
     """The key payload carries no app id, so the url comes from the parent app."""
     certificate = AppSigningCertificate(okta_service, APP_DATA, make_key('abc123'))
-    assert certificate.url == f'{okta_service.api}/apps/0oaapp1/credentials/keys/abc123'
+    assert certificate.url == f'{okta_service.session.api}/apps/0oaapp1/credentials/keys/abc123'
 
 
 def test_inherited_entity_properties(okta_service):

@@ -58,7 +58,7 @@ class Feature(Entity):
             string: The url of the feature
 
         """
-        return f'{self._okta.api}/features/{self.id}'
+        return f'{self._okta.session.api}/features/{self.id}'
 
     @property
     def name(self) -> str | None:
@@ -182,7 +182,7 @@ class Feature(Entity):
         """
         if lifecycle not in ('enable', 'disable'):
             raise InvalidLifecycle(f"lifecycle must be 'enable' or 'disable', got {lifecycle!r}")
-        base_url = f'{self._okta.api}/features/{self.id}/{lifecycle}'
+        base_url = f'/features/{self.id}/{lifecycle}'
         url = f'{base_url}?mode=force' if force else base_url
         response = self._okta.session.post(url)
         if not response.ok:

@@ -430,8 +430,8 @@ class User(Entity):
             generator: A generator of roles objects for which the user is member of
 
         """
-        url = f'{self._okta.api}/users/{self.id}/roles'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        url = f'/users/{self.id}/roles'
+        for data in self._okta.session.get_paginated_url(url):
             yield AdminRole(self._okta, data)
 
     @property
@@ -442,8 +442,8 @@ class User(Entity):
             generator: A generator of Group objects for which the user is member of
 
         """
-        url = f'{self._okta.api}/users/{self.id}/groups'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        url = f'/users/{self.id}/groups'
+        for data in self._okta.session.get_paginated_url(url):
             yield groups.Group(self._okta, data)
 
     def delete(self) -> bool:
@@ -488,7 +488,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/activate?sendEmail=false'
+        url = f'/users/{self.id}/lifecycle/activate?sendEmail=false'
         return self._post_lifecycle(url, 'Activating user failed')
 
     def deactivate(self) -> bool:
@@ -498,7 +498,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/deactivate'
+        url = f'/users/{self.id}/lifecycle/deactivate'
         return self._post_lifecycle(url, 'Deactivating user failed')
 
     def unlock(self) -> bool:
@@ -508,7 +508,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/unlock'
+        url = f'/users/{self.id}/lifecycle/unlock'
         return self._post_lifecycle(url, 'Unlocking user failed')
 
     def expire_password(self) -> bool:
@@ -518,7 +518,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/expire_password'
+        url = f'/users/{self.id}/lifecycle/expire_password'
         return self._post_lifecycle(url, "Expiring user's password failed")
 
     def reset_password(self) -> bool:
@@ -528,7 +528,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/reset_password??sendEmail=false'
+        url = f'/users/{self.id}/lifecycle/reset_password??sendEmail=false'
         return self._post_lifecycle(url, "Resetting user's password failed")
 
     def set_temporary_password(self) -> str | None:
@@ -538,7 +538,7 @@ class User(Entity):
             string: Password on success, None otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/expire_password?tempPassword=true'
+        url = f'/users/{self.id}/lifecycle/expire_password?tempPassword=true'
         response = self._okta.session.post(url)
         if not response.ok:
             error = f'Setting a temporary password failed\nResponse: {response.text}'
@@ -554,7 +554,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/suspend'
+        url = f'/users/{self.id}/lifecycle/suspend'
         return self._post_lifecycle(url, 'Suspending user failed')
 
     def unsuspend(self) -> bool:
@@ -564,7 +564,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/lifecycle/unsuspend'
+        url = f'/users/{self.id}/lifecycle/unsuspend'
         return self._post_lifecycle(url, 'Un-suspending user failed')
 
     def update_password(self, old_password: str, new_password: str) -> bool:
@@ -574,7 +574,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/credentials/change_password'
+        url = f'/users/{self.id}/credentials/change_password'
         payload = {
             'oldPassword': {'value': old_password},
             'newPassword': {'value': new_password},
@@ -591,7 +591,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}'
+        url = f'/users/{self.id}'
         payload = {'credentials': {'password': {'value': password}}}
         response = self._okta.session.put(url, data=json.dumps(payload))
         if not response.ok:
@@ -609,7 +609,7 @@ class User(Entity):
             Bool: True or False depending on success
 
         """
-        url = f'{self._okta.api}/users/{self.id}'
+        url = f'/users/{self.id}'
         response = self._okta.session.post(url, data=json.dumps(new_profile))
         if not response.ok:
             self._logger.error(response.text)
@@ -622,7 +622,7 @@ class User(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self.id}/credentials/change_recovery_question'
+        url = f'/users/{self.id}/credentials/change_recovery_question'
         payload = {
             'password': {'value': password},
             'recovery_question': {'question': question, 'answer': answer},
@@ -663,9 +663,9 @@ class User(Entity):
                 application it is to.
 
         """
-        url = f'{self._okta.api}/apps'
+        url = '/apps'
         params = {'filter': f'user.id eq "{self.id}"', 'expand': f'user/{self.id}'}
-        for data in self._okta._get_paginated_url(url, params=params):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url, params=params):
             assignment = data.get('_embedded', {}).get('user')
             if assignment:
                 yield UserAssignment(self._okta, assignment, application_data=data)
@@ -678,8 +678,8 @@ class User(Entity):
                 is enrolled in
 
         """
-        url = f'{self._okta.api}/users/{self.id}/factors'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        url = f'/users/{self.id}/factors'
+        for data in self._okta.session.get_paginated_url(url):
             yield create_factor_from_data(self._okta, self._data, data)
 
     def supported_factors(self) -> 'Generator[UserSupportedFactor, None, None]':
@@ -695,8 +695,8 @@ class User(Entity):
                 the user can enroll in
 
         """
-        url = f'{self._okta.api}/users/{self.id}/factors/catalog'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        url = f'/users/{self.id}/factors/catalog'
+        for data in self._okta.session.get_paginated_url(url):
             yield UserSupportedFactor(self._okta, self._data, data)
 
     def enroll_factor(self, factor_type: str, provider: str, query: dict[str, Any]) -> 'UserFactor | None':
@@ -713,7 +713,7 @@ class User(Entity):
         Returns:
             UserFactor: The enrolled UserFactor object on success, None otherwise
         """
-        url = f'{self._okta.api}/users/{self.id}/factors'
+        url = f'/users/{self.id}/factors'
         payload = {'factorType': factor_type, 'provider': provider}
         response = self._okta.session.post(url, data=json.dumps(payload), params=query)
         if not response.ok:
@@ -1234,7 +1234,7 @@ class UserFactor(Entity):
             bool: True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/users/{self._user_data.get("id")}/factors/{self.id}'
+        url = f'/users/{self._user_data.get("id")}/factors/{self.id}'
         response = self._okta.session.delete(url)
         return response.ok
 

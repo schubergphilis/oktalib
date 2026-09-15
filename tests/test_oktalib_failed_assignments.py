@@ -24,7 +24,7 @@ def application(okta_service):
             'id': '0oaapp1',
             'label': 'An app',
             'signOnMode': 'SAML_2_0',
-            '_links': {'users': {'href': f'{okta_service.api}/apps/0oaapp1/users'}},
+            '_links': {'users': {'href': f'{okta_service.session.api}/apps/0oaapp1/users'}},
         },
     )
 

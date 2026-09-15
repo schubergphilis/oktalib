@@ -86,7 +86,7 @@ def test_never_pushed_mapping(okta_service, saml_app_data):
 def test_url_is_built_from_the_parent_app(okta_service, saml_app_data):
     """The mapping payload carries no app id, so the url comes from the parent app."""
     mapping = GroupPushMapping(okta_service, saml_app_data, make_mapping('gpm1'))
-    assert mapping.url == f'{okta_service.api}/apps/0oaapp1/group-push/mappings/gpm1'
+    assert mapping.url == f'{okta_service.session.api}/apps/0oaapp1/group-push/mappings/gpm1'
 
 
 def test_source_group_is_resolved(okta_service, saml_app_data, monkeypatch):
@@ -127,7 +127,7 @@ def test_status_is_filtered_server_side(application, monkeypatch):
 
     monkeypatch.setattr(application._okta.session, 'get', record)
     assert [mapping.id for mapping in application.group_push_mappings(status='ERROR')] == ['gpm2']
-    assert requested['url'] == f'{application._okta.api}/apps/0oaapp1/group-push/mappings'
+    assert requested['url'] == '/apps/0oaapp1/group-push/mappings'
     assert requested['params']['status'] == 'ERROR'
 
 
@@ -153,7 +153,7 @@ def test_expand_task_is_requested(application, monkeypatch):
         return make_json_response([])
 
     monkeypatch.setattr(application._okta.session, 'get', record)
-    application._data['_links'] = {'users': {'href': f'{application._okta.api}/apps/0oaapp1/users'}}
+    application._data['_links'] = {'users': {'href': f'{application._okta.session.api}/apps/0oaapp1/users'}}
     assert not list(application.user_assignments_with_tasks())
     assert requested['params']['expand'] == 'task'
 
