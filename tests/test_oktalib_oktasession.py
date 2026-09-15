@@ -82,9 +82,12 @@ def okta_answering():
         served = []
 
         class Handler(BaseHTTPRequestHandler):
+            """Answer every verb from the scripted list, recording what was asked."""
+
             protocol_version = 'HTTP/1.1'
 
             def respond(self):
+                """Serve the next scripted status, after the configured delay."""
                 served.append(self.command)
                 # Drain the body, or keep-alive would parse it as the next request line.
                 self.rfile.read(int(self.headers.get('content-length') or 0))
@@ -131,7 +134,8 @@ def test_a_client_error_is_not_retried(responder):
     assert len(attempts) == 1
 
 
-def test_a_rate_limit_is_retried_until_it_succeeds(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_a_rate_limit_is_retried_until_it_succeeds(okta_answering):
     """The rate limit is transient, so the request is repeated rather than failed."""
     url, served = okta_answering([429, 429, 200])
     response = RateLimitedSession().get(url)
@@ -140,7 +144,8 @@ def test_a_rate_limit_is_retried_until_it_succeeds(instant_retries, okta_answeri
     assert served == ['GET', 'GET', 'GET']
 
 
-def test_a_rate_limit_is_retried_on_a_post_too(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_a_rate_limit_is_retried_on_a_post_too(okta_answering):
     """Okta rejected the request rather than acting on it, so a replay cannot duplicate.
 
     This is the case urllib3's own ``allowed_methods`` would refuse, and it is the
@@ -154,7 +159,8 @@ def test_a_rate_limit_is_retried_on_a_post_too(instant_retries, okta_answering):
     assert served == ['POST', 'POST']
 
 
-def test_a_rate_limit_that_outlasts_the_retries_is_reported(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_a_rate_limit_that_outlasts_the_retries_is_reported(okta_answering):
     """Callers document an except ApiLimitReached, so exhaustion must still raise it."""
     url, served = okta_answering([429])
 
@@ -164,7 +170,8 @@ def test_a_rate_limit_that_outlasts_the_retries_is_reported(instant_retries, okt
     assert len(served) == RETRY_TOTAL + 1
 
 
-def test_the_giving_up_warning_is_logged_under_the_class(instant_retries, okta_answering, caplog):
+@pytest.mark.usefixtures('instant_retries')
+def test_the_giving_up_warning_is_logged_under_the_class(okta_answering, caplog):
     """The operator needs to know a run failed because Okta throttled it.
 
     The logger is named for the class rather than injected, so a subclass is filterable
@@ -178,7 +185,8 @@ def test_the_giving_up_warning_is_logged_under_the_class(instant_retries, okta_a
     assert any('giving up' in record.message for record in caplog.records)
 
 
-def test_a_server_error_on_a_get_is_retried(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_a_server_error_on_a_get_is_retried(okta_answering):
     """A 503 is Okta being briefly unavailable, and a GET costs nothing to repeat."""
     url, served = okta_answering([503, 503, 200])
     response = RateLimitedSession().get(url)
@@ -187,7 +195,8 @@ def test_a_server_error_on_a_get_is_retried(instant_retries, okta_answering):
     assert served == ['GET', 'GET', 'GET']
 
 
-def test_a_server_error_on_a_post_is_not_retried(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_a_server_error_on_a_post_is_not_retried(okta_answering):
     """A 503 leaves it unknown whether Okta acted, so a POST must not be replayed."""
     url, served = okta_answering([503, 200])
     response = RateLimitedSession().post(url, data='{}')
@@ -196,7 +205,8 @@ def test_a_server_error_on_a_post_is_not_retried(instant_retries, okta_answering
     assert served == ['POST']
 
 
-def test_an_exhausted_server_error_comes_back_as_a_response(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_an_exhausted_server_error_comes_back_as_a_response(okta_answering):
     """raise_on_status off keeps validate_response the single place errors surface."""
     url, served = okta_answering([503])
     response = RateLimitedSession().get(url)
@@ -205,7 +215,8 @@ def test_an_exhausted_server_error_comes_back_as_a_response(instant_retries, okt
     assert len(served) == RETRY_TOTAL + 1
 
 
-def test_a_hung_endpoint_is_not_retried(instant_retries, okta_answering):
+@pytest.mark.usefixtures('instant_retries')
+def test_a_hung_endpoint_is_not_retried(okta_answering):
     """Retrying a read timeout would multiply it by the budget and block for minutes."""
     url, served = okta_answering([200], delay=2)
 

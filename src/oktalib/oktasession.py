@@ -240,7 +240,7 @@ class OktaSession(RateLimitedSession):
         if not response.ok:
             raise AuthFailed(response.content)
 
-    def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:
+    def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:  # type: ignore[override]
         """Resolve an endpoint against the instance and make the request.
 
         Args:
