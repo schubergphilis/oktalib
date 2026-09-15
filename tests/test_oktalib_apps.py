@@ -70,7 +70,8 @@ def test_get_saml_application_metadata(okta_cassette, test_saml_app):
         assert metadata is not None
         assert metadata.entity_id == 'http://www.okta.com/exk2nq5bkqm3wrGtg0h8'
         assert sso is not None
-        expected_post_url = f'{test_saml_app._okta.host}/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml'
+        app_path = '/app/schubergphilis_testapp_1/exk2nq5bkqm3wrGtg0h8/sso/saml'
+        expected_post_url = f'{test_saml_app._okta.session.host}{app_path}'
         assert sso.http_post == expected_post_url
         assert cert is not None and 'MIIDrDCCApSgAwIBAgIGAZyKxMVNMA0GCSqGSIb3DQEBCwUAMIGWMQsw' in cert
 

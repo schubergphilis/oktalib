@@ -128,7 +128,7 @@ def test_search_users_by_query_sends_the_expression(okta_service, monkeypatch):
     monkeypatch.setattr(okta_service.session, 'get', record)
     found = list(okta_service.search_users_by_query('status eq "LOCKED_OUT"'))
     assert [user.id for user in found] == ['00u1', '00u2']
-    assert requested['url'] == f'{okta_service.api}/users'
+    assert requested['url'] == '/users'
     assert requested['params']['search'] == 'status eq "LOCKED_OUT"'
 
 
@@ -149,7 +149,7 @@ def test_search_users_by_query_sorts(okta_service, monkeypatch):
 
 def test_search_users_by_query_follows_every_page(okta_service, monkeypatch):
     """Every match is yielded, since a truncated status query is worse than none."""
-    second_page = f'{okta_service.api}/users?after=00u2'
+    second_page = f'{okta_service.session.api}/users?after=00u2'
     pages = {
         None: make_users_response([{'id': '00u1'}, {'id': '00u2'}], next_url=second_page),
         second_page: make_users_response([{'id': '00u3'}]),

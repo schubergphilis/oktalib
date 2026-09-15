@@ -83,7 +83,7 @@ class Group(Entity):
             string: The url of the group
 
         """
-        return f'{self._okta.api}/groups/{self.id}'
+        return f'{self._okta.session.api}/groups/{self.id}'
 
     @property
     def type(self) -> str | None:
@@ -117,7 +117,7 @@ class Group(Entity):
 
     @name.setter
     def name(self, value: str) -> None:
-        url = f'{self._okta.api}/groups/{self.id}'
+        url = f'/groups/{self.id}'
         payload = {'profile': {'name': value, 'description': self.description}}
         response = self._okta.session.put(url, data=json.dumps(payload))
         if not response.ok:
@@ -137,7 +137,7 @@ class Group(Entity):
 
     @description.setter
     def description(self, value: str) -> None:
-        url = f'{self._okta.api}/groups/{self.id}'
+        url = f'/groups/{self.id}'
         payload = {'profile': {'name': self.name, 'description': value}}
         response = self._okta.session.put(url, data=json.dumps(payload))
         if not response.ok:
@@ -178,7 +178,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url):
             yield users.User(self._okta, data)
 
     @property
@@ -191,7 +191,7 @@ class Group(Entity):
 
         """
         url = self._data.get('_links', {}).get('apps', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url):
             yield apps.Application(self._okta, data)
 
     def delete(self) -> bool:
@@ -201,7 +201,7 @@ class Group(Entity):
             bool: True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/groups/{self.id}'
+        url = f'/groups/{self.id}'
         response = self._okta.session.delete(url)
         return response.ok
 
@@ -251,7 +251,7 @@ class Group(Entity):
         )
         if not user:
             raise InvalidUser(login)
-        url = f'{self._okta.api}/groups/{self.id}/users/{user.id}'
+        url = f'/groups/{self.id}/users/{user.id}'
         response = self._okta.session.put(url)
         if not response.ok:
             self._logger.error(f'Adding user failed. Response: {response.text}')
@@ -270,7 +270,7 @@ class Group(Entity):
         user = next((user for user in self._okta.users if user.login == login), None)
         if not user:
             raise InvalidUser(login)
-        url = f'{self._okta.api}/groups/{self.id}/users/{user.id}'
+        url = f'/groups/{self.id}/users/{user.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Removing user failed. Response: {response.text}')
@@ -286,7 +286,7 @@ class Group(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/groups/{self.id}/users/{id_}'
+        url = f'/groups/{self.id}/users/{id_}'
         response = self._okta.session.put(url)
         if not response.ok:
             self._logger.error(f'Adding user failed. Response: {response.text}')
@@ -302,7 +302,7 @@ class Group(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/groups/{self.id}/users/{id_}'
+        url = f'/groups/{self.id}/users/{id_}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Removing user failed. Response: {response.text}')
@@ -383,7 +383,7 @@ class GroupPushMapping(Entity):
             string: The url of the mapping
 
         """
-        return f'{self._okta.api}/apps/{self._app_data.get("id")}/group-push/mappings/{self.id}'
+        return f'{self._okta.session.api}/apps/{self._app_data.get("id")}/group-push/mappings/{self.id}'
 
     @property
     def status(self) -> str | None:

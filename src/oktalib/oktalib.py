@@ -35,9 +35,6 @@ import logging
 from collections.abc import Generator
 from typing import Any
 
-import backoff
-from requests import Response, Session
-
 from .entities import (
     AdminRole,
     APIServiceApp,
@@ -52,12 +49,10 @@ from .entities import (
     User,
 )
 from .oktalibexceptions import (
-    ApiLimitReached,
-    AuthFailed,
     InvalidApplication,
     InvalidGroup,
-    ServerError,
 )
+from .oktasession import OktaSession
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
@@ -81,48 +76,6 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
-class RateLimitedSession(Session):
-    """A requests session that backs off when Okta reports its rate limit.
-
-    Okta answers 429 when an endpoint's budget is exhausted. Overriding ``request``
-    covers every verb, because ``Session.get`` and friends all route through it.
-    """
-
-    def __init__(self, logger: logging.Logger | None = None) -> None:
-        """Initialize the session.
-
-        Args:
-            logger: Where to report backing off; defaults to this module's logger.
-
-        """
-        super().__init__()
-        self._logger = logger or LOGGER
-
-    @backoff.on_exception(backoff.expo, ApiLimitReached, max_time=60)
-    def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:  # type: ignore[override]
-        """Make a request, retrying with exponential backoff on a rate limit.
-
-        Args:
-            method: HTTP verb.
-            url: The url to request.
-            args: Positional arguments passed through to requests.
-            kwargs: Keyword arguments passed through to requests.
-
-        Raises:
-            ApiLimitReached: The endpoint answered 429. Caught by the backoff
-                decorator, which retries; it escapes only once max_time is spent.
-
-        Returns:
-            Response: The response.
-
-        """
-        response = super().request(method, url, *args, **kwargs)
-        if response.status_code == 429:
-            self._logger.warning('Api is exhausted for endpoint, backing off.')
-            raise ApiLimitReached
-        return response
-
-
 class Okta:
     """Models the api of okta."""
 
@@ -136,32 +89,7 @@ class Okta:
         """
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
-        self.host = host
-        self.api = f'{host}/api/v1'
-        self.token = token
-        self.session = self._setup_session()
-
-    def _setup_session(self) -> Session:
-        """Sets up the session for the Okta object.
-
-        Returns:
-            Session: The session object with the correct headers and authentication.
-
-        """
-        session = RateLimitedSession(logger=self._logger)
-        session.get(self.host)
-        session.headers.update(
-            {
-                'accept': 'application/json',
-                'content-type': 'application/json',
-                'authorization': f'SSWS {self.token}',
-            }
-        )
-        url = f'{self.api}/users/me/'
-        response = session.get(url)
-        if not response.ok:
-            raise AuthFailed(response.content)
-        return session
+        self.session = OktaSession(host, token)
 
     @property
     def features(self) -> Generator[Feature, None, None]:
@@ -171,8 +99,8 @@ class Okta:
             generator: The generator of features configured in okta
 
         """
-        url = f'{self.api}/features'
-        for data in self._get_paginated_url(url):
+        url = '/features'
+        for data in self.session.get_paginated_url(url):
             yield Feature(self, data)
 
     def get_feature_by_id(self, feature_id: str) -> Feature | None:
@@ -185,7 +113,7 @@ class Okta:
             Feature: The feature if a match is found else None
 
         """
-        url = f'{self.api}/features/{feature_id}'
+        url = f'/features/{feature_id}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -220,8 +148,8 @@ class Okta:
             generator: The generator of feature dependencies for the specified feature
 
         """
-        url = f'{self.api}/features/{feature_id}/dependencies'
-        for data in self._get_paginated_url(url):
+        url = f'/features/{feature_id}/dependencies'
+        for data in self.session.get_paginated_url(url):
             yield Feature(self, data)
 
     def get_feature_dependents_by_id(self, feature_id: str) -> Generator[Feature, None, None]:
@@ -237,8 +165,8 @@ class Okta:
             generator: The generator of feature dependents for the specified feature
 
         """
-        url = f'{self.api}/features/{feature_id}/dependents'
-        for data in self._get_paginated_url(url):
+        url = f'/features/{feature_id}/dependents'
+        for data in self.session.get_paginated_url(url):
             yield Feature(self, data)
 
     @property
@@ -249,8 +177,8 @@ class Okta:
             generator: The generator of groups configured in okta
 
         """
-        url = f'{self.api}/groups'
-        for data in self._get_paginated_url(url):
+        url = '/groups'
+        for data in self.session.get_paginated_url(url):
             yield Group(self, data)
 
     def create_group(self, name: str, description: str) -> Group | None:
@@ -264,7 +192,7 @@ class Okta:
             The created group object on success, None otherwise
 
         """
-        url = f'{self.api}/groups'
+        url = '/groups'
         payload = {'profile': {'name': name, 'description': description}}
         response = self.session.post(url, data=json.dumps(payload))
         if not response.ok:
@@ -313,7 +241,7 @@ class Okta:
             Group: The group if a match is found else None
 
         """
-        url = f'{self.api}/groups/{group_id}'
+        url = f'/groups/{group_id}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -330,7 +258,7 @@ class Okta:
             list: A list of groups if a match is found else an empty list
 
         """
-        url = f'{self.api}/groups?q={name}'
+        url = f'/groups?q={name}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -348,7 +276,7 @@ class Okta:
         Returns:
             list: A list of groups if a match is found else an empty list
         """
-        url = f'{self.api}/groups?search={query}'
+        url = f'/groups?search={query}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -373,59 +301,6 @@ class Okta:
             raise InvalidGroup(name)
         return group.delete()
 
-    def _get_paginated_url(
-        self,
-        url: str,
-        result_limit: int = 100,
-        params: dict[str, Any] | None = None,
-    ) -> Generator[dict[str, Any], None, None]:
-        """Gets the paginated data from a url.
-
-        Args:
-            url: The url to get the data from
-            result_limit: The number of results to get per page, defaults to 100
-            params: Optional extra query parameters for the first request. Entries
-                with a None value are dropped, so callers can pass optional
-                filters through directly. Subsequent pages are followed by the
-                link Okta returns, which already carries these parameters.
-
-        Returns:
-            generator: A generator of the data from the url
-
-        """
-        query: dict[str, Any] = {'limit': result_limit}
-        query.update({key: value for key, value in (params or {}).items() if value is not None})
-        response = self._validate_response(url, query)
-        yield from response.json()
-        next_link = response.links.get('next', {}).get('url')
-        while next_link:
-            response = self._validate_response(url=next_link)
-            yield from response.json()
-            next_link = response.links.get('next', {}).get('url')
-
-    def _validate_response(self, url: str, params: dict[str, Any] | None = None) -> Response:
-        """Validate API response and raise appropriate exceptions on error.
-
-        Args:
-            url: The API endpoint URL to request
-            params: Optional query parameters for the request
-
-        Returns:
-            Response: The validated HTTP response object
-
-        Raises:
-            ServerError: If the response indicates an error (not ok status)
-
-        """
-        response = self.session.get(url=url, params=params)
-        if not response.ok:
-            try:
-                error_message = response.json().get('errorSummary')
-            except (ValueError, AttributeError):
-                error_message = response.text
-            raise ServerError(error_message) from None
-        return response
-
     @property
     def users(self) -> Generator[User, None, None]:
         """The users configured in okta.
@@ -434,8 +309,8 @@ class Okta:
             generator: The generator of users configured in okta
 
         """
-        url = f'{self.api}/users'
-        for data in self._get_paginated_url(url):
+        url = '/users'
+        for data in self.session.get_paginated_url(url):
             yield User(self, data)
 
     def create_user(
@@ -463,7 +338,7 @@ class Okta:
 
         """
         activate = 'true' if enabled else 'false'
-        url = f'{self.api}/users?activate={activate}'
+        url = f'/users?activate={activate}'
         payload: dict[str, Any] = {
             'profile': {
                 'firstName': first_name,
@@ -490,7 +365,7 @@ class Okta:
             User: The user if found, None otherwise
 
         """
-        url = f'{self.api}/users?filter=profile.login+eq+"{login}"'
+        url = f'/users?filter=profile.login+eq+"{login}"'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -510,7 +385,7 @@ class Okta:
             list: The users if found, empty list otherwise
 
         """
-        url = f'{self.api}/users?q={value}'
+        url = f'/users?q={value}'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -527,7 +402,7 @@ class Okta:
             list: The users if found, empty list otherwise
 
         """
-        url = f'{self.api}/users?filter=profile.email+eq+"{email}"'
+        url = f'/users?filter=profile.email+eq+"{email}"'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -570,8 +445,8 @@ class Okta:
                 otherwise fails.
 
         """
-        url = f'{self.api}/users'
-        for data in self._get_paginated_url(url, params={'search': query, 'sortBy': sort_by}):
+        url = '/users'
+        for data in self.session.get_paginated_url(url, params={'search': query, 'sortBy': sort_by}):
             yield User(self, data)
 
     def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
@@ -584,7 +459,7 @@ class Okta:
             list: A list of the user's roles if found, None otherwise
 
         """
-        url = f'{self.api}/users/{user_id}/roles'
+        url = f'/users/{user_id}/roles'
         response = self.session.get(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -602,7 +477,7 @@ class Okta:
             User: The response, None otherwise
 
         """
-        url = f'{self.api}/users/{user_id}/roles'
+        url = f'/users/{user_id}/roles'
         data = {'type': role_name}
         response = self.session.post(url, json=data)
         if not response.ok:
@@ -621,7 +496,7 @@ class Okta:
             User: The response, None otherwise
 
         """
-        url = f'{self.api}/users/{user_id}/roles/{role_id}'
+        url = f'/users/{user_id}/roles/{role_id}'
         response = self.session.delete(url)
         if not response.ok:
             self._logger.error(response.text)
@@ -671,7 +546,7 @@ class Okta:
         Returns:
             Application: The created application
         """
-        url = f'{self.api}/apps'
+        url = '/apps'
         response = self.session.post(url, json=data)
 
         if not response.ok:
@@ -856,8 +731,8 @@ class Okta:
                        (e.g., SAMLApplication for SAML apps, APIServiceApp for API Services apps).
 
         """
-        url = f'{self.api}/apps'
-        for data in self._get_paginated_url(url):
+        url = '/apps'
+        for data in self.session.get_paginated_url(url):
             yield self._create_application_from_data(data)
 
     def get_application_by_id(self, id_: str) -> Application | None:
@@ -870,7 +745,7 @@ class Okta:
             Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
 
         """
-        url = f'{self.api}/apps/{id_}'
+        url = f'/apps/{id_}'
         response = self.session.get(url)
         if not response.ok:
             return None
@@ -953,8 +828,8 @@ class Okta:
             generator: The generator of agent pools configured in okta
 
         """
-        url = f'{self.api}/agentPools'
-        for data in self._get_paginated_url(url):
+        url = '/agentPools'
+        for data in self.session.get_paginated_url(url):
             yield DirectoryIntegrationsAgentPool(self, data)
 
     def get_directory_integrations_agent_pools_by_type(
@@ -974,8 +849,8 @@ class Okta:
             ServerError: If Okta rejects the pool type.
 
         """
-        url = f'{self.api}/agentPools'
-        for data in self._get_paginated_url(url, params={'poolType': pool_type}):
+        url = '/agentPools'
+        for data in self.session.get_paginated_url(url, params={'poolType': pool_type}):
             yield DirectoryIntegrationsAgentPool(self, data)
 
     def get_directory_integrations_agent_pool_by_id(self, pool_id: str) -> DirectoryIntegrationsAgentPool | None:
@@ -1022,7 +897,7 @@ class Okta:
             SAMLMetadata: The application's SAML metadata if found, None otherwise
 
         """
-        url = f'{self.api}/apps/{id_}/sso/saml/metadata?kid={kid}'
+        url = f'/apps/{id_}/sso/saml/metadata?kid={kid}'
         headers = {'Accept': 'text/xml'}
         response = self.session.get(url, headers=headers)
         if not response.ok:

@@ -90,7 +90,7 @@ def test_pool_properties(pool):
 
 def test_pool_url(pool, okta_service):
     """The pool url is built from its id."""
-    assert pool.url == f'{okta_service.api}/agentPools/poolid1'
+    assert pool.url == f'{okta_service.session.api}/agentPools/poolid1'
 
 
 def test_pool_has_no_timestamps(pool):
@@ -243,7 +243,7 @@ def test_pools_are_listed(okta_service, monkeypatch):
 
     monkeypatch.setattr(okta_service.session, 'get', record)
     assert [pool.id for pool in okta_service.directory_integrations_agent_pools] == ['poolid1', 'poolid2']
-    assert requested['url'] == f'{okta_service.api}/agentPools'
+    assert requested['url'] == '/agentPools'
 
 
 def test_pool_by_id(okta_service, monkeypatch):
@@ -283,7 +283,7 @@ def test_pools_by_type_filters_server_side(okta_service, monkeypatch):
 
     monkeypatch.setattr(okta_service.session, 'get', record)
     assert [pool.id for pool in okta_service.get_directory_integrations_agent_pools_by_type('AD')] == ['poolid1']
-    assert requested['url'] == f'{okta_service.api}/agentPools'
+    assert requested['url'] == '/agentPools'
     assert requested['params']['poolType'] == 'AD'
 
 
@@ -301,7 +301,7 @@ def test_pool_refreshes_from_the_listing(pool, monkeypatch):
 
     monkeypatch.setattr(pool._okta.session, 'get', record)
     assert pool._update()
-    assert requested == [f'{pool._okta.api}/agentPools']
+    assert requested == ['/agentPools']
     assert pool.operational_status == 'DEGRADED'
 
 

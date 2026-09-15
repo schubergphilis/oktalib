@@ -13,10 +13,11 @@ from _pytest.fixtures import SubRequest
 from betamax import Betamax
 from betamax.cassette import Cassette, Interaction
 from betamax.serializers import JSONSerializer
-from requests import Response, Session
+from requests import Response
 
+import oktalib.oktalib
 from oktalib import Okta
-from oktalib.oktalib import RateLimitedSession
+from oktalib.oktasession import OktaSession
 from tests.sanitizer import sanitize_interaction
 
 REQUEST_HEADERS_TO_REMOVE = [
@@ -212,14 +213,18 @@ def okta_service() -> Okta:
     token = os.environ.get('OKTA_API_KEY', 'fake_api_key')
     if token == 'fake_api_key':
 
-        def get_authenticated_session(
-            self,
-        ) -> Session:  # noqa: ARG001
-            # pylint: disable='unused-argument'
-            """Create an authenticated session without actual authentication."""
-            return RateLimitedSession()
+        class UnauthenticatedSession(OktaSession):
+            """A session that skips the token check, for runs without credentials.
 
-        Okta._setup_session = get_authenticated_session
+            Substituted for the class the client reaches for rather than patched onto
+            OktaSession itself, so the transport's own tests still exercise the real
+            authentication.
+            """
+
+            def authenticate(self) -> None:
+                """Do not ask Okta to confirm a token we do not have."""
+
+        oktalib.oktalib.OktaSession = UnauthenticatedSession
     configure_betamax(token=token, base_url=host)
     return Okta(host=host, token=token)
 

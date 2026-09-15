@@ -224,7 +224,7 @@ class DirectoryIntegrationsAgentPool(Entity):
             string: The url identifying the agent pool
 
         """
-        return f'{self._okta.api}/agentPools/{self.id}'
+        return f'{self._okta.session.api}/agentPools/{self.id}'
 
     def _update(self) -> bool:
         """Refresh the pool data from the listing.

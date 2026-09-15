@@ -207,7 +207,7 @@ class OAuthApplicationGrant(Entity):
             bool: True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/apps/{self._app_data.get("id")}/grants/{self.id}'
+        url = f'/apps/{self._app_data.get("id")}/grants/{self.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Deleting grant failed. Response: {response.text}')
@@ -297,7 +297,7 @@ class ClientSecret(Entity):
 
         """
         app_id = self._app_data.get('id')
-        url = f'{self._okta.api}/apps/{app_id}/credentials/secrets/{self.id}/lifecycle/deactivate'
+        url = f'/apps/{app_id}/credentials/secrets/{self.id}/lifecycle/deactivate'
         response = self._okta.session.post(url)
         if not response.ok:
             self._logger.error(f'Deactivating client secret failed. Response: {response.text}')
@@ -310,7 +310,7 @@ class ClientSecret(Entity):
             bool: True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/apps/{self._app_data.get("id")}/credentials/secrets/{self.id}'
+        url = f'/apps/{self._app_data.get("id")}/credentials/secrets/{self.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Deleting client secret failed. Response: {response.text}')
@@ -356,7 +356,7 @@ class AppKey(Entity):
             string: The url of the key
 
         """
-        return f'{self._okta.api}/apps/{self._app_data.get("id")}/credentials/keys/{self.id}'
+        return f'{self._okta.session.api}/apps/{self._app_data.get("id")}/credentials/keys/{self.id}'
 
     @property
     def key_type(self) -> str | None:
@@ -542,7 +542,7 @@ class ClientRole(Entity):
 
         """
         client_id = self._client_data.get('id')
-        url = f'{self._okta.host}/oauth2/v1/clients/{client_id}/roles/{self.id}'
+        url = f'{self._okta.session.host}/oauth2/v1/clients/{client_id}/roles/{self.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Deleting client role failed. Response: {response.text}')
@@ -657,7 +657,7 @@ class Application(Entity):
             string: The url of the application
 
         """
-        return f'{self._okta.api}/apps/{self.id}'
+        return f'{self._okta.session.api}/apps/{self.id}'
 
     @property
     def name(self) -> str | None:
@@ -748,7 +748,7 @@ class Application(Entity):
                 application, empty on failure
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/credentials/keys'
+        url = f'/apps/{self.id}/credentials/keys'
         response = self._okta.session.get(url)
         if not response.ok:
             self._logger.error(f'Retrieving signing certificates failed. Response: {response.text}')
@@ -791,8 +791,8 @@ class Application(Entity):
                 application
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/group-push/mappings'
-        for data in self._okta._get_paginated_url(url, params={'status': status}):  # noqa: SLF001
+        url = f'/apps/{self.id}/group-push/mappings'
+        for data in self._okta.session.get_paginated_url(url, params={'status': status}):
             yield groups.GroupPushMapping(self._okta, self._data, data)
 
     def delete(self) -> bool:
@@ -802,7 +802,7 @@ class Application(Entity):
             bool: True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/apps/{self.id}'
+        url = f'/apps/{self.id}'
         response = self._okta.session.delete(url)
         return response.ok
 
@@ -835,7 +835,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url):
             yield users.User(self._okta, data)
 
     @property
@@ -847,7 +847,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        for group in self._okta._get_paginated_url(url):  # noqa: SLF001
+        for group in self._okta.session.get_paginated_url(url):
             yield self._okta.get_group_by_id(group.get('id', ''))
 
     @property
@@ -859,7 +859,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('groups', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url):
             yield groups.GroupAssignment(self._okta, data)
 
     def get_group_assignment_by_group_name(self, name: str) -> 'GroupAssignment | None':
@@ -884,7 +884,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url):
             yield users.UserAssignment(self._okta, data)
 
     def user_assignments_with_tasks(self) -> 'Generator[UserAssignment, None, None]':
@@ -911,7 +911,7 @@ class Application(Entity):
 
         """
         url = self._data.get('_links', {}).get('users', {}).get('href')
-        for data in self._okta._get_paginated_url(url, params={'expand': 'task'}):  # noqa: SLF001
+        for data in self._okta.session.get_paginated_url(url, params={'expand': 'task'}):
             yield users.UserAssignment(self._okta, data)
 
     def failed_user_assignments(self, task_status: str | None = None) -> 'Generator[UserAssignment, None, None]':
@@ -1015,7 +1015,7 @@ class Application(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/groups/{group_id}'
+        url = f'/apps/{self.id}/groups/{group_id}'
         response = self._okta.session.put(url)
         if not response.ok:
             self._logger.error(f'Adding group failed. Response: {response.text}')
@@ -1034,7 +1034,7 @@ class Application(Entity):
         group = self._okta.get_group_by_name(group_name)
         if not group:
             raise InvalidGroup(group_name)
-        url = f'{self._okta.api}/apps/{self.id}/groups/{group.id}'
+        url = f'/apps/{self.id}/groups/{group.id}'
         response = self._okta.session.put(url, data=json.dumps({}))
         if not response.ok:
             self._logger.error(f'Adding group failed. Response: {response.text}')
@@ -1050,7 +1050,7 @@ class Application(Entity):
             True on success, False otherwise
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/groups/{group_id}'
+        url = f'/apps/{self.id}/groups/{group_id}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Removing group failed. Response: {response.text}')
@@ -1069,7 +1069,7 @@ class Application(Entity):
         group = self._okta.get_group_by_name(group_name)
         if not group:
             raise InvalidGroup(group_name)
-        url = f'{self._okta.api}/apps/{self.id}/groups/{group.id}'
+        url = f'/apps/{self.id}/groups/{group.id}'
         response = self._okta.session.delete(url)
         if not response.ok:
             self._logger.error(f'Removing group failed. Response: {response.text}')
@@ -1121,7 +1121,7 @@ class SAMLApplication(Application):
             Bool: The status of the assignment( True or False )
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/groups/{group_id}'
+        url = f'/apps/{self.id}/groups/{group_id}'
         payload = {'id': group_id, 'profile': {'role': role, 'samlRoles': saml_roles}}
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
@@ -1135,7 +1135,7 @@ class SAMLApplication(Application):
             list: List of saml iam roles
 
         """
-        url = f'{self._okta.api}/internal/apps/{self.id}/types'
+        url = f'/internal/apps/{self.id}/types'
         response = self._okta.session.get(url)
         if not response.ok:
             self._logger.error(f'Response: {response.text}')
@@ -1199,7 +1199,7 @@ class APIServiceApp(Application):
 
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/credentials/secrets'
+        url = f'/apps/{self.id}/credentials/secrets'
         response = self._okta.session.get(url)
         if not response.ok:
             self._logger.error(f'Retrieving client secrets failed. Response: {response.text}')
@@ -1216,7 +1216,7 @@ class APIServiceApp(Application):
             ClientSecret | None: The newly created client secrets of the application
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/credentials/secrets'
+        url = f'/apps/{self.id}/credentials/secrets'
         response = self._okta.session.post(url)
         if not response.ok:
             # Check if error is due to maximum secrets limit
@@ -1240,8 +1240,8 @@ class APIServiceApp(Application):
             OAuthApplicationGrant | None: The newly created OAuth application grant
                 on success, None otherwise
         """
-        url = f'{self._okta.api}/apps/{self.id}/grants'
-        payload = {'issuer': self._okta.host, 'scopeId': scope_id}
+        url = f'/apps/{self.id}/grants'
+        payload = {'issuer': self._okta.session.host, 'scopeId': scope_id}
         response = self._okta.session.post(url, json=payload)
         if not response.ok:
             self._logger.error(f'Adding grants failed. Response: {response.text}')
@@ -1270,8 +1270,8 @@ class APIServiceApp(Application):
                 of the application
 
         """
-        url = f'{self._okta.api}/apps/{self.id}/grants'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        url = f'/apps/{self.id}/grants'
+        for data in self._okta.session.get_paginated_url(url):
             yield OAuthApplicationGrant(self._okta, self._data, data)
 
     @property
@@ -1286,8 +1286,8 @@ class APIServiceApp(Application):
             generator: A generator of ClientRole objects for the client roles of the application
 
         """
-        url = f'{self._okta.host}/oauth2/v1/clients/{self.id}/roles'
-        for data in self._okta._get_paginated_url(url):  # noqa: SLF001
+        url = f'{self._okta.session.host}/oauth2/v1/clients/{self.id}/roles'
+        for data in self._okta.session.get_paginated_url(url):
             yield ClientRole(self._okta, self._data, data)
 
     def add_client_role(self, role_type: str) -> ClientRole | None:
@@ -1303,7 +1303,7 @@ class APIServiceApp(Application):
         Returns:
             ClientRole | None: The newly created client role on success, None otherwise
         """
-        url = f'{self._okta.host}/oauth2/v1/clients/{self.id}/roles'
+        url = f'{self._okta.session.host}/oauth2/v1/clients/{self.id}/roles'
         payload = {'type': role_type}
         response = self._okta.session.post(url, json=payload)
         if not response.ok:
@@ -1370,7 +1370,7 @@ class APIServiceApp(Application):
         """
         payload = deepcopy(self._data)
         payload.setdefault('settings', {}).setdefault('oauthClient', {})['jwks_uri'] = jwks_uri
-        url = f'{self._okta.api}/apps/{self.id}'
+        url = f'/apps/{self.id}'
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
             self._logger.error(f'Adding public keys with JWKS URI failed. Response: {response.text}')
@@ -1387,7 +1387,7 @@ class APIServiceApp(Application):
         Returns:
             bool: True on success, False otherwise
         """
-        url = f'{self._okta.api}/apps/{self.id}/credentials/jwks'
+        url = f'/apps/{self.id}/credentials/jwks'
         response = self._okta.session.post(url, json=jwks)
         if not response.ok:
             self._logger.error(f'Adding public keys with JWKS failed. Response: {response.text}')
@@ -1410,7 +1410,7 @@ class APIServiceApp(Application):
         oauth_client['token_endpoint_auth_method'] = 'private_key_jwt'
         oauth_client.pop('client_secret', None)
 
-        url = f'{self._okta.api}/apps/{self.id}'
+        url = f'/apps/{self.id}'
         response = self._okta.session.put(url, json=payload)
         if not response.ok:
             self._logger.error(f'Enabling public key authentication failed. Response: {response.text}')

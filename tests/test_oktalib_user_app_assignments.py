@@ -67,7 +67,7 @@ def test_the_filter_and_expand_name_the_same_user(user, user_id, monkeypatch):
 
     monkeypatch.setattr(user._okta.session, 'get', record)
     assert not list(user.app_assignments())
-    assert requested['url'] == f'{user._okta.api}/apps'
+    assert requested['url'] == '/apps'
     assert requested['params']['filter'] == f'user.id eq "{user_id}"'
     assert requested['params']['expand'] == f'user/{user_id}'
 
