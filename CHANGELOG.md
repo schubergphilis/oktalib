@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [4.0.0](https://github.com/schubergphilis/oktalib/compare/v3.6.0...v4.0.0) (2026-09-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* Okta.host, Okta.api and Okta.token have moved to Okta.session. Read them as okta.session.host, okta.session.api and okta.session.token.
+
+### Features
+
+* move the http transport into its own OktaSession ([cd6e8ad](https://github.com/schubergphilis/oktalib/commit/cd6e8ad9b44f3302df2a6e98b9545d3315d3e793))
+
 ## [3.6.0](https://github.com/schubergphilis/oktalib/compare/v3.5.0...v3.6.0) (2026-09-14)
 
 
