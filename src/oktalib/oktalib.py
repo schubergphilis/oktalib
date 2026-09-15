@@ -92,6 +92,446 @@ class Okta:
         self.session = OktaSession(host, token)
 
     @property
+    def applications(self) -> Generator[Application, None, None]:
+        """The applications configured in okta.
+
+        Returns:
+            generator: The generator of applications configured in okta.
+                       Returns Application subclasses based on sign-on mode
+                       (e.g., SAMLApplication for SAML apps, APIServiceApp for API Services apps).
+
+        """
+        url = '/apps'
+        for data in self.session.get_paginated_url(url):
+            yield self._create_application_from_data(data)
+
+    def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
+        """Assigns a group to an application.
+
+        Args:
+            application_label: The label of the application to assign the group to
+            group_name: The group name to assign to the application
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        application = self.get_application_by_label(application_label)
+        if not application:
+            raise InvalidApplication(application_label)
+        group = self.get_group_by_name(group_name)
+        if not group:
+            raise InvalidGroup(group_name)
+        return application.add_group_by_id(group.id)
+
+    def _cleanup_broken_app(self, app: APIServiceApp, label: str) -> None:
+        """Clean up a broken application by deactivating and deleting it.
+
+        Args:
+            app: The application to clean up
+            label: The label of the application (for logging)
+        """
+        try:
+            app.deactivate()
+            app.delete()
+        except Exception as cleanup_error:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions in cleanup to avoid raising during error handling
+            self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
+
+    def create_api_services_app_with_client_secret(
+        self,
+        label: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with client_secret authentication.
+
+        Args:
+            label: The application label/name
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        return self._create_application_api_services(payload)
+
+    def create_api_services_app_with_jwks(
+        self,
+        label: str,
+        jwks: dict[str, Any],
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using inline JWKS.
+
+        This method creates an application that uses private_key_jwt authentication
+        with an inline JSON Web Key Set.
+
+        Args:
+            label: The application label/name
+            jwks: JSON Web Key Set dictionary containing the public key
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_jwks(jwks=jwks)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def create_api_services_app_with_jwks_uri(
+        self,
+        label: str,
+        jwks_uri: str,
+        dpop_bound_access_tokens: bool = True,
+        consent_method: str = 'REQUIRED',
+    ) -> APIServiceApp | None:
+        """Create an API Service application with private_key_jwt auth using JWKS URI.
+
+        This method creates an application that uses private_key_jwt authentication
+        by fetching public keys from the provided JWKS URI.
+
+        Args:
+            label: The application label/name
+            jwks_uri: URL to JSON Web Key Set (public keys endpoint)
+            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
+            consent_method: Consent method (default: 'REQUIRED')
+
+        Returns:
+            APIServiceApp | None: The created application on success, None otherwise
+
+        Note:
+            The application is first created, then the JWKS URI is configured,
+            and finally private_key_jwt authentication is enabled.
+        """
+        payload = self._get_api_services_app_payload(
+            label=label,
+            dpop_bound_access_tokens=dpop_bound_access_tokens,
+            consent_method=consent_method,
+        )
+        app = self._create_application_api_services(payload)
+        if not isinstance(app, APIServiceApp):
+            return None
+
+        try:
+            app.add_public_keys_by_public_url(jwks_uri=jwks_uri)
+            app._enable_public_private_key_authentication()
+            return app
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            # Catch all exceptions to ensure cleanup of broken apps
+            self._logger.error(f'Failed to configure app {label}: {e}')
+            self._cleanup_broken_app(app, label)
+            return None
+
+    def _create_application_api_services(self, data: dict[str, Any]) -> APIServiceApp | None:
+        """Creates an API Services application in okta from the provided data.
+
+        Args:
+            data: The application data to create the application from
+        Returns:
+            Application: The created application
+        """
+        url = '/apps'
+        response = self.session.post(url, json=data)
+
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        app = self._create_application_from_data(response.json())
+        return app if isinstance(app, APIServiceApp) else None
+
+    def _create_application_from_data(self, data: dict[str, Any]) -> Application:
+        """Create an Application instance based on the application type.
+
+        Uses pattern matching to determine the application type from sign-on mode
+        and returns the appropriate Application subclass.
+
+        Args:
+            data: The application data from the Okta API
+
+        Returns:
+            Application: An Application or subclass instance (e.g., SAMLApplication, APIServiceApp)
+
+        """
+        sign_on_mode = (data.get('signOnMode') or '').upper()
+
+        try:
+            app_type = ApplicationType(sign_on_mode)
+        except ValueError:
+            app_type = ApplicationType.UNKNOWN
+
+        match app_type:
+            case ApplicationType.SAML_2_0:
+                return SAMLApplication(self, data)
+            case ApplicationType.OPENID_CONNECT:
+                # Check if this is an API Services application
+                application_type = data.get('settings', {}).get('oauthClient', {}).get('application_type')
+                if application_type == 'service':
+                    return APIServiceApp(self, data)
+                return Application(self, data)
+            case (
+                ApplicationType.WS_FEDERATION
+                | ApplicationType.SECURE_PASSWORD_STORE
+                | ApplicationType.AUTO_LOGIN
+                | ApplicationType.BROWSER_PLUGIN
+                | ApplicationType.BASIC_AUTH
+                | ApplicationType.BOOKMARK
+                | ApplicationType.UNKNOWN
+                | _
+            ):
+                return Application(self, data)
+
+    def _get_api_services_app_payload(
+        self,
+        label: str,
+        dpop_bound_access_tokens: bool,
+        consent_method: str,
+    ) -> dict[str, Any]:
+        """Gets the payload for creating an API Services application.
+
+        Args:
+            label: The application label/name
+            dpop_bound_access_tokens: Enable DPoP bound access tokens
+            consent_method: Consent method
+
+        Returns:
+            dict: The payload for creating an API Services application
+
+        """
+        credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
+
+        oauth_client: dict[str, Any] = {
+            'application_type': 'service',
+            'consent_method': consent_method,
+            'grant_types': ['client_credentials'],
+            'response_types': ['token'],
+            'dpop_bound_access_tokens': dpop_bound_access_tokens,
+        }
+
+        return {
+            'credentials': credentials,
+            'label': label,
+            'name': 'oidc_client',
+            'signOnMode': 'OPENID_CONNECT',
+            'settings': {'oauthClient': oauth_client},
+        }
+
+    def get_application_by_id(self, id_: str) -> Application | None:
+        """Retrieves an application by id.
+
+        Args:
+            id_: The id of the application to retrieve
+
+        Returns:
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
+
+        """
+        url = f'/apps/{id_}'
+        response = self.session.get(url)
+        if not response.ok:
+            return None
+        return self._create_application_from_data(response.json())
+
+    def get_application_by_label(self, label: str) -> Application | None:
+        """Retrieves an application by label.
+
+        Args:
+            label: The label of the application to retrieve
+
+        Returns:
+            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
+
+        """
+        return next(
+            (app for app in self.applications if (app.label or '').lower() == label.lower()),
+            None,
+        )
+
+    def get_application_by_sign_on_mode(self, sign_on_mode: str) -> Application | None:
+        """Retrieves an application by sign-on mode.
+
+        Args:
+            sign_on_mode: The sign-on mode of the application to retrieve
+
+        Returns:
+            Application Object
+
+        """
+        return next(
+            (
+                app
+                for app in self.applications
+                if app.sign_on_mode and sign_on_mode and app.sign_on_mode.lower() == sign_on_mode.lower()
+            ),
+            None,
+        )
+
+    def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
+        """Retrieves an application's SAML metadata by id.
+
+        Args:
+            id_: The id of the application to retrieve
+            kid: The key ID to match the SAML metadata with
+
+        Returns:
+            SAMLMetadata: The application's SAML metadata if found, None otherwise
+
+        """
+        url = f'/apps/{id_}/sso/saml/metadata?kid={kid}'
+        headers = {'Accept': 'text/xml'}
+        response = self.session.get(url, headers=headers)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return SAMLMetadata(response.text)
+
+    def get_expired_app_certificates(self) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
+        """Retrieves the app signing certificates that have already expired.
+
+        Returns:
+            generator: A generator of (Application, AppSigningCertificate)
+                tuples for every expired certificate
+
+        """
+        yield from self.get_expiring_app_certificates(days=0)
+
+    def get_expiring_app_certificates(
+        self, days: int = 30
+    ) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
+        """Retrieves the app signing certificates expiring within a window.
+
+        Only applications whose sign-on mode signs assertions are inspected, so
+        the sign-on mode already present in the application listing keeps this
+        to one extra request per signing application rather than one per
+        application. Already expired certificates are included.
+
+        Args:
+            days: The size of the window in days, counted from now
+
+        Returns:
+            generator: A generator of (Application, AppSigningCertificate)
+                tuples for every certificate expiring within the window
+
+        """
+        yield from (
+            (application, certificate)
+            for application in self.applications
+            if application.sign_on_mode in SIGNING_SIGN_ON_MODES
+            for certificate in application.expiring_signing_certificates(days)
+        )
+
+    def remove_group_from_application(self, application_label: str, group_name: str) -> bool:
+        """Removes a group from an application.
+
+        Args:
+            application_label: The label of the application to remove the group from
+            group_name: The name of the group to remove from the application
+
+        Returns:
+            True on success, False otherwise
+
+        """
+        application = self.get_application_by_label(application_label)
+        if not application:
+            raise InvalidApplication(application_label)
+        group = self.get_group_by_name(group_name)
+        if not group:
+            raise InvalidGroup(group_name)
+        return application.remove_group_by_id(group.id)
+
+    @property
+    def directory_integrations_agent_pools(self) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
+        """The Directory Integrations agent pools configured in okta.
+
+        Returns:
+            generator: The generator of agent pools configured in okta
+
+        """
+        url = '/agentPools'
+        for data in self.session.get_paginated_url(url):
+            yield DirectoryIntegrationsAgentPool(self, data)
+
+    def get_directory_integrations_agent_pool_by_id(self, pool_id: str) -> DirectoryIntegrationsAgentPool | None:
+        """Retrieves a Directory Integrations agent pool by id.
+
+        Okta answers 405 for a single pool, so this searches the listing rather than
+        addressing the pool directly. Orgs have few pools, so the listing is cheap.
+
+        Args:
+            pool_id: The id of the agent pool to retrieve
+
+        Returns:
+            DirectoryIntegrationsAgentPool: The pool if a match is found else None
+
+        """
+        return next(
+            (pool for pool in self.directory_integrations_agent_pools if pool.id == pool_id),
+            None,
+        )
+
+    def get_directory_integrations_agent_pool_by_name(self, name: str) -> DirectoryIntegrationsAgentPool | None:
+        """Retrieves a Directory Integrations agent pool by name.
+
+        Args:
+            name: The name of the agent pool to retrieve
+
+        Returns:
+            DirectoryIntegrationsAgentPool: The pool if a match is found else None
+
+        """
+        return next(
+            (pool for pool in self.directory_integrations_agent_pools if (pool.name or '').lower() == name.lower()),
+            None,
+        )
+
+    def get_directory_integrations_agent_pools_by_type(
+        self, pool_type: str
+    ) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
+        """Retrieves the Directory Integrations agent pools of one type.
+
+        Okta applies this filter itself, so it costs no more than listing them all.
+
+        Args:
+            pool_type: The type of pool to retrieve, e.g. AD or LDAP
+
+        Returns:
+            generator: The generator of agent pools of that type
+
+        Raises:
+            ServerError: If Okta rejects the pool type.
+
+        """
+        url = '/agentPools'
+        for data in self.session.get_paginated_url(url, params={'poolType': pool_type}):
+            yield DirectoryIntegrationsAgentPool(self, data)
+
+    @property
     def features(self) -> Generator[Feature, None, None]:
         """The features configured in okta.
 
@@ -200,36 +640,23 @@ class Okta:
             return None
         return Group(self, response.json())
 
-    def get_group_type_by_name(self, name: str, group_type: str = 'OKTA_GROUP') -> Group | None:
-        """Retrieves the group type of okta by name.
+    def delete_group(self, name: str) -> bool:
+        """Deletes a group from okta.
 
         Args:
-            group_type: The type of okta group to retrieve
-            name: The name of the group to retrieve
+            name: The name of the group to delete
 
         Returns:
-            Group: The group if a match is found else None
+            bool: True on success, False otherwise
+
+        Raises:
+            InvalidGroup: The group provided as argument does not exist.
 
         """
-        return next(
-            (group for group in self.search_groups_by_name(name) if group.type == group_type),
-            None,
-        )
-
-    def get_group_by_name(self, name: str) -> Group | None:
-        """Retrieves the first group (of any type) by name.
-
-        Args:
-            name: The name of the group to retrieve
-
-        Returns:
-            Group: The group if a match is found else None
-
-        """
-        return next(
-            (group for group in self.search_groups_by_name(name) if group.name == name),
-            None,
-        )
+        group = self.get_group_by_name(name)
+        if not group:
+            raise InvalidGroup(name)
+        return group.delete()
 
     def get_group_by_id(self, group_id: str) -> Group | None:
         """Retrieves the group (of any type) by id.
@@ -247,6 +674,37 @@ class Okta:
             self._logger.error(response.text)
             return None
         return Group(self, response.json())
+
+    def get_group_by_name(self, name: str) -> Group | None:
+        """Retrieves the first group (of any type) by name.
+
+        Args:
+            name: The name of the group to retrieve
+
+        Returns:
+            Group: The group if a match is found else None
+
+        """
+        return next(
+            (group for group in self.search_groups_by_name(name) if group.name == name),
+            None,
+        )
+
+    def get_group_type_by_name(self, name: str, group_type: str = 'OKTA_GROUP') -> Group | None:
+        """Retrieves the group type of okta by name.
+
+        Args:
+            group_type: The type of okta group to retrieve
+            name: The name of the group to retrieve
+
+        Returns:
+            Group: The group if a match is found else None
+
+        """
+        return next(
+            (group for group in self.search_groups_by_name(name) if group.type == group_type),
+            None,
+        )
 
     def search_groups_by_name(self, name: str) -> list[Group]:
         """Retrieves the groups (of any type) by name.
@@ -283,24 +741,6 @@ class Okta:
             return []
         return [Group(self, data) for data in response.json()]
 
-    def delete_group(self, name: str) -> bool:
-        """Deletes a group from okta.
-
-        Args:
-            name: The name of the group to delete
-
-        Returns:
-            bool: True on success, False otherwise
-
-        Raises:
-            InvalidGroup: The group provided as argument does not exist.
-
-        """
-        group = self.get_group_by_name(name)
-        if not group:
-            raise InvalidGroup(name)
-        return group.delete()
-
     @property
     def users(self) -> Generator[User, None, None]:
         """The users configured in okta.
@@ -312,6 +752,25 @@ class Okta:
         url = '/users'
         for data in self.session.get_paginated_url(url):
             yield User(self, data)
+
+    def assign_role_to_user_by_id(self, user_id: str, role_name: str) -> AdminRole | None:
+        """Assigns an admin role to a user by id.
+
+        Args:
+            user_id: The user ID to match the user with
+            role_name: The name of the role to assign
+
+        Returns:
+            User: The response, None otherwise
+
+        """
+        url = f'/users/{user_id}/roles'
+        data = {'type': role_name}
+        response = self.session.post(url, json=data)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return AdminRole(self, response.json())
 
     def create_user(
         self,
@@ -355,6 +814,23 @@ class Okta:
             return None
         return User(self, response.json())
 
+    def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
+        """Retrieves if any, admin roles assigned to the user by id.
+
+        Args:
+            id: The user ID to match the user with
+
+        Returns:
+            list: A list of the user's roles if found, None otherwise
+
+        """
+        url = f'/users/{user_id}/roles'
+        response = self.session.get(url)
+        if not response.ok:
+            self._logger.error(response.text)
+            return None
+        return [AdminRole(self, data) for data in response.json()]
+
     def get_user_by_login(self, login: str) -> User | None:
         """Retrieves a user by login.
 
@@ -374,6 +850,24 @@ class Okta:
             (User(self, data) for data in response.json() if data.get('profile', {}).get('login', '') == login),
             None,
         )
+
+    def remove_role_from_user_by_id(self, user_id: str, role_id: str) -> bool:
+        """Remove an admin role from a user by id.
+
+        Args:
+            user_id: The user ID to match the user with
+            role_id: The id of the role to remove
+
+        Returns:
+            User: The response, None otherwise
+
+        """
+        url = f'/users/{user_id}/roles/{role_id}'
+        response = self.session.delete(url)
+        if not response.ok:
+            self._logger.error(response.text)
+            return False
+        return True
 
     def search_users(self, value: str) -> list[User]:
         """Retrieves a list of users by looking into name, last name and email.
@@ -448,497 +942,3 @@ class Okta:
         url = '/users'
         for data in self.session.get_paginated_url(url, params={'search': query, 'sortBy': sort_by}):
             yield User(self, data)
-
-    def get_user_assigned_roles_by_id(self, user_id: str) -> list[AdminRole] | None:
-        """Retrieves if any, admin roles assigned to the user by id.
-
-        Args:
-            id: The user ID to match the user with
-
-        Returns:
-            list: A list of the user's roles if found, None otherwise
-
-        """
-        url = f'/users/{user_id}/roles'
-        response = self.session.get(url)
-        if not response.ok:
-            self._logger.error(response.text)
-            return None
-        return [AdminRole(self, data) for data in response.json()]
-
-    def assign_role_to_user_by_id(self, user_id: str, role_name: str) -> AdminRole | None:
-        """Assigns an admin role to a user by id.
-
-        Args:
-            user_id: The user ID to match the user with
-            role_name: The name of the role to assign
-
-        Returns:
-            User: The response, None otherwise
-
-        """
-        url = f'/users/{user_id}/roles'
-        data = {'type': role_name}
-        response = self.session.post(url, json=data)
-        if not response.ok:
-            self._logger.error(response.text)
-            return None
-        return AdminRole(self, response.json())
-
-    def remove_role_from_user_by_id(self, user_id: str, role_id: str) -> bool:
-        """Remove an admin role from a user by id.
-
-        Args:
-            user_id: The user ID to match the user with
-            role_id: The id of the role to remove
-
-        Returns:
-            User: The response, None otherwise
-
-        """
-        url = f'/users/{user_id}/roles/{role_id}'
-        response = self.session.delete(url)
-        if not response.ok:
-            self._logger.error(response.text)
-            return False
-        return True
-
-    def _get_api_services_app_payload(
-        self,
-        label: str,
-        dpop_bound_access_tokens: bool,
-        consent_method: str,
-    ) -> dict[str, Any]:
-        """Gets the payload for creating an API Services application.
-
-        Args:
-            label: The application label/name
-            dpop_bound_access_tokens: Enable DPoP bound access tokens
-            consent_method: Consent method
-
-        Returns:
-            dict: The payload for creating an API Services application
-
-        """
-        credentials = {'oauthClient': {'token_endpoint_auth_method': 'client_secret_basic'}}
-
-        oauth_client: dict[str, Any] = {
-            'application_type': 'service',
-            'consent_method': consent_method,
-            'grant_types': ['client_credentials'],
-            'response_types': ['token'],
-            'dpop_bound_access_tokens': dpop_bound_access_tokens,
-        }
-
-        return {
-            'credentials': credentials,
-            'label': label,
-            'name': 'oidc_client',
-            'signOnMode': 'OPENID_CONNECT',
-            'settings': {'oauthClient': oauth_client},
-        }
-
-    def _create_application_api_services(self, data: dict[str, Any]) -> APIServiceApp | None:
-        """Creates an API Services application in okta from the provided data.
-
-        Args:
-            data: The application data to create the application from
-        Returns:
-            Application: The created application
-        """
-        url = '/apps'
-        response = self.session.post(url, json=data)
-
-        if not response.ok:
-            self._logger.error(response.text)
-            return None
-        app = self._create_application_from_data(response.json())
-        return app if isinstance(app, APIServiceApp) else None
-
-    def create_api_services_app_with_client_secret(
-        self,
-        label: str,
-        dpop_bound_access_tokens: bool = True,
-        consent_method: str = 'REQUIRED',
-    ) -> APIServiceApp | None:
-        """Create an API Service application with client_secret authentication.
-
-        Args:
-            label: The application label/name
-            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
-            consent_method: Consent method (default: 'REQUIRED')
-
-        Returns:
-            APIServiceApp | None: The created application on success, None otherwise
-        """
-        payload = self._get_api_services_app_payload(
-            label=label,
-            dpop_bound_access_tokens=dpop_bound_access_tokens,
-            consent_method=consent_method,
-        )
-        return self._create_application_api_services(payload)
-
-    def create_api_services_app_with_jwks_uri(
-        self,
-        label: str,
-        jwks_uri: str,
-        dpop_bound_access_tokens: bool = True,
-        consent_method: str = 'REQUIRED',
-    ) -> APIServiceApp | None:
-        """Create an API Service application with private_key_jwt auth using JWKS URI.
-
-        This method creates an application that uses private_key_jwt authentication
-        by fetching public keys from the provided JWKS URI.
-
-        Args:
-            label: The application label/name
-            jwks_uri: URL to JSON Web Key Set (public keys endpoint)
-            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
-            consent_method: Consent method (default: 'REQUIRED')
-
-        Returns:
-            APIServiceApp | None: The created application on success, None otherwise
-
-        Note:
-            The application is first created, then the JWKS URI is configured,
-            and finally private_key_jwt authentication is enabled.
-        """
-        payload = self._get_api_services_app_payload(
-            label=label,
-            dpop_bound_access_tokens=dpop_bound_access_tokens,
-            consent_method=consent_method,
-        )
-        app = self._create_application_api_services(payload)
-        if not isinstance(app, APIServiceApp):
-            return None
-
-        try:
-            app.add_public_keys_by_public_url(jwks_uri=jwks_uri)
-            app._enable_public_private_key_authentication()
-            return app
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # Catch all exceptions to ensure cleanup of broken apps
-            self._logger.error(f'Failed to configure app {label}: {e}')
-            self._cleanup_broken_app(app, label)
-            return None
-
-    def create_api_services_app_with_jwks(
-        self,
-        label: str,
-        jwks: dict[str, Any],
-        dpop_bound_access_tokens: bool = True,
-        consent_method: str = 'REQUIRED',
-    ) -> APIServiceApp | None:
-        """Create an API Service application with private_key_jwt auth using inline JWKS.
-
-        This method creates an application that uses private_key_jwt authentication
-        with an inline JSON Web Key Set.
-
-        Args:
-            label: The application label/name
-            jwks: JSON Web Key Set dictionary containing the public key
-            dpop_bound_access_tokens: Enable DPoP bound access tokens (default: True)
-            consent_method: Consent method (default: 'REQUIRED')
-
-        Returns:
-            APIServiceApp | None: The created application on success, None otherwise
-
-        Note:
-            The application is first created, then the JWKS is configured,
-            and finally private_key_jwt authentication is enabled.
-        """
-        payload = self._get_api_services_app_payload(
-            label=label,
-            dpop_bound_access_tokens=dpop_bound_access_tokens,
-            consent_method=consent_method,
-        )
-        app = self._create_application_api_services(payload)
-        if not isinstance(app, APIServiceApp):
-            return None
-
-        try:
-            app.add_public_keys_by_jwks(jwks=jwks)
-            app._enable_public_private_key_authentication()
-            return app
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            # Catch all exceptions to ensure cleanup of broken apps
-            self._logger.error(f'Failed to configure app {label}: {e}')
-            self._cleanup_broken_app(app, label)
-            return None
-
-    def _cleanup_broken_app(self, app: APIServiceApp, label: str) -> None:
-        """Clean up a broken application by deactivating and deleting it.
-
-        Args:
-            app: The application to clean up
-            label: The label of the application (for logging)
-        """
-        try:
-            app.deactivate()
-            app.delete()
-        except Exception as cleanup_error:  # pylint: disable=broad-exception-caught
-            # Catch all exceptions in cleanup to avoid raising during error handling
-            self._logger.error(f'Failed to clean up broken app {label}: {cleanup_error}')
-
-    def _create_application_from_data(self, data: dict[str, Any]) -> Application:
-        """Create an Application instance based on the application type.
-
-        Uses pattern matching to determine the application type from sign-on mode
-        and returns the appropriate Application subclass.
-
-        Args:
-            data: The application data from the Okta API
-
-        Returns:
-            Application: An Application or subclass instance (e.g., SAMLApplication, APIServiceApp)
-
-        """
-        sign_on_mode = (data.get('signOnMode') or '').upper()
-
-        try:
-            app_type = ApplicationType(sign_on_mode)
-        except ValueError:
-            app_type = ApplicationType.UNKNOWN
-
-        match app_type:
-            case ApplicationType.SAML_2_0:
-                return SAMLApplication(self, data)
-            case ApplicationType.OPENID_CONNECT:
-                # Check if this is an API Services application
-                application_type = data.get('settings', {}).get('oauthClient', {}).get('application_type')
-                if application_type == 'service':
-                    return APIServiceApp(self, data)
-                return Application(self, data)
-            case (
-                ApplicationType.WS_FEDERATION
-                | ApplicationType.SECURE_PASSWORD_STORE
-                | ApplicationType.AUTO_LOGIN
-                | ApplicationType.BROWSER_PLUGIN
-                | ApplicationType.BASIC_AUTH
-                | ApplicationType.BOOKMARK
-                | ApplicationType.UNKNOWN
-                | _
-            ):
-                return Application(self, data)
-
-    @property
-    def applications(self) -> Generator[Application, None, None]:
-        """The applications configured in okta.
-
-        Returns:
-            generator: The generator of applications configured in okta.
-                       Returns Application subclasses based on sign-on mode
-                       (e.g., SAMLApplication for SAML apps, APIServiceApp for API Services apps).
-
-        """
-        url = '/apps'
-        for data in self.session.get_paginated_url(url):
-            yield self._create_application_from_data(data)
-
-    def get_application_by_id(self, id_: str) -> Application | None:
-        """Retrieves an application by id.
-
-        Args:
-            id_: The id of the application to retrieve
-
-        Returns:
-            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
-
-        """
-        url = f'/apps/{id_}'
-        response = self.session.get(url)
-        if not response.ok:
-            return None
-        return self._create_application_from_data(response.json())
-
-    def get_application_by_label(self, label: str) -> Application | None:
-        """Retrieves an application by label.
-
-        Args:
-            label: The label of the application to retrieve
-
-        Returns:
-            Application Object or subclass (e.g., SAMLApplication, APIServiceApp)
-
-        """
-        return next(
-            (app for app in self.applications if (app.label or '').lower() == label.lower()),
-            None,
-        )
-
-    def get_application_by_sign_on_mode(self, sign_on_mode: str) -> Application | None:
-        """Retrieves an application by sign-on mode.
-
-        Args:
-            sign_on_mode: The sign-on mode of the application to retrieve
-
-        Returns:
-            Application Object
-
-        """
-        return next(
-            (
-                app
-                for app in self.applications
-                if app.sign_on_mode and sign_on_mode and app.sign_on_mode.lower() == sign_on_mode.lower()
-            ),
-            None,
-        )
-
-    def get_expiring_app_certificates(
-        self, days: int = 30
-    ) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
-        """Retrieves the app signing certificates expiring within a window.
-
-        Only applications whose sign-on mode signs assertions are inspected, so
-        the sign-on mode already present in the application listing keeps this
-        to one extra request per signing application rather than one per
-        application. Already expired certificates are included.
-
-        Args:
-            days: The size of the window in days, counted from now
-
-        Returns:
-            generator: A generator of (Application, AppSigningCertificate)
-                tuples for every certificate expiring within the window
-
-        """
-        yield from (
-            (application, certificate)
-            for application in self.applications
-            if application.sign_on_mode in SIGNING_SIGN_ON_MODES
-            for certificate in application.expiring_signing_certificates(days)
-        )
-
-    def get_expired_app_certificates(self) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
-        """Retrieves the app signing certificates that have already expired.
-
-        Returns:
-            generator: A generator of (Application, AppSigningCertificate)
-                tuples for every expired certificate
-
-        """
-        yield from self.get_expiring_app_certificates(days=0)
-
-    @property
-    def directory_integrations_agent_pools(self) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
-        """The Directory Integrations agent pools configured in okta.
-
-        Returns:
-            generator: The generator of agent pools configured in okta
-
-        """
-        url = '/agentPools'
-        for data in self.session.get_paginated_url(url):
-            yield DirectoryIntegrationsAgentPool(self, data)
-
-    def get_directory_integrations_agent_pools_by_type(
-        self, pool_type: str
-    ) -> Generator[DirectoryIntegrationsAgentPool, None, None]:
-        """Retrieves the Directory Integrations agent pools of one type.
-
-        Okta applies this filter itself, so it costs no more than listing them all.
-
-        Args:
-            pool_type: The type of pool to retrieve, e.g. AD or LDAP
-
-        Returns:
-            generator: The generator of agent pools of that type
-
-        Raises:
-            ServerError: If Okta rejects the pool type.
-
-        """
-        url = '/agentPools'
-        for data in self.session.get_paginated_url(url, params={'poolType': pool_type}):
-            yield DirectoryIntegrationsAgentPool(self, data)
-
-    def get_directory_integrations_agent_pool_by_id(self, pool_id: str) -> DirectoryIntegrationsAgentPool | None:
-        """Retrieves a Directory Integrations agent pool by id.
-
-        Okta answers 405 for a single pool, so this searches the listing rather than
-        addressing the pool directly. Orgs have few pools, so the listing is cheap.
-
-        Args:
-            pool_id: The id of the agent pool to retrieve
-
-        Returns:
-            DirectoryIntegrationsAgentPool: The pool if a match is found else None
-
-        """
-        return next(
-            (pool for pool in self.directory_integrations_agent_pools if pool.id == pool_id),
-            None,
-        )
-
-    def get_directory_integrations_agent_pool_by_name(self, name: str) -> DirectoryIntegrationsAgentPool | None:
-        """Retrieves a Directory Integrations agent pool by name.
-
-        Args:
-            name: The name of the agent pool to retrieve
-
-        Returns:
-            DirectoryIntegrationsAgentPool: The pool if a match is found else None
-
-        """
-        return next(
-            (pool for pool in self.directory_integrations_agent_pools if (pool.name or '').lower() == name.lower()),
-            None,
-        )
-
-    def get_application_metadata(self, id_: str, kid: str) -> SAMLMetadata | None:
-        """Retrieves an application's SAML metadata by id.
-
-        Args:
-            id_: The id of the application to retrieve
-            kid: The key ID to match the SAML metadata with
-
-        Returns:
-            SAMLMetadata: The application's SAML metadata if found, None otherwise
-
-        """
-        url = f'/apps/{id_}/sso/saml/metadata?kid={kid}'
-        headers = {'Accept': 'text/xml'}
-        response = self.session.get(url, headers=headers)
-        if not response.ok:
-            self._logger.error(response.text)
-            return None
-        return SAMLMetadata(response.text)
-
-    def assign_group_to_application(self, application_label: str, group_name: str) -> bool:
-        """Assigns a group to an application.
-
-        Args:
-            application_label: The label of the application to assign the group to
-            group_name: The group name to assign to the application
-
-        Returns:
-            True on success, False otherwise
-
-        """
-        application = self.get_application_by_label(application_label)
-        if not application:
-            raise InvalidApplication(application_label)
-        group = self.get_group_by_name(group_name)
-        if not group:
-            raise InvalidGroup(group_name)
-        return application.add_group_by_id(group.id)
-
-    def remove_group_from_application(self, application_label: str, group_name: str) -> bool:
-        """Removes a group from an application.
-
-        Args:
-            application_label: The label of the application to remove the group from
-            group_name: The name of the group to remove from the application
-
-        Returns:
-            True on success, False otherwise
-
-        """
-        application = self.get_application_by_label(application_label)
-        if not application:
-            raise InvalidApplication(application_label)
-        group = self.get_group_by_name(group_name)
-        if not group:
-            raise InvalidGroup(group_name)
-        return application.remove_group_by_id(group.id)
