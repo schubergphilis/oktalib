@@ -12,6 +12,36 @@ Main client for interacting with the Okta API.
       members: true
       heading_level: 3
 
+## Credentials
+
+What the client authenticates with. Either kind is passed to `Okta` the same way.
+
+### ApiTokenCredentials
+
+::: oktalib.oktacredentials.ApiTokenCredentials
+    options:
+      show_source: false
+      members: true
+      heading_level: 4
+
+### ServiceAppCredentials
+
+::: oktalib.oktacredentials.ServiceAppCredentials
+    options:
+      show_source: false
+      members: true
+      heading_level: 4
+
+### OktaCredentials
+
+The interface both implement, for anyone adding a third.
+
+::: oktalib.oktacredentials.OktaCredentials
+    options:
+      show_source: false
+      members: true
+      heading_level: 4
+
 ## Entities
 
 ### Group

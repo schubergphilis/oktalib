@@ -8,6 +8,7 @@ oktalib provides a simple, object-oriented interface to Okta's REST API. It hand
 
 ## Key Features
 
+- **Two Ways to Authenticate**: An API token, or an API Services app signing with a private key and holding DPoP-bound tokens
 - **Automatic Rate Limiting**: Built-in exponential backoff when API limits are reached
 - **Pagination Support**: Automatically handles paginated responses
 - **Entity Objects**: Work with Groups, Users, Applications, and Admin Roles as Python objects
@@ -17,10 +18,11 @@ oktalib provides a simple, object-oriented interface to Okta's REST API. It hand
 ## Quick Example
 
 ```python
-from oktalib import Okta
+from oktalib import ApiTokenCredentials, Okta
 
-# Initialize the client
-okta = Okta(host='https://your-domain.okta.com', token='your-api-token')
+# Initialize the client. A service app authenticating with a private key goes in the
+# same place, as ServiceAppCredentials -- see the usage guide.
+okta = Okta(host='https://your-domain.okta.com', credentials=ApiTokenCredentials('your-api-token'))
 
 # Get a user
 user = okta.get_user_by_login('user@example.com')
