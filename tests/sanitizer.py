@@ -21,10 +21,10 @@ Two rules for anyone writing a recorded test:
 """
 
 import base64
-import contextlib
 import gzip
 import hashlib
 import json
+import re
 from typing import Any
 
 # Profile keys kept verbatim. ``Group`` refuses to build without ``profile.name``,
@@ -59,8 +59,19 @@ SECRET_KEYS = frozenset(
         'password',
         'privateKey',
         'private_key',
+        # A minted token is usable for an hour by whoever holds it, and the token
+        # endpoint answers with it in plain json.
+        'access_token',
+        'refresh_token',
+        'id_token',
     }
 )
+
+# Parameters of an x-www-form-urlencoded body that must not be recorded. The token
+# endpoint is the only form-encoded request the library makes, and its ``client_assertion``
+# is a signed credential that Okta accepts until it expires.
+FORM_SECRET_PARAMS = frozenset({'client_assertion', 'client_secret', 'assertion', 'code', 'refresh_token'})
+FORM_SECRET_PATTERN = re.compile(rf'(^|&)({"|".join(sorted(FORM_SECRET_PARAMS))})=[^&]*')
 
 # Keys holding free-form operator-facing text, redacted wherever they appear. A
 # provisioning task's ``errorString`` names the affected person outright ("Automatic
@@ -215,11 +226,30 @@ def host_aliases(host: str) -> list[str]:
     return sorted({host, f'{subdomain}-admin.{domain}'}, key=len, reverse=True)
 
 
-def redact_text(text: str, host: str) -> str:
-    """Redact a decoded body, whether or not it is JSON.
+def redact_form(text: str) -> str:
+    """Replace the secret parameters of a form-encoded body, leaving the rest verbatim.
 
-    Non-JSON bodies (the SAML metadata endpoint returns XML) are left structurally
-    alone and only have the host replaced.
+    Deliberately a substitution rather than a parse and re-encode. Anything with an
+    equals sign in it parses as a form of sorts, the XML from the SAML metadata
+    endpoint included, and re-encoding that would escape a body that was never a form
+    in the first place. Matching the parameter names instead touches nothing else.
+
+    Args:
+        text: The decoded body
+
+    Returns:
+        str: The body with any secret parameter replaced
+
+    """
+    return FORM_SECRET_PATTERN.sub(lambda match: f'{match.group(1)}{match.group(2)}={REDACTED}', text)
+
+
+def redact_text(text: str, host: str) -> str:
+    """Redact a decoded body, whatever it is encoded as.
+
+    JSON is redacted by key. A form-encoded body, which is what the token endpoint is
+    asked with, is redacted by parameter. Anything else (the SAML metadata endpoint
+    returns XML) is left structurally alone and only has the host replaced.
 
     Args:
         text: The decoded body
@@ -231,8 +261,10 @@ def redact_text(text: str, host: str) -> str:
 
     """
     redacted = text
-    with contextlib.suppress(ValueError):
+    try:
         redacted = json.dumps(sanitize_payload(json.loads(redacted)))
+    except ValueError:
+        redacted = redact_form(redacted)
     for name in host_aliases(host):
         redacted = redacted.replace(name, PSEUDONYM_DOMAIN)
     return redacted

@@ -27,6 +27,9 @@ REQUEST_HEADERS_TO_REMOVE = [
     'Accept',
     'Accept-Encoding',
     'Cookie',
+    # A DPoP proof embeds the client's public key and hashes the token it was signed
+    # for, so it identifies both the key and the token even once they have expired.
+    'DPoP',
 ]
 RESPONSE_HEADERS_TO_REMOVE = [
     'Date',
@@ -46,6 +49,11 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'X-Rate-Limit-Remaining',
     'X-Rate-Limit-Reset',
     'Content-Length',
+    # Okta hands out a DPoP nonce that stays usable for three days, in a header of its
+    # own when the token endpoint asks for one and inside WWW-Authenticate when a
+    # resource server does.
+    'DPoP-Nonce',
+    'WWW-Authenticate',
 ]
 
 # Paths of cassettes that received a new recording this session (populated by the
