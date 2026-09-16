@@ -14,6 +14,7 @@ from requests import PreparedRequest, Response
 from requests.auth import AuthBase
 from requests.exceptions import ReadTimeout
 
+from oktalib.oktacredentials import ApiTokenCredentials
 from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
 from oktalib.oktasession import (
     DEFAULT_TIMEOUT,
@@ -380,7 +381,7 @@ def okta_session(responder):
 
     def install(status_codes=(200,)):
         attempts = responder(status_codes)
-        return OktaSession('https://example.okta.com', 'a-token'), attempts
+        return OktaSession('https://example.okta.com', ApiTokenCredentials('a-token')), attempts
 
     return install
 
@@ -417,10 +418,16 @@ def test_the_api_root_is_spelled_out_for_the_callers_that_need_it(okta_session):
 
 
 def test_the_token_is_sent_on_every_request(okta_session):
-    """Authentication is installed once on the session, not per call."""
-    session, _ = okta_session()
+    """The credentials are applied as each request is prepared rather than pinned once.
 
-    assert session.headers['authorization'] == 'SSWS a-token'
+    An api token would work either way, but installing it the same way as a credential
+    that has to sign per request is what keeps one code path for both.
+    """
+    session, attempts = okta_session()
+    session.get('/users')
+
+    assert attempts[-1].headers['authorization'] == 'SSWS a-token'
+    assert 'authorization' not in session.headers
 
 
 def test_a_rejected_token_fails_at_construction(responder):
@@ -428,4 +435,4 @@ def test_a_rejected_token_fails_at_construction(responder):
     responder([200, 401])
 
     with pytest.raises(AuthFailed):
-        OktaSession('https://example.okta.com', 'a-bad-token')
+        OktaSession('https://example.okta.com', ApiTokenCredentials('a-bad-token'))

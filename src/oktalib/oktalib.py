@@ -48,6 +48,7 @@ from .entities import (
     SAMLMetadata,
     User,
 )
+from .oktacredentials import OktaCredentials
 from .oktalibexceptions import (
     InvalidApplication,
     InvalidGroup,
@@ -79,17 +80,22 @@ LOGGER.addHandler(logging.NullHandler())
 class Okta:
     """Models the api of okta."""
 
-    def __init__(self, host: str, token: str) -> None:
+    def __init__(self, host: str, credentials: OktaCredentials) -> None:
         """Initializes the Okta object.
 
         Args:
             host: The host of the okta instance, e.g. https://dev.oktapreview.com
-            token: The API token to use for authentication
+            credentials: What to authenticate with, either an
+                :class:`oktalib.oktacredentials.ApiTokenCredentials` or a
+                :class:`oktalib.oktacredentials.ServiceAppCredentials`.
 
         """
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
-        self.session = OktaSession(host, token)
+        # Constructed through the module global on purpose: the test suite substitutes
+        # the class by rebinding this name, so reaching for it any other way sends the
+        # suite to the network, and it fails by passing.
+        self.session = OktaSession(host, credentials)
 
     @property
     def applications(self) -> Generator[Application, None, None]:

@@ -48,6 +48,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.exceptions import InvalidHeader
 from urllib3.util.retry import Retry
 
+from .oktacredentials import OktaCredentials
 from .oktalibexceptions import ApiLimitReached, AuthFailed, ServerError
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
@@ -222,20 +223,20 @@ class OktaSession(RateLimitedSession):
     def __init__(
         self,
         host: str,
-        token: str,
+        credentials: OktaCredentials,
         timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT,
     ) -> None:
         """Initialize and authenticate the session.
 
         Args:
             host: The host of the okta instance, e.g. https://dev.oktapreview.com
-            token: The API token to use for authentication
+            credentials: What to authenticate with, an api token or a service app.
             timeout: The default applied to any request that does not name its own.
 
         """
         super().__init__(timeout=timeout)
         self.host = host
-        self.token = token
+        self._credentials = credentials
         self.authenticate()
 
     @property
@@ -249,23 +250,47 @@ class OktaSession(RateLimitedSession):
         return f'{self.host}/api/v1'
 
     def authenticate(self) -> None:
-        """Install the credentials on the session and confirm the token works.
+        """Install the credentials on the session and confirm they work.
+
+        The credentials go on as ``auth`` rather than a header, so they are applied
+        while each request is prepared. That is what lets a retry re-sign rather than
+        replay, and it is the only reason a DPoP proof can be per request at all.
 
         Raises:
-            AuthFailed: Okta rejected the token.
+            AuthFailed: Okta rejected the credentials.
 
         """
+        # Unauthenticated on purpose, and before the credentials are installed: it only
+        # confirms the host answers, and a service app should not spend a token on it.
         self.get(self.host)
         self.headers.update(
             {
                 'accept': 'application/json',
                 'content-type': 'application/json',
-                'authorization': f'SSWS {self.token}',
             }
         )
-        response = self.get('/users/me/')
+        self._logger.debug(f'Authenticating with {self._credentials}.')
+        self.auth = self._credentials.authenticator(self.host, self._token_session())
+        probe = self._credentials.probe
+        if probe is None:
+            return
+        response = self.get(probe)
         if not response.ok:
             raise AuthFailed(response.content)
+
+    def _token_session(self) -> RateLimitedSession:
+        """A session for credentials that have to call an endpoint to obtain authority.
+
+        Deliberately not this session. This one labels every body as json, which would
+        mislabel a form encoded token request, and it carries the very handler being
+        renewed. It is still rate limited, so the token endpoint gets the same backoff
+        as everything else.
+
+        Returns:
+            RateLimitedSession: A session to mint over.
+
+        """
+        return RateLimitedSession(timeout=self.timeout)
 
     def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:  # type: ignore[override]
         """Resolve an endpoint against the instance and make the request.

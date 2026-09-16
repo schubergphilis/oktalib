@@ -16,7 +16,7 @@ from betamax.serializers import JSONSerializer
 from requests import Response
 
 import oktalib.oktalib
-from oktalib import Okta
+from oktalib import ApiTokenCredentials, Okta
 from oktalib.oktasession import OktaSession
 from tests.sanitizer import sanitize_interaction
 
@@ -226,7 +226,7 @@ def okta_service() -> Okta:
 
         oktalib.oktalib.OktaSession = UnauthenticatedSession
     configure_betamax(token=token, base_url=host)
-    return Okta(host=host, token=token)
+    return Okta(host=host, credentials=ApiTokenCredentials(token))
 
 
 @pytest.fixture(scope='session')

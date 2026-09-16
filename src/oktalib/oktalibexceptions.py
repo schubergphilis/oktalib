@@ -42,7 +42,11 @@ __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 
 class AuthFailed(Exception):
-    """The authentication was not possible. Invalid token maybe."""
+    """Okta would not accept the credentials.
+
+    An invalid api token, or a service app whose key, client id, requested scopes or
+    proof of possession it refused.
+    """
 
 
 class InvalidGroup(Exception):
