@@ -36,12 +36,16 @@ interprets payloads; it never assembles a url or decides how to retry.
 """
 
 import logging
+import random
+import time
 from collections.abc import Generator
+from contextlib import suppress
 from http import HTTPStatus
 from typing import Any
 
 from requests import Response, Session
 from requests.adapters import HTTPAdapter
+from urllib3.exceptions import InvalidHeader
 from urllib3.util.retry import Retry
 
 from .oktalibexceptions import ApiLimitReached, AuthFailed, ServerError
@@ -60,6 +64,7 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 DEFAULT_TIMEOUT = (5, 30)  # (connect, read)
+RATE_LIMIT_STATUS = HTTPStatus.TOO_MANY_REQUESTS
 RETRY_TOTAL = 3
 RETRY_BACKOFF_FACTOR = 1.0
 RETRY_BACKOFF_JITTER = 0.5
@@ -74,8 +79,8 @@ IDEMPOTENT_METHODS = frozenset({'DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT'})
 DEFAULT_PAGE_SIZE = 100
 
 
-class OktaRetry(Retry):
-    """A retry policy that reads a rate limit differently from a server error.
+def should_retry(method: str, status_code: int) -> bool:
+    """Decide whether a response is worth asking for again.
 
     A 429 means Okta rejected the request outright rather than acting on it, so
     replaying it cannot make the same change twice and every verb is safe to retry.
@@ -83,47 +88,62 @@ class OktaRetry(Retry):
     POSTs, and a rate limit is hit during exactly that kind of bulk work.
 
     A 500/502/503/504 is the opposite: it leaves it genuinely unknown whether Okta
-    acted before failing, so those stay restricted to the idempotent verbs through
-    ``allowed_methods``. Since ``allowed_methods`` is consulted for every retryable
-    condition, the rate limit has to be exempted from it here rather than configured.
+    acted before failing, so those stay restricted to the idempotent verbs.
+
+    Args:
+        method: HTTP verb.
+        status_code: The status Okta answered with.
+
+    Returns:
+        bool: True if the request should be sent again.
+
     """
+    if status_code == RATE_LIMIT_STATUS:
+        return True
+    return status_code in SERVER_ERROR_STATUSES and method.upper() in IDEMPOTENT_METHODS
 
-    def is_retry(self, method: str, status_code: int, has_retry_after: bool = False) -> bool:
-        """Decide whether a response is worth sending again.
 
-        Args:
-            method: HTTP verb.
-            status_code: The status Okta answered with.
-            has_retry_after: Whether the response carried a Retry-After header.
+def retry_delay(attempt: int, retry_after: str | None) -> float:
+    """How long to wait before asking again.
 
-        Returns:
-            bool: True if the request should be retried.
+    Okta's own Retry-After wins when it sends one, since it knows when the limit
+    resets. Otherwise this is urllib3's formula, jittered so that a fleet of clients
+    throttled at the same moment does not come back in lockstep.
 
-        """
-        if status_code == HTTPStatus.TOO_MANY_REQUESTS:
-            return True
-        return super().is_retry(method, status_code, has_retry_after)
+    Args:
+        attempt: Which attempt just failed, counting from one.
+        retry_after: The Retry-After header Okta answered with, if any.
+
+    Returns:
+        float: Seconds to wait, never more than RETRY_BACKOFF_MAX.
+
+    """
+    if retry_after:
+        with suppress(InvalidHeader):
+            return min(Retry().parse_retry_after(retry_after), RETRY_BACKOFF_MAX)
+    backoff = RETRY_BACKOFF_FACTOR * 2 ** (attempt - 1) + random.uniform(0, RETRY_BACKOFF_JITTER)
+    return min(backoff, RETRY_BACKOFF_MAX)
 
 
 class RateLimitedSession(Session):
     """A requests session that retries what Okta says is worth retrying.
 
-    The retrying itself happens in urllib3, mounted here as an adapter, so jittered
-    exponential backoff and Retry-After parsing come for free rather than being
-    implemented again. :class:`OktaRetry` decides which statuses are safe on which
-    verbs.
+    The retrying happens in :meth:`request`, above requests' auth layer, rather than
+    in urllib3 below it. urllib3 resends the serialized bytes it was handed, which
+    replays whatever the credentials signed: a DPoP proof would go out twice carrying
+    a jti Okta has already recorded, and an iat aged by the whole backoff. Asking
+    again from here re-enters ``prepare_request``, so every attempt is signed afresh.
+    :func:`should_retry` decides which statuses are safe on which verbs.
 
-    ``raise_on_status`` is off so that an exhausted budget comes back as a response
-    instead of a ``RetryError``. A server error then reaches
-    :meth:`OktaSession.validate_response` and becomes the ``ServerError`` callers
-    already expect, and a rate limit is turned into ``ApiLimitReached`` by
-    :meth:`request`, which keeps both documented exceptions intact.
+    An exhausted budget comes back as a response rather than an exception. A server
+    error then reaches :meth:`OktaSession.validate_response` and becomes the
+    ``ServerError`` callers already expect, and a rate limit is turned into
+    ``ApiLimitReached`` by :meth:`request`, which keeps both documented exceptions
+    intact.
 
     Connection and read failures are deliberately left unretried. Replaying them
     would multiply the read timeout by the retry budget, so a hung endpoint would
-    block for minutes rather than ``DEFAULT_TIMEOUT``, and urllib3 would report the
-    exhaustion as a ``ConnectionError`` on idempotent verbs while the others raise
-    ``ReadTimeout`` for the very same failure.
+    block for minutes rather than ``DEFAULT_TIMEOUT``.
     """
 
     def __init__(
@@ -143,21 +163,10 @@ class RateLimitedSession(Session):
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
         self.timeout = timeout
-        adapter = HTTPAdapter(
-            max_retries=OktaRetry(
-                total=RETRY_TOTAL,
-                connect=False,
-                read=False,
-                other=0,
-                backoff_factor=RETRY_BACKOFF_FACTOR,
-                backoff_jitter=RETRY_BACKOFF_JITTER,
-                backoff_max=RETRY_BACKOFF_MAX,
-                status_forcelist=SERVER_ERROR_STATUSES,
-                allowed_methods=IDEMPOTENT_METHODS,
-                respect_retry_after_header=True,
-                raise_on_status=False,
-            )
-        )
+        # Nothing is retried down here: urllib3 would resend the bytes it was handed,
+        # below the auth layer, replaying a signature the server has already seen.
+        # :meth:`request` asks again instead, so each attempt is signed afresh.
+        adapter = HTTPAdapter(max_retries=0)
         self.mount('https://', adapter)
         self.mount('http://', adapter)
 
@@ -181,8 +190,21 @@ class RateLimitedSession(Session):
 
         """
         kwargs.setdefault('timeout', self.timeout)
-        response = super().request(method, url, *args, **kwargs)
-        if response.status_code == HTTPStatus.TOO_MANY_REQUESTS:
+        attempt = 0
+        while True:
+            response = super().request(method, url, *args, **kwargs)
+            attempt += 1
+            if attempt > RETRY_TOTAL or not should_retry(method, response.status_code):
+                break
+            delay = retry_delay(attempt, response.headers.get('retry-after'))
+            self._logger.debug(
+                f'Okta answered {response.status_code} for {url}, '
+                f'attempt {attempt} of {RETRY_TOTAL + 1}, waiting {delay:.1f}s.'
+            )
+            # Return the connection to the pool before sleeping on it.
+            response.close()
+            time.sleep(delay)
+        if response.status_code == RATE_LIMIT_STATUS:
             self._logger.warning('Api is still exhausted for endpoint after retrying, giving up.')
             raise ApiLimitReached
         return response

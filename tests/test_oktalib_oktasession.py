@@ -3,24 +3,30 @@
 
 import logging
 import time
+from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import NamedTuple
+from typing import Any, NamedTuple
+from uuid import uuid4
 
 import pytest
 from requests import PreparedRequest, Response
+from requests.auth import AuthBase
 from requests.exceptions import ReadTimeout
 
 from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
 from oktalib.oktasession import (
     DEFAULT_TIMEOUT,
-    IDEMPOTENT_METHODS,
     LOGGER_BASENAME,
+    RATE_LIMIT_STATUS,
+    RETRY_BACKOFF_FACTOR,
+    RETRY_BACKOFF_JITTER,
+    RETRY_BACKOFF_MAX,
     RETRY_TOTAL,
-    SERVER_ERROR_STATUSES,
-    OktaRetry,
     OktaSession,
     RateLimitedSession,
+    retry_delay,
+    should_retry,
 )
 
 
@@ -29,6 +35,29 @@ class Attempt(NamedTuple):
 
     url: str
     timeout: float | tuple[float, float] | None
+    headers: dict[str, Any] = {}  # noqa: RUF012
+    body: Any = None
+
+
+class Served(NamedTuple):
+    """One request as the real server saw it."""
+
+    method: str
+    headers: dict[str, str] = {}  # noqa: RUF012
+
+
+class FreshProof(AuthBase):  # pylint: disable=too-few-public-methods
+    """Stand in for a DPoP handler: stamp a proof that is unique per preparation.
+
+    The real handler derives its proof from the request, so a replay that never runs
+    the auth layer again reuses the jti Okta has already seen. A uuid per call makes
+    that reuse visible without needing a key, the dependency or a cassette.
+    """
+
+    def __call__(self, request: PreparedRequest) -> PreparedRequest:
+        """Sign the request as a DPoP handler would."""
+        request.headers['DPoP'] = str(uuid4())
+        return request
 
 
 @pytest.fixture
@@ -41,15 +70,23 @@ def responder(monkeypatch):
     """
     attempts = []
 
-    def install(status_codes):
+    def install(status_codes, headers=None):
         codes = list(status_codes)
 
         def send(_adapter, request: PreparedRequest, **kwargs) -> Response:
-            attempts.append(Attempt(url=request.url, timeout=kwargs.get('timeout')))
+            attempts.append(
+                Attempt(
+                    url=request.url,
+                    timeout=kwargs.get('timeout'),
+                    headers=dict(request.headers),
+                    body=request.body,
+                )
+            )
             response = Response()
             response.status_code = codes[len(attempts) - 1] if len(attempts) <= len(codes) else codes[-1]
             response._content = b'{}'
             response.request = request
+            response.headers.update(headers or {})
             return response
 
         monkeypatch.setattr('requests.adapters.HTTPAdapter.send', send)
@@ -87,7 +124,8 @@ def okta_answering():
 
             def respond(self):
                 """Serve the next scripted status, after the configured delay."""
-                served.append(self.command)
+                headers = {name.lower(): value for name, value in self.headers.items()}
+                served.append(Served(method=self.command, headers=headers))
                 # Drain the body, or keep-alive would parse it as the next request line.
                 self.rfile.read(int(self.headers.get('content-length') or 0))
                 if delay:
@@ -140,7 +178,7 @@ def test_a_rate_limit_is_retried_until_it_succeeds(okta_answering):
     response = RateLimitedSession().get(url)
 
     assert response.status_code == 200
-    assert served == ['GET', 'GET', 'GET']
+    assert [record.method for record in served] == ['GET', 'GET', 'GET']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -155,7 +193,28 @@ def test_a_rate_limit_is_retried_on_a_post_too(okta_answering):
     response = RateLimitedSession().post(url, data='{}')
 
     assert response.status_code == 200
-    assert served == ['POST', 'POST']
+    assert [record.method for record in served] == ['POST', 'POST']
+
+
+@pytest.mark.usefixtures('instant_retries')
+def test_a_retried_request_is_signed_again(okta_answering):
+    """A retry must carry a new proof, not a replay of the one Okta already saw.
+
+    Retrying below the auth layer resends the serialized bytes, so a DPoP proof goes
+    out a second time with a jti the server has already recorded and rejects, and an
+    iat that has aged by however long the backoff lasted. See
+    okta/terraform-provider-okta#2598 for the same failure in the wild. This is the
+    defect that passes every happy-path test and then fails during a bulk run, so the
+    signing has to happen above whatever repeats the request.
+    """
+    url, served = okta_answering([429, 200])
+    session = RateLimitedSession()
+    session.auth = FreshProof()
+    response = session.post(url, data='{}')
+
+    assert response.status_code == 200
+    assert len(served) == 2
+    assert served[0].headers['dpop'] != served[1].headers['dpop']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -191,7 +250,7 @@ def test_a_server_error_on_a_get_is_retried(okta_answering):
     response = RateLimitedSession().get(url)
 
     assert response.status_code == 200
-    assert served == ['GET', 'GET', 'GET']
+    assert [record.method for record in served] == ['GET', 'GET', 'GET']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -201,7 +260,7 @@ def test_a_server_error_on_a_post_is_not_retried(okta_answering):
     response = RateLimitedSession().post(url, data='{}')
 
     assert response.status_code == 503
-    assert served == ['POST']
+    assert [record.method for record in served] == ['POST']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -226,22 +285,61 @@ def test_a_hung_endpoint_is_not_retried(okta_answering):
 
 
 def test_a_rate_limit_is_retryable_on_every_verb():
-    """The policy exempts 429 from allowed_methods; everything else obeys it."""
-    retry = OktaRetry(status_forcelist=SERVER_ERROR_STATUSES, allowed_methods=IDEMPOTENT_METHODS)
-
-    assert retry.is_retry('POST', 429)
-    assert retry.is_retry('GET', 429)
-    assert not retry.is_retry('POST', 503)
-    assert retry.is_retry('GET', 503)
+    """A 429 is safe on any verb; a server error is only safe on the idempotent ones."""
+    assert should_retry('POST', RATE_LIMIT_STATUS)
+    assert should_retry('GET', RATE_LIMIT_STATUS)
+    assert not should_retry('POST', 503)
+    assert should_retry('GET', 503)
 
 
-def test_the_mounted_policy_restricts_server_errors_to_the_safe_verbs():
-    """A dropped connection on a POST leaves it unknown whether Okta acted on it."""
-    retries = RateLimitedSession().get_adapter('https://example.com').max_retries
+def test_a_client_error_is_never_retryable():
+    """A 404 is an answer, and the policy has to say so rather than rely on the caller."""
+    assert not should_retry('GET', 404)
+    assert not should_retry('GET', 200)
 
-    assert 'GET' in retries.allowed_methods
-    assert 'POST' not in retries.allowed_methods
-    assert 'PATCH' not in retries.allowed_methods
+
+def test_okta_is_waited_for_as_long_as_it_asks(responder, monkeypatch):
+    """Okta knows when the limit resets, so its Retry-After beats our own guess."""
+    slept = []
+    monkeypatch.setattr('oktalib.oktasession.time.sleep', slept.append)
+    responder([429, 200], headers={'retry-after': '2'})
+    response = RateLimitedSession().get('https://example.com/api/v1/users')
+
+    assert response.status_code == 200
+    assert slept == [2]
+
+
+def test_a_retry_after_date_is_understood():
+    """Okta may answer with an HTTP date rather than a number of seconds."""
+    in_thirty_seconds = formatdate(time.time() + 30, usegmt=True)
+
+    assert 25 <= retry_delay(1, in_thirty_seconds) <= 30
+
+
+def test_a_long_retry_after_is_capped():
+    """An hour-long wait would hang a caller that asked for a timeout of seconds."""
+    assert retry_delay(1, '3600') == RETRY_BACKOFF_MAX
+
+
+def test_an_unparseable_retry_after_falls_back_to_the_backoff():
+    """A header we cannot read is not a reason to give up on retrying."""
+    assert RETRY_BACKOFF_FACTOR <= retry_delay(1, 'in a little while') <= RETRY_BACKOFF_FACTOR + RETRY_BACKOFF_JITTER
+
+
+def test_the_wait_grows_with_each_attempt():
+    """A limit that survived one wait is unlikely to clear within the same again."""
+    assert retry_delay(3, None) > retry_delay(1, None)
+
+
+def test_no_retrying_happens_inside_urllib3():
+    """Retrying below the auth layer would replay a signature the server has seen.
+
+    urllib3 resends the bytes it was handed, so a DPoP proof or a client assertion
+    would go out again with a jti Okta has already recorded. The repeating therefore
+    belongs in request(), and this asserts the adapter was left with none of it.
+    """
+    for scheme in ('https://', 'http://'):
+        assert RateLimitedSession().get_adapter(f'{scheme}example.com').max_retries.total == 0
 
 
 def test_a_request_that_names_no_timeout_gets_the_default(responder):
