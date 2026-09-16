@@ -41,6 +41,7 @@ escape as an exception, so replacing it stays a change to one method.
 
 """
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -219,8 +220,9 @@ class ServiceAppCredentials(OktaCredentials):
 
         Args:
             client_id: The client id of the API Services app.
-            private_key: The private key whose public half is registered on the app,
-                as a JWK mapping or a PEM.
+            private_key: The private key whose public half is registered on the app, as
+                a JWK mapping, the same as json, or a PEM. A path is deliberately not
+                accepted: the key belongs in a secret manager rather than on disk.
             scopes: The okta.* scopes to ask for. Okta refuses any that are not granted
                 to the app, so there is no sensible default.
             key_id: The id Okta gave the registered public key. Okta selects the key to
@@ -235,29 +237,38 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         self._client_id = client_id
-        self._private_key = private_key
         self._scopes = tuple(scopes)
-        self._key_id = key_id
-        self._algorithm = algorithm
         self._dpop = dpop
         self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
+        # Read here rather than when the token is minted: it needs nothing but the key,
+        # so deferring it would only move the complaint away from the line that caused it.
+        self._signing_key = self._key_to_sign_with(private_key, key_id)
+        self._algorithm = algorithm or SIGNATURE_ALGORITHMS.get(str(self._signing_key.kty))
 
-    @property
-    def signing_key(self) -> Jwk:
-        """The private key, as something that can sign an assertion.
+    def _key_to_sign_with(self, private_key: dict[str, Any] | str, key_id: str | None) -> Jwk:
+        """Read the private key, as something that can sign an assertion.
+
+        Args:
+            private_key: The key, as a JWK mapping, JWK json, or a PEM.
+            key_id: The id Okta knows the key by, if it is not in the key already.
+
+        Raises:
+            AuthFailed: The key could not be read, or Okta could not be told which
+                registered key it is.
 
         Returns:
             Jwk: The key, carrying the kid Okta knows it by.
 
-        Raises:
-            AuthFailed: The key could not be read.
-
         """
         try:
-            key = self._private_key
-            jwk = Jwk.from_pem(key) if isinstance(key, str) else to_jwk(key)
-            if self._key_id:
-                jwk = to_jwk(dict(jwk) | {'kid': self._key_id})
+            if not isinstance(private_key, str):
+                jwk = to_jwk(private_key)
+            elif private_key.lstrip().startswith('{'):
+                jwk = to_jwk(json.loads(private_key))
+            else:
+                jwk = Jwk.from_pem(private_key)
+            if key_id:
+                jwk = to_jwk(dict(jwk) | {'kid': key_id})
         except (ValueError, TypeError) as error:
             raise AuthFailed(f'The private key of service app {self._client_id} could not be read: {error}') from error
         if not jwk.get('kid'):
@@ -290,12 +301,12 @@ class ServiceAppCredentials(OktaCredentials):
                 key on every request.
 
         """
-        jwk = self.signing_key
-        algorithm = self._algorithm or SIGNATURE_ALGORITHMS.get(str(jwk.kty))
         try:
             client = OAuth2Client(
                 token_endpoint=f'{host}{TOKEN_ENDPOINT}',
-                auth=PrivateKeyJwt(self._client_id, jwk, alg=algorithm, lifetime=ASSERTION_LIFETIME),
+                auth=PrivateKeyJwt(
+                    self._client_id, self._signing_key, alg=self._algorithm, lifetime=ASSERTION_LIFETIME
+                ),
                 dpop_bound_access_tokens=self._dpop,
                 session=token_session,
             )

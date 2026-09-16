@@ -142,17 +142,24 @@ def test_a_pem_is_accepted_as_well_as_a_jwk(private_key, token_endpoint):
     assert claims_of(assertion_of(requests_made[-1]), 1)['iss'] == '0oa1'
 
 
-def test_a_key_with_no_id_says_where_to_find_one(private_key, token_endpoint):
+def test_a_key_with_no_id_says_where_to_find_one(private_key):
     """A PEM carries no kid, so the failure has to name what is missing and where it is.
 
     The dependency refuses such a key before a request is ever made, reporting only
     that a key id is required, which leaves the caller no way to find out which one.
     """
-    token_endpoint()
-    credentials = ServiceAppCredentials('0oa1', private_key.to_pem(), ['okta.users.read'], dpop=False)
-
     with pytest.raises(AuthFailed, match='key_id'):
-        credentials.authenticator(HOST, RateLimitedSession())
+        ServiceAppCredentials('0oa1', private_key.to_pem(), ['okta.users.read'])
+
+
+def test_a_jwk_is_accepted_as_json_too(private_key, token_endpoint):
+    """A secret manager hands back a string, and a JWK is as likely a shape as a PEM."""
+    requests_made = token_endpoint()
+    ServiceAppCredentials('0oa1', json.dumps(dict(private_key)), ['okta.users.read'], dpop=False).authenticator(
+        HOST, RateLimitedSession()
+    )
+
+    assert claims_of(assertion_of(requests_made[-1]), 0)['kid'] == private_key.kid
 
 
 def test_the_token_is_asked_for_at_the_org_authorization_server(private_key, token_endpoint):
@@ -185,13 +192,10 @@ def test_okta_refusing_to_mint_a_token_fails_at_construction(private_key, token_
         credentials.authenticator(HOST, RateLimitedSession())
 
 
-def test_a_key_that_cannot_be_read_is_reported_as_a_failed_authentication(token_endpoint):
-    """A malformed key is a credential problem, so it surfaces as one."""
-    token_endpoint()
-    credentials = ServiceAppCredentials('0oa1', 'this is not a key', ['okta.users.read'], dpop=False)
-
+def test_a_key_that_cannot_be_read_is_refused_before_anything_is_asked_of_okta():
+    """Reading the key needs nothing but the key, so it fails where the caller wrote it."""
     with pytest.raises(AuthFailed):
-        credentials.authenticator(HOST, RateLimitedSession())
+        ServiceAppCredentials('0oa1', 'this is not a key', ['okta.users.read'], key_id='irrelevant')
 
 
 def test_nothing_from_the_oauth_dependency_escapes_the_credentials(private_key, token_endpoint):
