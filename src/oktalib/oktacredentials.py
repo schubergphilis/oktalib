@@ -225,8 +225,9 @@ class ServiceAppCredentials(OktaCredentials):
                 to the app, so there is no sensible default.
             key_id: The id Okta gave the registered public key. Okta selects the key to
                 verify against by the kid in the assertion, and the id it assigns is
-                not the key's thumbprint, so without this the assertion is rejected as
-                invalid_client. Leave unset only if the key already carries its kid.
+                not the key's thumbprint, so it cannot be worked out from the key.
+                Required unless the key already carries its own kid, which a PEM never
+                does.
             algorithm: The algorithm to sign the assertion with. Derived from the key
                 when unset.
             dpop: Whether to bind the token to a held key, proving possession on every

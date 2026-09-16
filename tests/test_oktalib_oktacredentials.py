@@ -111,7 +111,7 @@ def test_the_key_id_okta_assigned_is_what_the_assertion_carries(private_key, tok
     """Okta finds the key to verify against by kid, and its kid is not the thumbprint.
 
     Signing under the thumbprint jwskate would otherwise compute leaves Okta unable to
-    match the assertion to a registered key, which it reports only as invalid_client.
+    match the assertion to any key it registered.
     """
     requests_made = token_endpoint()
     credentials = ServiceAppCredentials(
@@ -143,10 +143,10 @@ def test_a_pem_is_accepted_as_well_as_a_jwk(private_key, token_endpoint):
 
 
 def test_a_key_with_no_id_says_where_to_find_one(private_key, token_endpoint):
-    """A PEM carries no kid, and Okta reports the consequence only as invalid_client.
+    """A PEM carries no kid, so the failure has to name what is missing and where it is.
 
-    So the failure has to name the missing piece here, rather than leave the caller
-    reading an error about a client that is in fact configured correctly.
+    The dependency refuses such a key before a request is ever made, reporting only
+    that a key id is required, which leaves the caller no way to find out which one.
     """
     token_endpoint()
     credentials = ServiceAppCredentials('0oa1', private_key.to_pem(), ['okta.users.read'], dpop=False)
