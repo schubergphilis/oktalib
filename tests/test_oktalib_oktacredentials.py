@@ -4,6 +4,7 @@
 import ast
 import base64
 import json
+import traceback
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -223,6 +224,26 @@ def test_a_key_that_cannot_be_read_is_refused_before_anything_is_asked_of_okta()
     """Reading the key needs nothing but the key, so it fails where the caller wrote it."""
     with pytest.raises(AuthFailed):
         ServiceAppCredentials('0oa1', 'this is not a key', ['okta.users.read'], key_id='irrelevant')
+
+
+def test_a_key_that_cannot_be_read_is_not_quoted_in_the_failure(private_key):
+    """The reason a key was refused must not be repeated, because it is the key.
+
+    jwskate reports a JWK it will not accept by passing the whole mapping as the
+    exception's argument, so its str() is the key, private parameters included. A
+    message or traceback carrying that hands over enough to mint org tokens, which is
+    the opposite of what an error about a rejected key should cost.
+    """
+    # Structurally a JWK, but cryptography will not build a key from it.
+    unusable = dict(private_key) | {'d': private_key['d'][:-8]}
+
+    with pytest.raises(AuthFailed) as raised:
+        ServiceAppCredentials('0oa1', unusable, ['okta.users.read'])
+
+    rendered = f'{raised.value}{raised.value.__cause__}'.join(
+        traceback.format_exception(type(raised.value), raised.value, raised.value.__traceback__)
+    )
+    assert not [name for name in ('d', 'p', 'q', 'dp', 'dq', 'qi') if unusable[name] in rendered]
 
 
 def test_nothing_from_the_oauth_dependency_escapes_the_credentials(private_key, token_endpoint):

@@ -59,7 +59,6 @@ __maintainer__ = 'Costas Tyfoxylos'
 __email__ = '<ctyfoxylos@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
-# This is the main prefix used for logging
 LOGGER_BASENAME = 'oktasession'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())

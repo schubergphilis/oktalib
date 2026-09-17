@@ -285,7 +285,15 @@ class ServiceAppCredentials(OktaCredentials):
                 # object the caller keeps and uses elsewhere, so the kid goes on a copy.
                 jwk = to_jwk(dict(jwk) | {'kid': key_id})
         except (ValueError, TypeError) as error:
-            raise AuthFailed(f'The private key of service app {self._client_id} could not be read: {error}') from error
+            # Says nothing about why, on purpose. jwskate reports a key it will not accept
+            # by quoting the whole key back, private parameters and all, so neither this
+            # message nor a traceback may reach for it -- hence `from None` as well, since
+            # a cause is rendered with its own str().
+            raise AuthFailed(
+                f'The private key of service app {self._client_id} could not be read '
+                f'({type(error).__name__}). Nothing about the key is reported, since the '
+                f'underlying error quotes the key itself.'
+            ) from None
         if not jwk.get('kid'):
             raise AuthFailed(
                 f'The private key of service app {self._client_id} has no key id. Okta picks the key to verify '

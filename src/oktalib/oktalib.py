@@ -112,7 +112,7 @@ class Okta:
                 'https://your-domain.okta.com',
                 ServiceAppCredentials(
                     client_id='0oa1abc...',
-                    private_key=private_key,  # a JWK, the same as json, or a PEM
+                    private_key=private_key,  # a JWK (json), or a PEM (string)
                     scopes=['okta.users.read', 'okta.groups.manage'],
                     key_id='the-id-okta-assigned',
                 ),
