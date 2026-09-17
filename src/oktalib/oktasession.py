@@ -107,20 +107,28 @@ def retry_delay(attempt: int, retry_after: str | None) -> float:
     """How long to wait before asking again.
 
     Okta's own Retry-After wins when it sends one, since it knows when the limit
-    resets. Otherwise this is urllib3's formula, jittered so that a fleet of clients
-    throttled at the same moment does not come back in lockstep.
+    resets, and it is obeyed as given: capping it would mean coming back early, to be
+    refused again, against a limit that had already said how long it needed. urllib3
+    clamps it to six hours, which is the only bound applied.
+
+    Failing a header, this is urllib3's formula, jittered so that a fleet of clients
+    throttled at the same moment does not come back in lockstep. One deliberate
+    difference: urllib3 did not wait at all before its first retry, where this waits
+    RETRY_BACKOFF_FACTOR, since retrying a rate limit immediately only spends another
+    request on it.
 
     Args:
         attempt: Which attempt just failed, counting from one.
         retry_after: The Retry-After header Okta answered with, if any.
 
     Returns:
-        float: Seconds to wait, never more than RETRY_BACKOFF_MAX.
+        float: Seconds to wait. A computed backoff is capped at RETRY_BACKOFF_MAX; a
+            Retry-After is not.
 
     """
     if retry_after:
         with suppress(InvalidHeader):
-            return min(Retry().parse_retry_after(retry_after), RETRY_BACKOFF_MAX)
+            return Retry().parse_retry_after(retry_after)
     backoff = RETRY_BACKOFF_FACTOR * 2 ** (attempt - 1) + random.uniform(0, RETRY_BACKOFF_JITTER)
     return min(backoff, RETRY_BACKOFF_MAX)
 
@@ -289,9 +297,9 @@ class OktaSession(RateLimitedSession):
         )
         self._logger.debug(f'Authenticating with {self._credentials}.')
         self.auth = self._credentials.authenticator(self.host, self._token_session())
-        self.confirm_credentials()
+        self._confirm_credentials()
 
-    def confirm_credentials(self) -> None:
+    def _confirm_credentials(self) -> None:
         """Ask Okta to answer for the credentials now, if anything can.
 
         Raises:
@@ -303,7 +311,7 @@ class OktaSession(RateLimitedSession):
             return
         response = self.get(probe)
         if not response.ok:
-            raise AuthFailed(response.content)
+            raise AuthFailed(response.text)
 
     def _token_session(self) -> RateLimitedSession:
         """A session for credentials that have to call an endpoint to obtain authority.

@@ -10,11 +10,12 @@ from typing import Any, NamedTuple
 from uuid import uuid4
 
 import pytest
-from requests import PreparedRequest, Response
+from requests import PreparedRequest, Response, Session
 from requests.auth import AuthBase
 from requests.exceptions import ReadTimeout
+from urllib3.util.retry import Retry
 
-from oktalib.oktacredentials import ApiTokenCredentials
+from oktalib.oktacredentials import ApiTokenCredentials, OktaCredentials
 from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
 from oktalib.oktasession import (
     DEFAULT_TIMEOUT,
@@ -317,9 +318,19 @@ def test_a_retry_after_date_is_understood():
     assert 25 <= retry_delay(1, in_thirty_seconds) <= 30
 
 
-def test_a_long_retry_after_is_capped():
-    """An hour-long wait would hang a caller that asked for a timeout of seconds."""
-    assert retry_delay(1, '3600') == RETRY_BACKOFF_MAX
+def test_a_long_retry_after_is_obeyed_rather_than_capped():
+    """Okta said how long it needs, and coming back early only spends another request.
+
+    urllib3 did not cap a server's Retry-After either; it caps the backoff it computes
+    itself. Its own six hour clamp is the only bound left.
+    """
+    assert retry_delay(1, '3600') == 3600
+    assert retry_delay(1, '99999') == Retry.DEFAULT_RETRY_AFTER_MAX
+
+
+def test_a_computed_backoff_is_capped():
+    """Without a header the wait is ours to choose, and it should not grow unbounded."""
+    assert retry_delay(99, None) == RETRY_BACKOFF_MAX
 
 
 def test_an_unparseable_retry_after_falls_back_to_the_backoff():
@@ -428,6 +439,53 @@ def test_the_token_is_sent_on_every_request(okta_session):
 
     assert attempts[-1].headers['authorization'] == 'SSWS a-token'
     assert 'authorization' not in session.headers
+
+
+class NoProofNeeded(OktaCredentials):
+    """A credential that needs nothing from the org and has nothing to prove.
+
+    Records the session it was offered to mint over, which is the only way to see that
+    the session being authenticated is not the one handed to the credential.
+    """
+
+    def __init__(self) -> None:
+        """Initialize, with somewhere to record what it was given."""
+        self.token_session: Session | None = None
+
+    def authenticator(self, host: str, token_session: Session) -> AuthBase:
+        """Record the session offered, and sign nothing."""
+        self.token_session = token_session
+        return FreshProof()
+
+
+def test_a_credential_with_nothing_to_prove_is_not_confirmed_with_a_call(responder):
+    """A service app has no probe, and inventing one would fail a narrow-but-correct client.
+
+    So construction must not reach for an endpoint of its own choosing: the only request
+    is the unauthenticated warm-up.
+    """
+    attempts = responder([200])
+    OktaSession('https://example.okta.com', NoProofNeeded())
+
+    assert len(attempts) == 1
+    assert attempts[0].url.rstrip('/') == 'https://example.okta.com'
+
+
+def test_the_token_is_minted_over_a_session_of_its_own(responder):
+    """Minting over the authenticated session would mislabel the body and re-enter its auth.
+
+    This session sends json and carries the very handler being renewed, so a credential
+    that has to call an endpoint is handed a separate one -- carrying the same timeout,
+    since it talks to the same org.
+    """
+    responder([200])
+    credentials = NoProofNeeded()
+    session = OktaSession('https://example.okta.com', credentials, timeout=17)
+
+    assert credentials.token_session is not session
+    assert isinstance(credentials.token_session, RateLimitedSession)
+    assert credentials.token_session.timeout == 17
+    assert 'content-type' not in credentials.token_session.headers
 
 
 def test_a_rejected_token_fails_at_construction(responder):

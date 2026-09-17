@@ -75,10 +75,9 @@ CURRENT_USER_ENDPOINT = '/users/me/'
 ASSERTION_LIFETIME = 60
 # Renew this long before expiry, so a token cannot lapse between the check and the call.
 EXPIRY_LEEWAY = 20
-SIGNATURE_ALGORITHMS = {'RSA': 'RS256', 'EC': 'ES256'}
 
 
-def read_key(private_key: dict[str, Any] | str) -> Jwk:
+def read_key(private_key: Jwk | dict[str, Any] | str) -> Jwk:
     """Read a private key, however it was handed over.
 
     Args:
@@ -123,6 +122,56 @@ class ApiTokenAuth(AuthBase):  # pylint: disable=too-few-public-methods
         """
         request.headers['authorization'] = f'SSWS {self._token}'
         return request
+
+
+class ServiceAppAuth(AuthBase):  # pylint: disable=too-few-public-methods
+    """Presents a minted token, and renews it when it is about to expire.
+
+    A wrapper over the signer rather than the signer itself, because renewal happens an
+    hour into a run, lazily, while an ordinary call is being prepared. Okta can refuse
+    it by then -- a scope withdrawn, the app deactivated -- and without this the caller
+    would get an exception from a library it never imported, raised from a call site
+    whose documented failures are ``ServerError`` and ``ApiLimitReached``.
+    """
+
+    def __init__(self, authenticator: AuthBase, credentials: 'ServiceAppCredentials') -> None:
+        """Initialize the handler.
+
+        Args:
+            authenticator: The handler that presents and renews the token.
+            credentials: The credentials it was built from, to name in a failure.
+
+        """
+        self._authenticator = authenticator
+        self._credentials = credentials
+
+    @property
+    def token(self) -> Any:
+        """The token currently held, for callers and tests that inspect it.
+
+        Returns:
+            Any: The token, as the signer models it.
+
+        """
+        return self._authenticator.token  # type: ignore[attr-defined]
+
+    def __call__(self, request: PreparedRequest) -> PreparedRequest:
+        """Sign the request, renewing the token first if it has nearly expired.
+
+        Args:
+            request: The request on its way out.
+
+        Raises:
+            AuthFailed: Okta would not renew the token.
+
+        Returns:
+            PreparedRequest: The same request, signed.
+
+        """
+        try:
+            return self._authenticator(request)
+        except (OAuth2Error, RequestException) as error:
+            raise AuthFailed(f'Okta would not renew the token for {self._credentials}: {error}') from error
 
 
 class OktaCredentials(ABC):
@@ -230,7 +279,7 @@ class ServiceAppCredentials(OktaCredentials):
     def __init__(
         self,
         client_id: str,
-        private_key: dict[str, Any] | str,
+        private_key: Jwk | dict[str, Any] | str,
         scopes: str | Sequence[str],
         *,
         key_id: str | None = None,
@@ -266,30 +315,38 @@ class ServiceAppCredentials(OktaCredentials):
         self._scopes = tuple(scopes.split() if isinstance(scopes, str) else scopes)
         self._dpop = dpop
         self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
-        self._signing_key = self._key_to_sign_with(private_key, key_id)
-        self._algorithm = algorithm or SIGNATURE_ALGORITHMS.get(str(self._signing_key.kty))
+        self._signing_key = self._key_to_sign_with(private_key, key_id, algorithm)
 
-    def _key_to_sign_with(self, private_key: dict[str, Any] | str, key_id: str | None) -> Jwk:
+    def _key_to_sign_with(
+        self, private_key: Jwk | dict[str, Any] | str, key_id: str | None, algorithm: str | None
+    ) -> Jwk:
         """Read the private key, as something that can sign an assertion.
 
+        The id and the algorithm are stamped onto the key rather than passed alongside
+        it, because that is the only way either of them wins: the signer reads both off
+        the key first and falls back to its arguments, so a key that carries its own
+        ``alg`` would otherwise quietly outrank the one that was asked for.
+
         Args:
-            private_key: The key, as a JWK mapping, JWK json, or a PEM.
+            private_key: The key, as a Jwk, a JWK mapping, JWK json, or a PEM.
             key_id: The id Okta knows the key by, if it is not in the key already.
+            algorithm: The algorithm to sign with, or None to let the key decide.
 
         Raises:
-            AuthFailed: The key could not be read, or Okta could not be told which
-                registered key it is.
+            AuthFailed: The key could not be read, Okta could not be told which
+                registered key it is, or the key cannot sign with the algorithm asked
+                of it.
 
         Returns:
-            Jwk: The key, carrying the kid Okta knows it by.
+            Jwk: The key, carrying the kid Okta knows it by and the alg to sign with.
 
         """
         try:
             jwk = read_key(private_key)
-            if key_id:
-                # A Jwk does allow jwk['kid'] to be assigned, but private_key may be an
-                # object the caller keeps and uses elsewhere, so the kid goes on a copy.
-                jwk = to_jwk(dict(jwk) | {'kid': key_id})
+            # A Jwk does allow its members to be assigned, but private_key may be an
+            # object the caller keeps and uses elsewhere, so this goes on a copy.
+            stamped = {'kid': key_id or jwk.get('kid'), 'alg': algorithm or self._algorithm_for(jwk)}
+            jwk = to_jwk(dict(jwk) | {name: value for name, value in stamped.items() if value})
         except (ValueError, TypeError) as error:
             # Says nothing about why, on purpose. jwskate reports a key it will not accept
             # by quoting the whole key back, private parameters and all, so neither this
@@ -310,6 +367,26 @@ class ServiceAppCredentials(OktaCredentials):
             )
         return jwk
 
+    @staticmethod
+    def _algorithm_for(jwk: Jwk) -> str | None:
+        """The algorithm a key can sign an assertion with.
+
+        Asked of the key rather than derived from its type, because for an elliptic
+        curve key the algorithm follows the curve: P-256 signs ES256, P-384 only ES384
+        and P-521 only ES512. Mapping every EC key to ES256 leaves a P-384 key unable to
+        authenticate at all, and the complaint arrives from the signer rather than from
+        Okta, which reads as though the org rejected the credentials.
+
+        Args:
+            jwk: The key that will do the signing.
+
+        Returns:
+            str | None: The algorithm to sign with, or None if the key supports none,
+                which the signer reports better than a guess here would.
+
+        """
+        return next(iter(jwk.supported_signing_algorithms()), None)
+
     def authenticator(self, host: str, token_session: Session) -> AuthBase:
         """Build the handler that signs every call with a minted access token.
 
@@ -323,21 +400,28 @@ class ServiceAppCredentials(OktaCredentials):
                 handler being renewed.
 
         Raises:
-            AuthFailed: Okta would not mint a token for these credentials.
+            AuthFailed: The key cannot sign an assertion, or Okta would not mint a
+                token for these credentials.
 
         Returns:
             AuthBase: A handler that presents the token and proves possession of the
                 key on every request.
 
         """
+        # Two exchanges in one method, and they fail for different reasons: building the
+        # client validates the key locally and asks Okta nothing, so attributing that to
+        # Okta sends the caller to the admin console for a problem on their own disk.
         try:
             client = self._token_client(host, token_session)
             authenticator = OAuth2ClientCredentialsAuth(client, scope=' '.join(self._scopes), leeway=EXPIRY_LEEWAY)
+        except ValueError as error:
+            raise AuthFailed(f'The key of {self} cannot sign a client assertion: {error}') from error
+        try:
             authenticator.renew_token()
-        except (OAuth2Error, RequestException, ValueError) as error:
+        except (OAuth2Error, RequestException) as error:
             raise AuthFailed(f'Okta would not mint a token for {self}: {error}') from error
         self._logger.debug(f'Minted an access token for {self}, scopes {" ".join(self._scopes)}.')
-        return authenticator
+        return ServiceAppAuth(authenticator, self)
 
     def _token_client(self, host: str, token_session: Session) -> OAuth2Client:
         """Build the client that exchanges a signed assertion for a token.
@@ -352,7 +436,8 @@ class ServiceAppCredentials(OktaCredentials):
         """
         return OAuth2Client(
             token_endpoint=f'{host}{TOKEN_ENDPOINT}',
-            auth=PrivateKeyJwt(self._client_id, self._signing_key, alg=self._algorithm, lifetime=ASSERTION_LIFETIME),
+            # No alg argument: the key carries it, and the signer reads the key first.
+            auth=PrivateKeyJwt(self._client_id, self._signing_key, lifetime=ASSERTION_LIFETIME),
             dpop_bound_access_tokens=self._dpop,
             session=token_session,
         )
