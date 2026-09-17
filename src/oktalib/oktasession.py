@@ -129,12 +129,13 @@ def retry_delay(attempt: int, retry_after: str | None) -> float:
 class RateLimitedSession(Session):
     """A requests session that retries what Okta says is worth retrying.
 
-    The retrying happens in :meth:`request`, above requests' auth layer, rather than
-    in urllib3 below it. urllib3 resends the serialized bytes it was handed, which
-    replays whatever the credentials signed: a DPoP proof would go out twice carrying
-    a jti Okta has already recorded, and an iat aged by the whole backoff. Asking
-    again from here re-enters ``prepare_request``, so every attempt is signed afresh.
-    :func:`should_retry` decides which statuses are safe on which verbs.
+    The retrying happens in :meth:`request` rather than in urllib3, because urllib3 is
+    below the point where the credentials sign a request. requests signs while preparing
+    one, in ``prepare_request``, and hands urllib3 the finished bytes, so a retry there
+    replays whatever was signed: a DPoP proof would go out twice carrying a jti Okta has
+    already recorded, and an iat aged by the whole backoff. Asking again from here runs
+    ``prepare_request`` again, so every attempt is signed afresh. :func:`should_retry`
+    decides which statuses are safe on which verbs.
 
     An exhausted budget comes back as a response rather than an exception. A server
     error then reaches :meth:`OktaSession.validate_response` and becomes the
@@ -164,9 +165,11 @@ class RateLimitedSession(Session):
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
         self.timeout = timeout
-        # Nothing is retried down here: urllib3 would resend the bytes it was handed,
-        # below the auth layer, replaying a signature the server has already seen.
-        # :meth:`request` asks again instead, so each attempt is signed afresh.
+        # Nothing is retried down here. urllib3 is handed a request that requests has
+        # already passed through ``prepare_request``, which is where ``self.auth`` signs
+        # it, so all urllib3 can do is send those same bytes again -- replaying a
+        # signature the server has already seen. :meth:`request` asks again from above
+        # that instead, and signing happens again on the way through.
         adapter = HTTPAdapter(max_retries=0)
         self.mount('https://', adapter)
         self.mount('http://', adapter)
