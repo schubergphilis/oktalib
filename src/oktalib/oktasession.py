@@ -193,23 +193,41 @@ class RateLimitedSession(Session):
             Response: The response.
 
         """
+        response = self._ask_until_answered(method, url, *args, **kwargs)
+        if response.status_code == RATE_LIMIT_STATUS:
+            self._logger.warning('Api is still exhausted for endpoint after retrying, giving up.')
+            raise ApiLimitReached
+        return response
+
+    def _ask_until_answered(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:
+        """Keep asking while the answer is one :func:`should_retry` calls worth repeating.
+
+        Each attempt goes out through ``Session.request``, so the credentials sign it
+        again rather than the last signature being sent twice.
+
+        Args:
+            method: HTTP verb.
+            url: The url to request.
+            args: Positional arguments passed through to requests.
+            kwargs: Keyword arguments passed through to requests.
+
+        Returns:
+            Response: The last response, retryable or not.
+
+        """
         kwargs.setdefault('timeout', self.timeout)
         attempt = 0
         while True:
             response = super().request(method, url, *args, **kwargs)
             attempt += 1
             if attempt > RETRY_TOTAL or not should_retry(method, response.status_code):
-                break
+                return response
             delay = retry_delay(attempt, response.headers.get('retry-after'))
             self._logger.debug(
                 f'Okta answered {response.status_code} for {url}, '
                 f'attempt {attempt} of {RETRY_TOTAL + 1}, waiting {delay:.1f}s.'
             )
             time.sleep(delay)
-        if response.status_code == RATE_LIMIT_STATUS:
-            self._logger.warning('Api is still exhausted for endpoint after retrying, giving up.')
-            raise ApiLimitReached
-        return response
 
 
 class OktaSession(RateLimitedSession):
@@ -272,6 +290,15 @@ class OktaSession(RateLimitedSession):
         )
         self._logger.debug(f'Authenticating with {self._credentials}.')
         self.auth = self._credentials.authenticator(self.host, self._token_session())
+        self.confirm_credentials()
+
+    def confirm_credentials(self) -> None:
+        """Ask Okta to answer for the credentials now, if anything can.
+
+        Raises:
+            AuthFailed: Okta rejected the credentials.
+
+        """
         probe = self._credentials.probe
         if probe is None:
             return

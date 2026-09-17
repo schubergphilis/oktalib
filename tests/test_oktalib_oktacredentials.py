@@ -30,6 +30,21 @@ def signed(url: str = f'{HOST}/api/v1/users') -> PreparedRequest:
     return Request(method='GET', url=url).prepare()
 
 
+def imported_names(node: ast.AST) -> list[str]:
+    """The modules one node imports, whichever import form it is."""
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom):
+        return [node.module or '']
+    return []
+
+
+def imports_the_dependency(module: Path) -> bool:
+    """Whether a source file reaches for the oauth dependency at all."""
+    nodes = ast.walk(ast.parse(module.read_text(encoding='utf-8')))
+    return any(name.split('.')[0] in OAUTH_DEPENDENCIES for node in nodes for name in imported_names(node))
+
+
 def claims_of(token: str, segment: int) -> dict:
     """Read a segment of a JWT without verifying it, for asserting on what we sent."""
     encoded = token.split('.')[segment]
@@ -218,15 +233,6 @@ def test_the_oauth_dependency_lives_in_one_module_only():
     to credentials through an AuthBase, which is a requests type we already depend on.
     """
     source = Path(__file__).parent.parent / 'src' / 'oktalib'
-    importers = set()
-    for module in source.rglob('*.py'):
-        for node in ast.walk(ast.parse(module.read_text(encoding='utf-8'))):
-            names = []
-            if isinstance(node, ast.Import):
-                names = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom):
-                names = [node.module or '']
-            if any(name.split('.')[0] in OAUTH_DEPENDENCIES for name in names):
-                importers.add(module.name)
+    importers = {module.name for module in source.rglob('*.py') if imports_the_dependency(module)}
 
     assert importers == {'oktacredentials.py'}

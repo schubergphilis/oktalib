@@ -77,6 +77,27 @@ EXPIRY_LEEWAY = 20
 SIGNATURE_ALGORITHMS = {'RSA': 'RS256', 'EC': 'ES256'}
 
 
+def key_from(private_key: dict[str, Any] | str) -> Jwk:
+    """Read a private key, however it was handed over.
+
+    Args:
+        private_key: The key, as a JWK mapping, a Jwk, the same as json, or a PEM.
+
+    Raises:
+        ValueError: The key could not be read.
+        TypeError: The key is not one of the shapes above.
+
+    Returns:
+        Jwk: The key, as something that can sign.
+
+    """
+    # to_jwk reads a mapping, a Jwk and json alike, but tries json on any string, so a
+    # PEM is the one shape that has to be steered past it.
+    if isinstance(private_key, str) and not private_key.lstrip().startswith('{'):
+        return Jwk.from_pem(private_key)
+    return to_jwk(private_key)
+
+
 class ApiTokenAuth(AuthBase):  # pylint: disable=too-few-public-methods
     """Signs every request with an Okta api token."""
 
@@ -258,14 +279,10 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         try:
-            # to_jwk reads a mapping, a Jwk, and json, but tries json on any string, so
-            # a PEM has to be steered past it. Rebuilding with the kid rather than
-            # setting one leaves a Jwk the caller passed as they passed it.
-            if isinstance(private_key, str) and not private_key.lstrip().startswith('{'):
-                jwk = Jwk.from_pem(private_key)
-            else:
-                jwk = to_jwk(private_key)
+            jwk = key_from(private_key)
             if key_id:
+                # Rebuilt rather than set, so a Jwk the caller passed stays as they
+                # passed it.
                 jwk = to_jwk(dict(jwk) | {'kid': key_id})
         except (ValueError, TypeError) as error:
             raise AuthFailed(f'The private key of service app {self._client_id} could not be read: {error}') from error
@@ -300,20 +317,31 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         try:
-            client = OAuth2Client(
-                token_endpoint=f'{host}{TOKEN_ENDPOINT}',
-                auth=PrivateKeyJwt(
-                    self._client_id, self._signing_key, alg=self._algorithm, lifetime=ASSERTION_LIFETIME
-                ),
-                dpop_bound_access_tokens=self._dpop,
-                session=token_session,
-            )
+            client = self._token_client(host, token_session)
             authenticator = OAuth2ClientCredentialsAuth(client, scope=' '.join(self._scopes), leeway=EXPIRY_LEEWAY)
             authenticator.renew_token()
         except (OAuth2Error, RequestException, ValueError) as error:
             raise AuthFailed(f'Okta would not mint a token for {self}: {error}') from error
         self._logger.debug(f'Minted an access token for {self}, scopes {" ".join(self._scopes)}.')
         return authenticator
+
+    def _token_client(self, host: str, token_session: Session) -> OAuth2Client:
+        """Build the client that exchanges a signed assertion for a token.
+
+        Args:
+            host: The org root, which the token endpoint hangs off.
+            token_session: The session to exchange over.
+
+        Returns:
+            OAuth2Client: The client to mint with.
+
+        """
+        return OAuth2Client(
+            token_endpoint=f'{host}{TOKEN_ENDPOINT}',
+            auth=PrivateKeyJwt(self._client_id, self._signing_key, alg=self._algorithm, lifetime=ASSERTION_LIFETIME),
+            dpop_bound_access_tokens=self._dpop,
+            session=token_session,
+        )
 
     def __str__(self) -> str:
         """Describe the credentials without disclosing them.
