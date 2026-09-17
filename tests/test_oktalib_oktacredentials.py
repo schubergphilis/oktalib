@@ -180,6 +180,22 @@ def test_a_key_with_no_id_says_where_to_find_one(private_key):
         ServiceAppCredentials('0oa1', private_key.to_pem(), ['okta.users.read'])
 
 
+def test_scopes_are_accepted_as_one_string_as_well_as_a_sequence(private_key, token_endpoint):
+    """A string is a sequence of strings, so taking one apart asks for it by the letter.
+
+    Okta spells scopes space delimited and that is how they arrive from the environment,
+    so a caller passing the string straight through is the expected mistake. It used to
+    reach Okta as 32 single character scopes, reported back as a request for custom
+    scopes, which names neither the cause nor the caller's error.
+    """
+    requests_made = token_endpoint()
+    ServiceAppCredentials('0oa1', private_key, 'okta.users.read okta.groups.read', dpop=False).authenticator(
+        HOST, RateLimitedSession()
+    )
+
+    assert parse_qs(requests_made[-1].body)['scope'] == ['okta.users.read okta.groups.read']
+
+
 def test_a_jwk_is_accepted_as_json_too(private_key, token_endpoint):
     """A secret manager hands back a string, and a JWK is as likely a shape as a PEM."""
     requests_made = token_endpoint()

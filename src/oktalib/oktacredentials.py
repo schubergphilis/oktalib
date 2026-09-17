@@ -43,6 +43,7 @@ escape as an exception, so replacing it stays a change to one method.
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import Any
 
 from jwskate import Jwk, to_jwk
@@ -230,7 +231,7 @@ class ServiceAppCredentials(OktaCredentials):
         self,
         client_id: str,
         private_key: dict[str, Any] | str,
-        scopes: list[str] | tuple[str, ...],
+        scopes: str | Sequence[str],
         *,
         key_id: str | None = None,
         algorithm: str | None = None,
@@ -243,8 +244,10 @@ class ServiceAppCredentials(OktaCredentials):
             private_key: The private key whose public half is registered on the app, as
                 a JWK mapping, the same as json, or a PEM. A path is deliberately not
                 accepted: the key belongs in a secret manager rather than on disk.
-            scopes: The okta.* scopes to ask for. Okta refuses any that are not granted
-                to the app, so there is no sensible default.
+            scopes: The okta.* scopes to ask for, as a sequence or as one space
+                delimited string, which is how Okta itself spells them and how they
+                arrive from an environment variable. Okta refuses any that are not
+                granted to the app, so there is no sensible default.
             key_id: The id Okta gave the registered public key. Okta selects the key to
                 verify against by the kid in the assertion, and the id it assigns is
                 not the key's thumbprint, so it cannot be worked out from the key.
@@ -257,7 +260,10 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         self._client_id = client_id
-        self._scopes = tuple(scopes)
+        # A string is itself a sequence of strings, so tuple() would take it apart into
+        # letters and ask Okta for each one, which it reports as a request for custom
+        # scopes rather than as the mistake it is.
+        self._scopes = tuple(scopes.split() if isinstance(scopes, str) else scopes)
         self._dpop = dpop
         self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
         self._signing_key = self._key_to_sign_with(private_key, key_id)
