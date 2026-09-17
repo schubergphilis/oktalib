@@ -281,8 +281,8 @@ class ServiceAppCredentials(OktaCredentials):
         try:
             jwk = key_from(private_key)
             if key_id:
-                # Rebuilt rather than set, so a Jwk the caller passed stays as they
-                # passed it.
+                # A Jwk does allow jwk['kid'] to be assigned, but private_key may be an
+                # object the caller keeps and uses elsewhere, so the kid goes on a copy.
                 jwk = to_jwk(dict(jwk) | {'kid': key_id})
         except (ValueError, TypeError) as error:
             raise AuthFailed(f'The private key of service app {self._client_id} could not be read: {error}') from error

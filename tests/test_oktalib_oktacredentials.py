@@ -137,6 +137,18 @@ def test_the_key_id_okta_assigned_is_what_the_assertion_carries(private_key, tok
     assert claims_of(assertion_of(requests_made[-1]), 0)['kid'] == 'the-one-okta-assigned'
 
 
+def test_a_key_the_caller_owns_is_not_relabelled(private_key):
+    """The id Okta assigned goes on a copy of the key, not on the key we were given.
+
+    A Jwk permits its kid to be assigned, so the tempting one-liner would reach back
+    into an object the caller may keep and use for something else.
+    """
+    kid_they_gave_us = private_key.kid
+    ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], key_id='the-one-okta-assigned')
+
+    assert private_key.kid == kid_they_gave_us
+
+
 def test_the_signing_algorithm_follows_the_key(private_key, token_endpoint):
     """An algorithm that can be derived is one more thing that can be set wrong."""
     requests_made = token_endpoint()
