@@ -202,11 +202,6 @@ class RateLimitedSession(Session):
                 f'Okta answered {response.status_code} for {url}, '
                 f'attempt {attempt} of {RETRY_TOTAL + 1}, waiting {delay:.1f}s.'
             )
-            # Only does anything for a streamed response, whose body requests leaves
-            # unread and whose connection therefore stays checked out of the pool.
-            # Nothing here streams, but a caller may, and holding a pooled connection
-            # through the backoff would exhaust the pool rather than fail outright.
-            response.close()
             time.sleep(delay)
         if response.status_code == RATE_LIMIT_STATUS:
             self._logger.warning('Api is still exhausted for endpoint after retrying, giving up.')
