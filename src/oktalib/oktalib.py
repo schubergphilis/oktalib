@@ -89,6 +89,41 @@ class Okta:
                 :class:`oktalib.oktacredentials.ApiTokenCredentials` or a
                 :class:`oktalib.oktacredentials.ServiceAppCredentials`.
 
+        Raises:
+            AuthFailed: Okta rejected the credentials. Raised here rather than on the
+                first call, so a client that exists is one that authenticated.
+
+        Examples:
+            With an api token, the kind an administrator creates under Security → API:
+
+            ```python
+            from oktalib import ApiTokenCredentials, Okta
+
+            okta = Okta('https://your-domain.okta.com', ApiTokenCredentials('your-api-token'))
+            ```
+
+            With an API Services app, which signs an assertion with its private key and
+            holds a token bound to a second key it proves possession of per request:
+
+            ```python
+            from oktalib import Okta, ServiceAppCredentials
+
+            okta = Okta(
+                'https://your-domain.okta.com',
+                ServiceAppCredentials(
+                    client_id='0oa1abc...',
+                    private_key=private_key,  # a JWK, the same as json, or a PEM
+                    scopes=['okta.users.read', 'okta.groups.manage'],
+                    key_id='the-id-okta-assigned',
+                ),
+            )
+            ```
+
+            The scopes have to be granted to the app and an admin role assigned to it,
+            separately, before either will do anything: what the client may do is the
+            intersection. Minting the token proves the scopes, so an ungranted one fails
+            here, while a missing role surfaces as a 403 on the first call.
+
         """
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)

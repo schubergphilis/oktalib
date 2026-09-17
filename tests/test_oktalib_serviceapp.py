@@ -20,6 +20,25 @@ from oktalib.oktasession import RateLimitedSession
 from tests.conftest import configure_betamax, extract_pytest_path, okta_base_url, service_app_credentials
 
 
+class CapturingSession(RateLimitedSession):
+    """Keeps the headers each request actually went out with.
+
+    Betamax replaces a response's request with the recorded one, whose Authorization
+    and DPoP headers the recorder strips on the way into the cassette. Asserting on
+    what was sent therefore has to capture it before the recorder sees it.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize the session with somewhere to keep the headers."""
+        super().__init__(*args, **kwargs)
+        self.sent_headers: list[dict[str, str]] = []
+
+    def send(self, request, **kwargs):
+        """Record the headers, then send as usual."""
+        self.sent_headers.append(dict(request.headers))
+        return super().send(request, **kwargs)
+
+
 @pytest.fixture
 def recorded_service_app(request):
     """A session authenticated as a service app, with its token exchange recorded too.
@@ -40,7 +59,7 @@ def recorded_service_app(request):
         pytest.skip('no service app configured to record with, and nothing recorded to replay')
 
     token_session = RateLimitedSession()
-    api_session = RateLimitedSession()
+    api_session = CapturingSession()
     minting = Betamax(token_session).use_cassette(token_cassette)
     calling = Betamax(api_session).use_cassette(api_cassette)
     minting.start()
@@ -64,7 +83,7 @@ def test_a_service_app_is_granted_a_bound_token_and_may_use_it(recorded_service_
     host, api_session = recorded_service_app
     token = api_session.auth.token
     response = api_session.get(f'{host}/api/v1/users', params={'limit': 1})
-    sent = response.request.headers
+    sent = api_session.sent_headers[-1]
 
     assert token.token_type == 'DPoP'
     assert response.status_code == 200

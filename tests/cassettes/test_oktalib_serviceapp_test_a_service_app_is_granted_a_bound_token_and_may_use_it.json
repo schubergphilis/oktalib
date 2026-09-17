@@ -1,0 +1,68 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-09-17T06:28:35",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {},
+        "method": "GET",
+        "uri": "https://example.com/api/v1/users?limit=1"
+      },
+      "response": {
+        "body": {
+          "base64_string": "H4sIAAAAAAACE31TwXKbMBD9lYzOJQgwxXCqJ/b0kDZJW3JoO53OGsmgRkgaSTghGf69CBvj2p7edldvn95brX6+IUZQdoUwbsJyU+GyFUvZPNx+xtUcvbtCxoJtjEN8yxcfV0tXKzQFS4e2EIexhxMvjPMgyPA8i6JrjPEPB4PCsu0eKBrOD2w3FYjyvD/KgjCLwkM/B2M/yZKJqd+VHhU5uz3N+6txmsVTtwJjnqUmly67ALetoj1mHIe07Tx9fmFqZr7/aaLtF1wlqHO0Wm4Y30GdmjuoXXKIPZLMAL93lDUIKKl2p19Xy8VNvpueYMXT2DXGvSqSBLE7JswoDu2IOEq9NA3SJHWg+8dTVkMLKciqBsancRFqCs2UZVKc4i2zg4t/inw/bdQYqr31OoRZEscf6AvUitPrQtYORftEtpTeNfX63N6G6Wkqh+TIYC3X/QAfKinopHQQvuAMzCmf1CUI9gqXTNC93f/o7Xb7SqiwDLgZ3m1cjVO6/m23jAyW3saFQPe3+WJ4tr2lIe8c7W/OxNOO0VC+GYJKUxegylplMt8/kuKDYv428J1W41/8b13X/foLFTwKmJIDAAA=",
+          "encoding": "utf-8",
+          "string": ""
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Encoding": [
+            "gzip"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "Vary": [
+            "Accept-Encoding"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "expires": [
+            "0"
+          ],
+          "link": [
+            "<https://example.com/api/v1/users?limit=1>; rel=\"self\"",
+            "<https://example.com/api/v1/users?after=000u2gfh0gynDouPKM0h8&limit=1>; rel=\"next\""
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/api/v1/users?limit=1"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

@@ -50,12 +50,13 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'X-Rate-Limit-Remaining',
     'X-Rate-Limit-Reset',
     'Content-Length',
-    # Okta hands out a DPoP nonce that stays usable for three days, in a header of its
-    # own when the token endpoint asks for one and inside WWW-Authenticate when a
-    # resource server does.
-    'DPoP-Nonce',
-    'WWW-Authenticate',
 ]
+# A DPoP nonce cannot be stripped here, though it must not be recorded either. This hook
+# fires while the response is on its way back to the client as well as into the cassette,
+# and the nonce is the one thing the client needs from a use_dpop_nonce rejection --
+# removing it breaks the exchange being recorded, and removing it from the cassette
+# breaks the replay of that exchange. The value is replaced at session end instead, by
+# the sanitizer, which runs over the recorded file rather than the live response.
 
 # Paths of cassettes that received a new recording this session (populated by the
 # before_record hook). Only these are sanitized at session end, so replayed /

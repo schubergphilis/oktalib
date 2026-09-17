@@ -71,6 +71,11 @@ SECRET_KEYS = frozenset(
 # endpoint is the only form-encoded request the library makes, and its ``client_assertion``
 # is a signed credential that Okta accepts until it expires.
 FORM_SECRET_PARAMS = frozenset({'client_assertion', 'client_secret', 'assertion', 'code', 'refresh_token'})
+
+# Headers whose value is replaced rather than the header dropped. A DPoP nonce stays
+# usable for three days, and Okta returns it in a header of its own from the token
+# endpoint and inside WWW-Authenticate from a resource server.
+HEADERS_TO_REDACT = frozenset({'dpop-nonce', 'www-authenticate'})
 FORM_SECRET_PATTERN = re.compile(rf'(^|&)({"|".join(sorted(FORM_SECRET_PARAMS))})=[^&]*')
 
 # Keys holding free-form operator-facing text, redacted wherever they appear. A
@@ -304,8 +309,24 @@ def sanitize_body(body: dict[str, Any], host: str) -> None:
         body['string'] = redacted
 
 
+def redact_headers(headers: dict[str, Any]) -> None:
+    """Replace the value of any header that must not be recorded, in place.
+
+    The value is replaced rather than the header removed, because a replay needs the
+    header to still be there: a client answered with ``use_dpop_nonce`` reads its next
+    nonce out of this, and a cassette missing it could not replay the exchange it was
+    recorded from. What the nonce is does not matter on replay, only that there is one.
+
+    Args:
+        headers: The headers of one side of an interaction
+
+    """
+    for name in [name for name in headers if name.lower() in HEADERS_TO_REDACT]:
+        headers[name] = [REDACTED] if isinstance(headers[name], list) else REDACTED
+
+
 def sanitize_interaction(interaction: dict[str, Any], host: str) -> None:
-    """Redact both bodies of one cassette interaction in place.
+    """Redact both bodies, and the response headers, of one interaction in place.
 
     Args:
         interaction: One entry of a cassette's ``http_interactions``
@@ -316,3 +337,4 @@ def sanitize_interaction(interaction: dict[str, Any], host: str) -> None:
         body = interaction.get(side, {}).get('body')
         if isinstance(body, dict):
             sanitize_body(body, host)
+        redact_headers(interaction.get(side, {}).get('headers') or {})
