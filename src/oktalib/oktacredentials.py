@@ -77,7 +77,7 @@ EXPIRY_LEEWAY = 20
 SIGNATURE_ALGORITHMS = {'RSA': 'RS256', 'EC': 'ES256'}
 
 
-def key_from(private_key: dict[str, Any] | str) -> Jwk:
+def read_key(private_key: dict[str, Any] | str) -> Jwk:
     """Read a private key, however it was handed over.
 
     Args:
@@ -279,7 +279,7 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         try:
-            jwk = key_from(private_key)
+            jwk = read_key(private_key)
             if key_id:
                 # A Jwk does allow jwk['kid'] to be assigned, but private_key may be an
                 # object the caller keeps and uses elsewhere, so the kid goes on a copy.
