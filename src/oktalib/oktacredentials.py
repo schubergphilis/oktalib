@@ -240,10 +240,6 @@ class ServiceAppCredentials(OktaCredentials):
         self._scopes = tuple(scopes)
         self._dpop = dpop
         self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
-        # Read here rather than when the token is minted: private_key and key_id are
-        # between them everything it takes, with no host to know and nothing to ask
-        # Okta, so deferring it would only move the complaint away from the line that
-        # caused it.
         self._signing_key = self._key_to_sign_with(private_key, key_id)
         self._algorithm = algorithm or SIGNATURE_ALGORITHMS.get(str(self._signing_key.kty))
 
