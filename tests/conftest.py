@@ -13,10 +13,11 @@ from _pytest.fixtures import SubRequest
 from betamax import Betamax
 from betamax.cassette import Cassette, Interaction
 from betamax.serializers import JSONSerializer
+from jwskate import Jwk
 from requests import Response
 
 import oktalib.oktalib
-from oktalib import ApiTokenCredentials, Okta
+from oktalib import ApiTokenCredentials, Okta, ServiceAppCredentials
 from oktalib.oktasession import OktaSession
 from tests.sanitizer import sanitize_interaction
 
@@ -212,6 +213,26 @@ def get_cassette(request: SubRequest, recorder: Betamax) -> Callable[[], Abstrac
             return result
 
     return CassetteCtx()
+
+
+def service_app_credentials() -> ServiceAppCredentials:
+    """The service app to record with, or a stand-in that can only replay.
+
+    Betamax matches an interaction on its method and url, so a replayed token exchange
+    never compares the assertion in the request body. A generated key is therefore
+    enough to replay a recording made with the real one, which is what lets these tests
+    run in ci where no key is configured. Recording needs the real thing.
+    """
+    if 'OKTA_CLIENT_ID' not in os.environ:
+        return ServiceAppCredentials(
+            'a-recorded-service-app', Jwk.generate(alg='RS256').with_kid_thumbprint(), ['okta.users.read']
+        )
+    return ServiceAppCredentials(
+        client_id=os.environ['OKTA_CLIENT_ID'],
+        private_key=os.environ['OKTA_PRIVATE_KEY'],
+        scopes=os.environ.get('OKTA_SCOPES', 'okta.users.read').split(),
+        key_id=os.environ.get('OKTA_KEY_ID'),
+    )
 
 
 @pytest.fixture(scope='session')
