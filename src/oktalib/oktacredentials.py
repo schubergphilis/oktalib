@@ -41,7 +41,6 @@ escape as an exception, so replacing it stays a change to one method.
 
 """
 
-import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -259,12 +258,13 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         try:
-            if not isinstance(private_key, str):
-                jwk = to_jwk(private_key)
-            elif private_key.lstrip().startswith('{'):
-                jwk = to_jwk(json.loads(private_key))
-            else:
+            # to_jwk reads a mapping, a Jwk, and json, but tries json on any string, so
+            # a PEM has to be steered past it. Rebuilding with the kid rather than
+            # setting one leaves a Jwk the caller passed as they passed it.
+            if isinstance(private_key, str) and not private_key.lstrip().startswith('{'):
                 jwk = Jwk.from_pem(private_key)
+            else:
+                jwk = to_jwk(private_key)
             if key_id:
                 jwk = to_jwk(dict(jwk) | {'kid': key_id})
         except (ValueError, TypeError) as error:
