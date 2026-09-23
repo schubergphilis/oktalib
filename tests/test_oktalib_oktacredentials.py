@@ -227,7 +227,7 @@ def test_dpop_is_not_proved_when_it_is_declined(private_key, token_endpoint):
     assert 'DPoP' not in requests_made[-1].headers
 
 
-def test_a_refused_renewal_is_reported_as_a_failed_authentication(private_key, token_endpoint):
+def test_a_refused_renewal_is_reported_as_a_failed_authentication(private_key):
     """Renewal happens an hour in, lazily, while an ordinary call is being prepared.
 
     Okta can refuse it by then -- a scope withdrawn, the app deactivated -- and without
