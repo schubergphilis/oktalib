@@ -72,6 +72,21 @@ def test_some_api_call(okta_cassette, okta_service):
 
 For most tests, you'll need both fixtures. The cassette fixture records/replays HTTP traffic, while the service fixture provides the actual client to make API calls.
 
+**Recording against a real org:**
+
+Replaying needs nothing configured — with no credentials the suite runs entirely off the cassettes in `tests/cassettes`, which is how CI runs it. Recording a new one needs a real org, configured through the environment:
+
+| Variable | Needed for | Notes |
+| --- | --- | --- |
+| `OKTA_HOST` | everything | Include the scheme, e.g. `https://your-org.oktapreview.com`. The library does not normalize it. |
+| `OKTA_API_KEY` | recording as an API token | Absent, the suite replaces the session with one that does not authenticate, so recording is skipped rather than failing. |
+| `OKTA_CLIENT_ID` | recording as a service app | The client id of an API Services app. |
+| `OKTA_PRIVATE_KEY` | recording as a service app | A JWK, the same as json, or a PEM. Never commit it. |
+| `OKTA_KEY_ID` | recording as a service app | The id Okta assigned the registered public key. Required with a PEM, which carries none. |
+| `OKTA_SCOPES` | recording as a service app | Space separated. Read-only scopes are enough to record with. |
+
+Recorded interactions are scrubbed on the way out by `tests/sanitizer.py` and the header lists in `tests/conftest.py`: tokens, client assertions, DPoP proofs and nonces are replaced, and personal data in bodies is pseudonymised. Read a new cassette before committing it anyway — the scrubbing is a safety net, not a substitute for looking.
+
 
 ### Running Tests
 

@@ -13,10 +13,11 @@ from _pytest.fixtures import SubRequest
 from betamax import Betamax
 from betamax.cassette import Cassette, Interaction
 from betamax.serializers import JSONSerializer
+from jwskate import Jwk
 from requests import Response
 
 import oktalib.oktalib
-from oktalib import Okta
+from oktalib import ApiTokenCredentials, Okta, ServiceAppCredentials
 from oktalib.oktasession import OktaSession
 from tests.sanitizer import sanitize_interaction
 
@@ -27,6 +28,9 @@ REQUEST_HEADERS_TO_REMOVE = [
     'Accept',
     'Accept-Encoding',
     'Cookie',
+    # A DPoP proof embeds the client's public key and hashes the token it was signed
+    # for, so it identifies both the key and the token even once they have expired.
+    'DPoP',
 ]
 RESPONSE_HEADERS_TO_REMOVE = [
     'Date',
@@ -47,6 +51,12 @@ RESPONSE_HEADERS_TO_REMOVE = [
     'X-Rate-Limit-Reset',
     'Content-Length',
 ]
+# A DPoP nonce cannot be stripped here, though it must not be recorded either. This hook
+# fires while the response is on its way back to the client as well as into the cassette,
+# and the nonce is the one thing the client needs from a use_dpop_nonce rejection --
+# removing it breaks the exchange being recorded, and removing it from the cassette
+# breaks the replay of that exchange. The value is replaced at session end instead, by
+# the sanitizer, which runs over the recorded file rather than the live response.
 
 # Paths of cassettes that received a new recording this session (populated by the
 # before_record hook). Only these are sanitized at session end, so replayed /
@@ -206,6 +216,26 @@ def get_cassette(request: SubRequest, recorder: Betamax) -> Callable[[], Abstrac
     return CassetteCtx()
 
 
+def service_app_credentials() -> ServiceAppCredentials:
+    """The service app to record with, or a stand-in that can only replay.
+
+    Betamax matches an interaction on its method and url, so a replayed token exchange
+    never compares the assertion in the request body. A generated key is therefore
+    enough to replay a recording made with the real one, which is what lets these tests
+    run in ci where no key is configured. Recording needs the real thing.
+    """
+    if 'OKTA_CLIENT_ID' not in os.environ:
+        return ServiceAppCredentials(
+            'a-recorded-service-app', Jwk.generate(alg='RS256').with_kid_thumbprint(), ['okta.users.read']
+        )
+    return ServiceAppCredentials(
+        client_id=os.environ['OKTA_CLIENT_ID'],
+        private_key=os.environ['OKTA_PRIVATE_KEY'],
+        scopes=os.environ.get('OKTA_SCOPES', 'okta.users.read').split(),
+        key_id=os.environ.get('OKTA_KEY_ID'),
+    )
+
+
 @pytest.fixture(scope='session')
 def okta_service() -> Okta:
     """Return a library instance with an authenticated session."""
@@ -226,7 +256,7 @@ def okta_service() -> Okta:
 
         oktalib.oktalib.OktaSession = UnauthenticatedSession
     configure_betamax(token=token, base_url=host)
-    return Okta(host=host, token=token)
+    return Okta(host=host, credentials=ApiTokenCredentials(token))
 
 
 @pytest.fixture(scope='session')

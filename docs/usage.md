@@ -4,18 +4,63 @@ This guide covers common usage patterns for oktalib.
 
 ## Authentication
 
-First, initialize the Okta client with your domain and API token:
+The client takes a host and a credentials object. Okta accepts two kinds, and either is passed the same way.
+
+Credentials are validated when the client is constructed, so `AuthFailed` is raised there rather than on the first call you make.
+
+### API token
+
+The token an administrator creates under Security → API → Tokens.
 
 ```python
-from oktalib import Okta
+from oktalib import ApiTokenCredentials, Okta
 
 okta = Okta(
     host='https://your-domain.okta.com',
-    token='your-api-token'
+    credentials=ApiTokenCredentials('your-api-token'),
 )
 ```
 
-The client will automatically validate your credentials on initialization and raise `AuthFailed` if authentication fails.
+### Service app (OAuth 2.0)
+
+An [API Services app](https://developer.okta.com/docs/guides/implement-oauth-for-okta-serviceapp/main/) authenticates with a private key instead of a token, and its access tokens can be bound to that key with [DPoP](https://developer.okta.com/docs/guides/dpop/oktaresourceserver/main/) so a captured token is useless on its own.
+
+```python
+from oktalib import Okta, ServiceAppCredentials
+
+okta = Okta(
+    host='https://your-domain.okta.com',
+    credentials=ServiceAppCredentials(
+        client_id='0oa1abc...',
+        private_key=private_key,            # a JWK, the same as json, or a PEM
+        scopes=['okta.users.read', 'okta.groups.manage'],
+        key_id='the-id-okta-assigned',
+    ),
+)
+```
+
+A client secret is not an option here: Okta's org authorization server is the only issuer of `okta.*` scopes and it refuses `client_secret` authentication outright, whatever the app is configured with.
+
+Four things are worth knowing before you set one up.
+
+**Scopes and an admin role are two separate gates.** The `okta.*` scopes must be granted to the app under its *Okta API Scopes* tab, which only a super administrator can do, and the app must also have an admin role assigned. What the client may actually do is the intersection of the two. Minting a token proves the scopes, so an ungranted scope fails at construction — but a missing admin role does not, and shows up instead as a `403` on the first real call.
+
+**`key_id` is usually required.** Okta chooses which registered public key to verify an assertion against by the `kid` in it, and the id it assigns is not the key's thumbprint, so it cannot be derived from the key. A PEM carries no `kid` at all, so pass `key_id` unless you are handing over a JWK that already has one. You can read it from the app's public keys in the admin console, or from `settings.oauthClient.jwks.keys[].kid` on the app.
+
+**DPoP is an application setting.** It is on by default here, matching the app that `create_api_services_app_with_jwks` creates. If the app was not configured to require it, pass `dpop=False`.
+
+**Tokens last an hour and renew themselves.** There is no refresh token for this grant; a fresh one is minted when the old is close to expiring.
+
+### Handling a rejected credential
+
+```python
+from oktalib import AuthFailed, Okta, ServiceAppCredentials
+
+try:
+    okta = Okta(host='https://your-domain.okta.com', credentials=ServiceAppCredentials(...))
+except AuthFailed as error:
+    print(f'Okta would not accept these credentials: {error}')
+```
 
 ## Working with Groups
 
@@ -329,11 +374,13 @@ assignment = app.get_user_assignment_by_email('user@example.com')
 ## Error Handling
 
 ```python
-from oktalib import Okta, AuthFailed, InvalidGroup, InvalidUser, ApiLimitReached, ServerError
+from oktalib import ApiTokenCredentials, Okta, AuthFailed, InvalidGroup, InvalidUser, ApiLimitReached, ServerError
 
 try:
-    okta = Okta(host='https://your-domain.okta.com', token='bad-token')
+    okta = Okta(host='https://your-domain.okta.com', credentials=ApiTokenCredentials('bad-token'))
 except AuthFailed as e:
+    # Raised for either kind of credentials: a rejected token, or a service app whose
+    # key, client id or requested scopes Okta would not accept.
     print(f'Authentication failed: {e}')
 
 try:

@@ -48,6 +48,7 @@ from .entities import (
     SAMLMetadata,
     User,
 )
+from .oktacredentials import OktaCredentials
 from .oktalibexceptions import (
     InvalidApplication,
     InvalidGroup,
@@ -79,17 +80,60 @@ LOGGER.addHandler(logging.NullHandler())
 class Okta:
     """Models the api of okta."""
 
-    def __init__(self, host: str, token: str) -> None:
+    def __init__(self, host: str, credentials: OktaCredentials) -> None:
         """Initializes the Okta object.
 
         Args:
             host: The host of the okta instance, e.g. https://dev.oktapreview.com
-            token: The API token to use for authentication
+            credentials: What to authenticate with, either an
+                :class:`oktalib.oktacredentials.ApiTokenCredentials` or a
+                :class:`oktalib.oktacredentials.ServiceAppCredentials`.
+
+        Raises:
+            AuthFailed: Okta rejected the credentials. Raised here rather than on the
+                first call, so a client that exists is one that authenticated.
+
+        Examples:
+            With an api token, the kind an administrator creates under Security → API:
+
+            ```python
+            from oktalib import ApiTokenCredentials, Okta
+
+            okta = Okta('https://your-domain.okta.com', ApiTokenCredentials('your-api-token'))
+            ```
+
+            With an API Services app, which signs an assertion with its private key and
+            holds a token bound to a second key it proves possession of per request:
+
+            ```python
+            from oktalib import Okta, ServiceAppCredentials
+
+            okta = Okta(
+                'https://your-domain.okta.com',
+                ServiceAppCredentials(
+                    client_id='0oa1abc...',
+                    private_key=private_key,  # a JWK (json), or a PEM (string)
+                    scopes=['okta.users.read', 'okta.groups.manage'],
+                    key_id='the-id-okta-assigned',
+                ),
+            )
+            ```
+
+            The scopes have to be granted to the app and an admin role assigned to it,
+            separately, before either will do anything: what the client may do is the
+            intersection. Minting the token proves the scopes, so an ungranted one fails
+            here, while a missing role surfaces as a 403 on the first call.
 
         """
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
-        self.session = OktaSession(host, token)
+        # This name is resolved in this module's globals on every call, which is what
+        # lets tests/conftest.py substitute the class by assigning to
+        # oktalib.oktalib.OktaSession. Reaching for it any other way -- through the
+        # oktasession module, a default argument, an import inside this method -- reads
+        # past that assignment, and a suite that can no longer skip authentication will
+        # authenticate against a real org and still pass.
+        self.session = OktaSession(host, credentials)
 
     @property
     def applications(self) -> Generator[Application, None, None]:
