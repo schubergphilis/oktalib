@@ -164,7 +164,7 @@ class ServiceAppAuth(AuthBase):  # pylint: disable=too-few-public-methods
         try:
             return self._authenticator(request)
         except (OAuth2Error, RequestException) as error:
-            raise AuthFailed(f'Okta would not renew the token for {self._credentials}: {error}') from error
+            raise AuthFailed(f'Okta would not renew the token for {self._credentials.type}: {error}') from error
 
 
 class OktaCredentials(ABC):
@@ -198,11 +198,12 @@ class OktaCredentials(ABC):
         """
         return None
 
-    def __str__(self) -> str:
-        """Describe the credentials without disclosing them.
+    @property
+    def type(self) -> str:
+        """The kind of credentials, without disclosing them.
 
         Returns:
-            str: A description safe to log.
+            str: The class name, safe to log.
 
         """
         return self.__class__.__name__
@@ -399,12 +400,12 @@ class ServiceAppCredentials(OktaCredentials):
             client = self._token_client(host, token_session)
             authenticator = OAuth2ClientCredentialsAuth(client, scope=' '.join(self._scopes), leeway=EXPIRY_LEEWAY)
         except ValueError as error:
-            raise AuthFailed(f'The key of {self} cannot sign a client assertion: {error}') from error
+            raise AuthFailed(f'The key of {self.type} cannot sign a client assertion: {error}') from error
         try:
             authenticator.renew_token()
         except (OAuth2Error, RequestException) as error:
-            raise AuthFailed(f'Okta would not mint a token for {self}: {error}') from error
-        self._logger.debug(f'Minted an access token for {self}, scopes {" ".join(self._scopes)}.')
+            raise AuthFailed(f'Okta would not mint a token for {self.type}: {error}') from error
+        self._logger.debug(f'Minted an access token for {self.type}, scopes {" ".join(self._scopes)}.')
         return ServiceAppAuth(authenticator, self)
 
     def _token_client(self, host: str, token_session: Session) -> OAuth2Client:

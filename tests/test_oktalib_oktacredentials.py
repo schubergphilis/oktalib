@@ -124,8 +124,8 @@ def test_credentials_describe_themselves_without_disclosing_themselves(private_k
     service_app = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'])
 
     assert 'a-secret-token' not in f'{token} {token!r}'
-    assert str(token) == 'ApiTokenCredentials'
-    assert str(service_app) == 'ServiceAppCredentials'
+    assert token.type == str(token) == 'ApiTokenCredentials'
+    assert service_app.type == str(service_app) == 'ServiceAppCredentials'
     assert private_key.to_pem() not in f'{service_app} {service_app!r}'
 
 

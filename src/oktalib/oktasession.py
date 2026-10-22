@@ -294,7 +294,7 @@ class OktaSession(RateLimitedSession):
                 'content-type': 'application/json',
             }
         )
-        self._logger.debug(f'Authenticating with {self._credentials}.')
+        self._logger.debug(f'Authenticating with {self._credentials.type}.')
         self.auth = self._credentials.authenticator(self.host, self._token_session())
         self._confirm_credentials()
 
