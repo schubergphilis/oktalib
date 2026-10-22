@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # File: oktasession.py
 #
-# Copyright 2018 Costas Tyfoxylos
+# Copyright 2026 Yorick Hoorneman
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to
@@ -40,7 +40,6 @@ import random
 import time
 from collections.abc import Generator
 from contextlib import suppress
-from http import HTTPStatus
 from typing import Any
 
 from requests import Response, Session
@@ -48,35 +47,33 @@ from requests.adapters import HTTPAdapter
 from urllib3.exceptions import InvalidHeader
 from urllib3.util.retry import Retry
 
+from .configuration import (
+    DEFAULT_PAGE_SIZE,
+    DEFAULT_TIMEOUT,
+    IDEMPOTENT_METHODS,
+    RATE_LIMIT_STATUS,
+    RETRY_BACKOFF_FACTOR,
+    RETRY_BACKOFF_JITTER,
+    RETRY_BACKOFF_MAX,
+    RETRY_TOTAL,
+    SERVER_ERROR_STATUSES,
+)
 from .oktacredentials import OktaCredentials
 from .oktalibexceptions import ApiLimitReached, AuthFailed, ServerError
 
-__author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
+__author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
 __docformat__ = 'google'
-__copyright__ = 'Copyright 2018, Costas Tyfoxylos'
+__date__ = '2026-09-15'
+__copyright__ = 'Copyright 2026, Yorick Hoorneman'
+__credits__ = ['Yorick Hoorneman']
 __license__ = 'MIT'
-__maintainer__ = 'Costas Tyfoxylos'
-__email__ = '<ctyfoxylos@schubergphilis.com>'
+__maintainer__ = 'Yorick Hoorneman'
+__email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 LOGGER_BASENAME = 'oktasession'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
-
-DEFAULT_TIMEOUT = (5, 30)  # (connect, read)
-RATE_LIMIT_STATUS = HTTPStatus.TOO_MANY_REQUESTS
-RETRY_TOTAL = 3
-RETRY_BACKOFF_FACTOR = 1.0
-RETRY_BACKOFF_JITTER = 0.5
-RETRY_BACKOFF_MAX = 60
-SERVER_ERROR_STATUSES = (
-    HTTPStatus.INTERNAL_SERVER_ERROR,
-    HTTPStatus.BAD_GATEWAY,
-    HTTPStatus.SERVICE_UNAVAILABLE,
-    HTTPStatus.GATEWAY_TIMEOUT,
-)
-IDEMPOTENT_METHODS = frozenset({'DELETE', 'GET', 'HEAD', 'OPTIONS', 'PUT'})
-DEFAULT_PAGE_SIZE = 100
 
 
 def should_retry(method: str, status_code: int) -> bool:
@@ -129,6 +126,8 @@ def retry_delay(attempt: int, retry_after: str | None) -> float:
     if retry_after:
         with suppress(InvalidHeader):
             return Retry().parse_retry_after(retry_after)
+    # Doubles with each attempt, so with the defaults the waits run 1s, 2s, 4s, ... up to
+    # RETRY_BACKOFF_MAX, each pushed later by a random share of RETRY_BACKOFF_JITTER.
     backoff = RETRY_BACKOFF_FACTOR * 2 ** (attempt - 1) + random.uniform(0, RETRY_BACKOFF_JITTER)
     return min(backoff, RETRY_BACKOFF_MAX)
 

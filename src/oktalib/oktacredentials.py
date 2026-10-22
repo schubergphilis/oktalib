@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # File: oktacredentials.py
 #
-# Copyright 2018 Costas Tyfoxylos
+# Copyright 2026 Yorick Hoorneman
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to
@@ -51,30 +51,23 @@ from requests import PreparedRequest, RequestException, Session
 from requests.auth import AuthBase
 from requests_oauth2client import OAuth2Client, OAuth2ClientCredentialsAuth, OAuth2Error, PrivateKeyJwt
 
+from .configuration import ASSERTION_LIFETIME, CURRENT_USER_ENDPOINT, EXPIRY_LEEWAY, TOKEN_ENDPOINT
 from .oktalibexceptions import AuthFailed
 
-__author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
+__author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
 __docformat__ = 'google'
-__copyright__ = 'Copyright 2018, Costas Tyfoxylos'
+__date__ = '2026-09-16'
+__copyright__ = 'Copyright 2026, Yorick Hoorneman'
+__credits__ = ['Yorick Hoorneman']
 __license__ = 'MIT'
-__maintainer__ = 'Costas Tyfoxylos'
-__email__ = '<ctyfoxylos@schubergphilis.com>'
+__maintainer__ = 'Yorick Hoorneman'
+__email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 # This is the main prefix used for logging
 LOGGER_BASENAME = 'oktacredentials'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
-
-# Only the org authorization server mints tokens carrying okta.* scopes, so this sits at
-# the org root rather than under a custom authorization server's id.
-TOKEN_ENDPOINT = '/oauth2/v1/token'
-CURRENT_USER_ENDPOINT = '/users/me/'
-# Okta refuses an assertion that expires more than an hour out. A minute is plenty for
-# one request and leaves nothing worth replaying if it is ever captured.
-ASSERTION_LIFETIME = 60
-# Renew this long before expiry, so a token cannot lapse between the check and the call.
-EXPIRY_LEEWAY = 20
 
 
 def read_key(private_key: Jwk | dict[str, Any] | str) -> Jwk:
@@ -252,15 +245,6 @@ class ApiTokenCredentials(OktaCredentials):
         """
         return CURRENT_USER_ENDPOINT
 
-    def __str__(self) -> str:
-        """Describe the credentials without disclosing them.
-
-        Returns:
-            str: A description safe to log.
-
-        """
-        return 'api token'
-
 
 class ServiceAppCredentials(OktaCredentials):
     """An Okta API Services app, authenticating with a private key.
@@ -315,9 +299,9 @@ class ServiceAppCredentials(OktaCredentials):
         self._scopes = tuple(scopes.split() if isinstance(scopes, str) else scopes)
         self._dpop = dpop
         self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
-        self._signing_key = self._key_to_sign_with(private_key, key_id, algorithm)
+        self._signing_key = self._load_signing_key(private_key, key_id, algorithm)
 
-    def _key_to_sign_with(
+    def _load_signing_key(
         self, private_key: Jwk | dict[str, Any] | str, key_id: str | None, algorithm: str | None
     ) -> Jwk:
         """Read the private key, as something that can sign an assertion.
@@ -441,12 +425,3 @@ class ServiceAppCredentials(OktaCredentials):
             dpop_bound_access_tokens=self._dpop,
             session=token_session,
         )
-
-    def __str__(self) -> str:
-        """Describe the credentials without disclosing them.
-
-        Returns:
-            str: A description safe to log, a client id being public.
-
-        """
-        return f'service app {self._client_id}'

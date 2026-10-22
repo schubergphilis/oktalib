@@ -15,16 +15,18 @@ from requests.auth import AuthBase
 from requests.exceptions import ReadTimeout
 from urllib3.util.retry import Retry
 
-from oktalib.oktacredentials import ApiTokenCredentials, OktaCredentials
-from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
-from oktalib.oktasession import (
+from oktalib.configuration import (
     DEFAULT_TIMEOUT,
-    LOGGER_BASENAME,
     RATE_LIMIT_STATUS,
     RETRY_BACKOFF_FACTOR,
     RETRY_BACKOFF_JITTER,
     RETRY_BACKOFF_MAX,
     RETRY_TOTAL,
+)
+from oktalib.oktacredentials import ApiTokenCredentials, OktaCredentials
+from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
+from oktalib.oktasession import (
+    LOGGER_BASENAME,
     OktaSession,
     RateLimitedSession,
     retry_delay,

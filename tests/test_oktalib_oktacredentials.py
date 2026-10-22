@@ -119,12 +119,13 @@ def test_a_service_app_has_nothing_to_probe(private_key):
 
 
 def test_credentials_describe_themselves_without_disclosing_themselves(private_key):
-    """Descriptions reach logs, so they carry a client id at most, never key material."""
+    """Descriptions reach logs, so they name the kind of credential and nothing that identifies it."""
     token = ApiTokenCredentials('a-secret-token')
     service_app = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'])
 
     assert 'a-secret-token' not in f'{token} {token!r}'
-    assert str(service_app) == 'service app 0oa1'
+    assert str(token) == 'ApiTokenCredentials'
+    assert str(service_app) == 'ServiceAppCredentials'
     assert private_key.to_pem() not in f'{service_app} {service_app!r}'
 
 
