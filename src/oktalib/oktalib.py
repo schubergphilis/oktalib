@@ -127,12 +127,6 @@ class Okta:
         """
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
-        # This name is resolved in this module's globals on every call, which is what
-        # lets tests/conftest.py substitute the class by assigning to
-        # oktalib.oktalib.OktaSession. Reaching for it any other way -- through the
-        # oktasession module, a default argument, an import inside this method -- reads
-        # past that assignment, and a suite that can no longer skip authentication will
-        # authenticate against a real org and still pass.
         self.session = OktaSession(host, credentials)
 
     @property

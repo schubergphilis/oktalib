@@ -16,9 +16,9 @@ from betamax.serializers import JSONSerializer
 from jwskate import Jwk
 from requests import Response
 
-import oktalib.oktalib
 from oktalib import ApiTokenCredentials, Okta, ServiceAppCredentials
-from oktalib.oktasession import OktaSession
+from oktalib.configuration import DEFAULT_TIMEOUT
+from oktalib.ratelimitedsession import RateLimitedSession
 from tests.sanitizer import sanitize_interaction
 
 REQUEST_HEADERS_TO_REMOVE = [
@@ -236,33 +236,39 @@ def service_app_credentials() -> ServiceAppCredentials:
     )
 
 
+class ReplayOnlyApiToken(ApiTokenCredentials):
+    """An api token that skips asking Okta about itself, for runs without credentials.
+
+    Replayed tests have no token to prove and no org to reach, so the session is handed
+    over signed but unproven. The transport's own tests use the real credentials, so they
+    still exercise the real authentication.
+    """
+
+    def authenticated_session(
+        self,
+        host: str,
+        timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT,
+    ) -> RateLimitedSession:
+        """Build the signed session without calling Okta."""
+        session = RateLimitedSession(timeout=timeout)
+        session.auth = self.authenticator(host, timeout)
+        return session
+
+
 @pytest.fixture(scope='session')
 def okta_service() -> Okta:
     """Return a library instance with an authenticated session."""
     host = okta_base_url()
     token = os.environ.get('OKTA_API_KEY', 'fake_api_key')
-    if token == 'fake_api_key':
-
-        class UnauthenticatedSession(OktaSession):
-            """A session that skips the token check, for runs without credentials.
-
-            Substituted for the class the client reaches for rather than patched onto
-            OktaSession itself, so the transport's own tests still exercise the real
-            authentication.
-            """
-
-            def authenticate(self) -> None:
-                """Do not ask Okta to confirm a token we do not have."""
-
-        oktalib.oktalib.OktaSession = UnauthenticatedSession
+    credentials = ApiTokenCredentials(token) if token != 'fake_api_key' else ReplayOnlyApiToken(token)
     configure_betamax(token=token, base_url=host)
-    return Okta(host=host, credentials=ApiTokenCredentials(token))
+    return Okta(host=host, credentials=credentials)
 
 
 @pytest.fixture(scope='session')
 def okta_recorder(okta_service: Okta) -> Betamax:  # pylint: disable=redefined-outer-name
     """Attach Betamax recorder to the okta library's session."""
-    return Betamax(okta_service.session)
+    return Betamax(okta_service.session.http_session)
 
 
 @pytest.fixture()

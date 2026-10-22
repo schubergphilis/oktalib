@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 from uuid import uuid4
 
 import pytest
-from requests import PreparedRequest, Response, Session
+from requests import PreparedRequest, Response
 from requests.auth import AuthBase
 from requests.exceptions import ReadTimeout
 from urllib3.util.retry import Retry
@@ -25,13 +25,8 @@ from oktalib.configuration import (
 )
 from oktalib.oktacredentials import ApiTokenCredentials, OktaCredentials
 from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
-from oktalib.oktasession import (
-    LOGGER_BASENAME,
-    OktaSession,
-    RateLimitedSession,
-    retry_delay,
-    should_retry,
-)
+from oktalib.oktasession import OktaSession
+from oktalib.ratelimitedsession import LOGGER_BASENAME, RateLimitedSession, retry_delay, should_retry
 
 
 class Attempt(NamedTuple):
@@ -102,8 +97,8 @@ def responder(monkeypatch):
 @pytest.fixture
 def instant_retries(monkeypatch):
     """Keep the real retry policy but take the sleeping out, so the suite stays quick."""
-    monkeypatch.setattr('oktalib.oktasession.RETRY_BACKOFF_FACTOR', 0)
-    monkeypatch.setattr('oktalib.oktasession.RETRY_BACKOFF_JITTER', 0)
+    monkeypatch.setattr('oktalib.ratelimitedsession.RETRY_BACKOFF_FACTOR', 0)
+    monkeypatch.setattr('oktalib.ratelimitedsession.RETRY_BACKOFF_JITTER', 0)
 
 
 @pytest.fixture
@@ -243,7 +238,7 @@ def test_the_giving_up_warning_is_logged_under_the_class(okta_answering, caplog)
     with caplog.at_level(logging.WARNING, logger=LOGGER_BASENAME), pytest.raises(ApiLimitReached):
         RateLimitedSession().get(url)
 
-    assert [record.name for record in caplog.records] == ['oktasession.RateLimitedSession']
+    assert [record.name for record in caplog.records] == ['ratelimitedsession.RateLimitedSession']
     assert any('giving up' in record.message for record in caplog.records)
 
 
@@ -305,7 +300,7 @@ def test_a_client_error_is_never_retryable():
 def test_okta_is_waited_for_as_long_as_it_asks(responder, monkeypatch):
     """Okta knows when the limit resets, so its Retry-After beats our own guess."""
     slept = []
-    monkeypatch.setattr('oktalib.oktasession.time.sleep', slept.append)
+    monkeypatch.setattr('oktalib.ratelimitedsession.time.sleep', slept.append)
     responder([429, 200], headers={'retry-after': '2'})
     response = RateLimitedSession().get('https://example.com/api/v1/users')
 
@@ -440,54 +435,87 @@ def test_the_token_is_sent_on_every_request(okta_session):
     session.get('/users')
 
     assert attempts[-1].headers['authorization'] == 'SSWS a-token'
-    assert 'authorization' not in session.headers
+    assert 'authorization' not in session.http_session.headers
 
 
-class NoProofNeeded(OktaCredentials):
-    """A credential that needs nothing from the org and has nothing to prove.
-
-    Records the session it was offered to mint over, which is the only way to see that
-    the session being authenticated is not the one handed to the credential.
-    """
+class Renewable(OktaCredentials):
+    """A credential that proves nothing up front and counts how often it is renewed."""
 
     def __init__(self) -> None:
-        """Initialize, with somewhere to record what it was given."""
-        self.token_session: Session | None = None
+        """Initialize, with nothing renewed yet."""
+        self.renewals = 0
 
-    def authenticator(self, host: str, token_session: Session) -> AuthBase:
-        """Record the session offered, and sign nothing."""
-        self.token_session = token_session
+    def authenticator(self, host: str, timeout: float | tuple[float, float] | None) -> AuthBase:
+        """Sign with a fresh proof per request, as a DPoP handler would."""
         return FreshProof()
 
+    def validate(self, session: RateLimitedSession, host: str) -> None:
+        """Accept the session without asking Okta."""
 
-def test_a_credential_with_nothing_to_prove_is_not_confirmed_with_a_call(responder):
-    """A service app has no probe, and inventing one would fail a narrow-but-correct client.
-
-    So construction must not reach for an endpoint of its own choosing: the only request
-    is the unauthenticated warm-up.
-    """
-    attempts = responder([200])
-    OktaSession('https://example.okta.com', NoProofNeeded())
-
-    assert len(attempts) == 1
-    assert attempts[0].url.rstrip('/') == 'https://example.okta.com'
+    def renew(self, session: RateLimitedSession) -> None:
+        """Count the renewal."""
+        self.renewals += 1
 
 
-def test_the_token_is_minted_over_a_session_of_its_own(responder):
-    """Minting over the authenticated session would mislabel the body and re-enter its auth.
-
-    This session sends json and carries the very handler being renewed, so a credential
-    that has to call an endpoint is handed a separate one -- carrying the same timeout,
-    since it talks to the same org.
-    """
+def test_the_session_is_the_one_the_credentials_built(responder):
+    """The credentials authenticate the session, so the api session only wraps it."""
     responder([200])
-    credentials = NoProofNeeded()
-    session = OktaSession('https://example.okta.com', credentials, timeout=17)
+    session = OktaSession('https://example.okta.com', Renewable(), timeout=17)
 
-    assert credentials.token_session is not session
-    assert isinstance(credentials.token_session, RateLimitedSession)
-    assert credentials.token_session.timeout == 17
-    assert 'content-type' not in credentials.token_session.headers
+    assert isinstance(session.http_session, RateLimitedSession)
+    assert session.http_session.timeout == 17
+    assert isinstance(session.http_session.auth, FreshProof)
+
+
+def test_a_refused_request_is_renewed_and_asked_again(responder):
+    """A token Okta stopped accepting part way through a run is renewed, not reported.
+
+    The second attempt is prepared again, so it goes out with a proof of its own rather
+    than the one Okta just refused. A 401 means Okta did not act, so even a POST is safe.
+    """
+    attempts = responder([200, 401, 200])
+    credentials = Renewable()
+    session = OktaSession('https://example.okta.com', credentials)
+    response = session.post('/users', json={})
+
+    assert response.status_code == 200
+    assert credentials.renewals == 1
+    assert len(attempts) == 3
+    assert attempts[1].headers['DPoP'] != attempts[2].headers['DPoP']
+
+
+def test_a_request_refused_after_renewal_fails_the_authentication(responder):
+    """Renewing once is a recovery; renewing in a loop would hide credentials that are gone."""
+    attempts = responder([200, 401])
+    credentials = Renewable()
+    session = OktaSession('https://example.okta.com', credentials)
+
+    with pytest.raises(AuthFailed):
+        session.get('/users')
+
+    assert credentials.renewals == 1
+    assert len(attempts) == 3
+
+
+def test_a_forbidden_request_is_not_renewed(responder):
+    """A 403 is a missing role or scope, which no renewal can grant, so it is the caller's."""
+    responder([200, 403])
+    credentials = Renewable()
+    response = OktaSession('https://example.okta.com', credentials).get('/users')
+
+    assert response.status_code == 403
+    assert credentials.renewals == 0
+
+
+def test_an_api_token_refused_mid_run_fails_without_asking_again(responder):
+    """There is no renewing an api token, so a 401 is reported rather than repeated."""
+    attempts = responder([200, 200, 401])
+    session = OktaSession('https://example.okta.com', ApiTokenCredentials('a-token'))
+
+    with pytest.raises(AuthFailed, match='no longer accepts'):
+        session.get('/users')
+
+    assert len(attempts) == 3
 
 
 def test_a_rejected_token_fails_at_construction(responder):

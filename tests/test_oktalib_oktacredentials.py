@@ -15,7 +15,7 @@ from requests.auth import AuthBase
 
 from oktalib.oktacredentials import ApiTokenCredentials, ServiceAppAuth, ServiceAppCredentials
 from oktalib.oktalibexceptions import AuthFailed
-from oktalib.oktasession import RateLimitedSession
+from oktalib.ratelimitedsession import RateLimitedSession
 
 HOST = 'https://example.okta.com'
 OAUTH_DEPENDENCIES = ('requests_oauth2client', 'jwskate')
@@ -97,25 +97,82 @@ def assertion_of(request: PreparedRequest) -> str:
 
 def test_an_api_token_is_signed_as_ssws():
     """Okta's own api tokens use a scheme of their own rather than Bearer."""
-    request = ApiTokenCredentials('a-token').authenticator(HOST, RateLimitedSession())(signed())
+    request = ApiTokenCredentials('a-token').authenticator(HOST, timeout=None)(signed())
 
     assert request.headers['authorization'] == 'SSWS a-token'
 
 
-def test_an_api_token_is_proved_against_the_current_user():
+def test_an_api_token_is_proved_against_the_current_user(token_endpoint):
     """Any valid token may read its own user, so it proves the token without a scope."""
-    assert ApiTokenCredentials('a-token').probe == '/users/me/'
+    requests_made = token_endpoint()
+    ApiTokenCredentials('a-token').authenticated_session(HOST)
+
+    assert requests_made[-1].url == f'{HOST}/api/v1/users/me/'
+    assert requests_made[-1].headers['authorization'] == 'SSWS a-token'
 
 
-def test_a_service_app_has_nothing_to_probe(private_key):
+def test_a_rejected_api_token_fails_while_the_session_is_built(token_endpoint):
+    """A session that cannot authenticate is never handed over."""
+    token_endpoint(status_code=401, payload={'errorSummary': 'Invalid token provided'})
+
+    with pytest.raises(AuthFailed):
+        ApiTokenCredentials('a-bad-token').authenticated_session(HOST)
+
+
+def test_an_api_token_cannot_be_renewed_and_says_so_without_quoting_it():
+    """Only an administrator issues a new token, and the old one does not belong in a log."""
+    with pytest.raises(AuthFailed) as raised:
+        ApiTokenCredentials('a-secret-token').renew(RateLimitedSession())
+
+    assert 'a-secret-token' not in str(raised.value)
+
+
+def test_a_service_app_proves_itself_by_minting_rather_than_calling(private_key, token_endpoint):
     """There is no user to read, and every endpoint needs a scope that may not be granted.
 
-    Minting the token is the proof instead, so a probe could only fail a client that
-    is configured correctly but narrowly.
+    Minting the token is the proof instead, so calling an endpoint could only fail a
+    client that is configured correctly but narrowly.
     """
-    credentials = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'])
+    requests_made = token_endpoint()
+    ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False).authenticated_session(HOST)
 
-    assert credentials.probe is None
+    assert [request.url.rstrip('/') for request in requests_made] == [HOST, f'{HOST}/oauth2/v1/token']
+
+
+def test_the_token_is_minted_over_a_session_of_its_own(private_key, token_endpoint):
+    """The api session labels every body as json and carries the handler being renewed.
+
+    Minting over it would send the form encoded token request as json and re-enter the
+    handler from inside itself, so the token endpoint gets a session of its own.
+    """
+    requests_made = token_endpoint()
+    session = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False).authenticated_session(HOST)
+    token_request = requests_made[-1]
+
+    assert session.headers['content-type'] == 'application/json'
+    assert token_request.headers['content-type'] == 'application/x-www-form-urlencoded'
+    assert 'authorization' not in token_request.headers
+
+
+def test_a_service_app_renewal_mints_a_new_token(private_key, token_endpoint):
+    """Renewing is asked for when Okta refused the token held, so it cannot wait for expiry."""
+    requests_made = token_endpoint()
+    credentials = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False)
+    session = credentials.authenticated_session(HOST)
+    credentials.renew(session)
+
+    assert [request.url for request in requests_made].count(f'{HOST}/oauth2/v1/token') == 2
+
+
+def test_a_refused_service_app_renewal_is_reported_as_a_failed_authentication(private_key, token_endpoint):
+    """Okta refusing to mint on renewal is the same failure as refusing at the start."""
+    token_endpoint()
+    credentials = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False)
+    session = credentials.authenticated_session(HOST)
+    token_endpoint(status_code=400, payload={'error': 'invalid_client'})
+
+    with pytest.raises(AuthFailed, match='would not mint'):
+        credentials.renew(session)
 
 
 def test_credentials_describe_themselves_without_disclosing_themselves(private_key):
@@ -124,8 +181,8 @@ def test_credentials_describe_themselves_without_disclosing_themselves(private_k
     service_app = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'])
 
     assert 'a-secret-token' not in f'{token} {token!r}'
-    assert token.type == str(token) == 'ApiTokenCredentials'
-    assert service_app.type == str(service_app) == 'ServiceAppCredentials'
+    assert token.type == 'ApiTokenCredentials'
+    assert service_app.type == 'ServiceAppCredentials'
     assert private_key.to_pem() not in f'{service_app} {service_app!r}'
 
 
@@ -139,7 +196,7 @@ def test_the_key_id_okta_assigned_is_what_the_assertion_carries(private_key, tok
     credentials = ServiceAppCredentials(
         '0oa1', private_key, ['okta.users.read'], key_id='the-one-okta-assigned', dpop=False
     )
-    credentials.authenticator(HOST, RateLimitedSession())
+    credentials.authenticated_session(HOST)
 
     assert claims_of(assertion_of(requests_made[-1]), 0)['kid'] == 'the-one-okta-assigned'
 
@@ -159,9 +216,7 @@ def test_a_key_the_caller_owns_is_not_relabelled(private_key):
 def test_the_signing_algorithm_follows_the_key(private_key, token_endpoint):
     """An algorithm that can be derived is one more thing that can be set wrong."""
     requests_made = token_endpoint()
-    ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False).authenticator(
-        HOST, RateLimitedSession()
-    )
+    ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False).authenticated_session(HOST)
 
     assert claims_of(assertion_of(requests_made[-1]), 0)['alg'] == 'RS256'
 
@@ -182,7 +237,7 @@ def test_the_signing_algorithm_follows_an_ec_curve(curve, algorithm, token_endpo
     generated = dict(Jwk.generate(alg=algorithm).with_kid_thumbprint())
     key = to_jwk({name: value for name, value in generated.items() if name != 'alg'})
     assert key.crv == curve
-    ServiceAppCredentials('0oa1', key, ['okta.users.read'], dpop=False).authenticator(HOST, RateLimitedSession())
+    ServiceAppCredentials('0oa1', key, ['okta.users.read'], dpop=False).authenticated_session(HOST)
 
     assert claims_of(assertion_of(requests_made[-1]), 0)['alg'] == algorithm
 
@@ -196,9 +251,7 @@ def test_an_explicit_algorithm_beats_the_one_on_the_key(private_key, token_endpo
     """
     requests_made = token_endpoint()
     key = to_jwk(dict(private_key) | {'alg': 'RS256'})
-    ServiceAppCredentials('0oa1', key, ['okta.users.read'], algorithm='RS512', dpop=False).authenticator(
-        HOST, RateLimitedSession()
-    )
+    ServiceAppCredentials('0oa1', key, ['okta.users.read'], algorithm='RS512', dpop=False).authenticated_session(HOST)
 
     assert claims_of(assertion_of(requests_made[-1]), 0)['alg'] == 'RS512'
 
@@ -215,15 +268,13 @@ def test_a_key_that_cannot_sign_an_assertion_does_not_blame_okta(token_endpoint)
     credentials = ServiceAppCredentials('0oa1', public_key, ['okta.users.read'])
 
     with pytest.raises(AuthFailed, match='cannot sign a client assertion'):
-        credentials.authenticator(HOST, RateLimitedSession())
+        credentials.authenticated_session(HOST)
 
 
 def test_dpop_is_not_proved_when_it_is_declined(private_key, token_endpoint):
     """dpop=False is used throughout the suite, so it has to be worth something."""
     requests_made = token_endpoint()
-    ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False).authenticator(
-        HOST, RateLimitedSession()
-    )
+    ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False).authenticated_session(HOST)
 
     assert 'DPoP' not in requests_made[-1].headers
 
@@ -254,7 +305,7 @@ def test_a_pem_is_accepted_as_well_as_a_jwk(private_key, token_endpoint):
     requests_made = token_endpoint()
     ServiceAppCredentials(
         '0oa1', private_key.to_pem(), ['okta.users.read'], key_id='the-one-okta-assigned', dpop=False
-    ).authenticator(HOST, RateLimitedSession())
+    ).authenticated_session(HOST)
 
     assert claims_of(assertion_of(requests_made[-1]), 1)['iss'] == '0oa1'
 
@@ -278,8 +329,8 @@ def test_scopes_are_accepted_as_one_string_as_well_as_a_sequence(private_key, to
     scopes, which names neither the cause nor the caller's error.
     """
     requests_made = token_endpoint()
-    ServiceAppCredentials('0oa1', private_key, 'okta.users.read okta.groups.read', dpop=False).authenticator(
-        HOST, RateLimitedSession()
+    ServiceAppCredentials('0oa1', private_key, 'okta.users.read okta.groups.read', dpop=False).authenticated_session(
+        HOST
     )
 
     assert parse_qs(requests_made[-1].body)['scope'] == ['okta.users.read okta.groups.read']
@@ -288,8 +339,8 @@ def test_scopes_are_accepted_as_one_string_as_well_as_a_sequence(private_key, to
 def test_a_jwk_is_accepted_as_json_too(private_key, token_endpoint):
     """A secret manager hands back a string, and a JWK is as likely a shape as a PEM."""
     requests_made = token_endpoint()
-    ServiceAppCredentials('0oa1', json.dumps(dict(private_key)), ['okta.users.read'], dpop=False).authenticator(
-        HOST, RateLimitedSession()
+    ServiceAppCredentials('0oa1', json.dumps(dict(private_key)), ['okta.users.read'], dpop=False).authenticated_session(
+        HOST
     )
 
     assert claims_of(assertion_of(requests_made[-1]), 0)['kid'] == private_key.kid
@@ -298,9 +349,9 @@ def test_a_jwk_is_accepted_as_json_too(private_key, token_endpoint):
 def test_the_token_is_asked_for_at_the_org_authorization_server(private_key, token_endpoint):
     """Only the org authorization server mints tokens carrying okta.* scopes."""
     requests_made = token_endpoint()
-    ServiceAppCredentials('0oa1', private_key, ['okta.users.read', 'okta.groups.read'], dpop=False).authenticator(
-        HOST, RateLimitedSession()
-    )
+    ServiceAppCredentials(
+        '0oa1', private_key, ['okta.users.read', 'okta.groups.read'], dpop=False
+    ).authenticated_session(HOST)
     body = parse_qs(requests_made[-1].body)
 
     assert requests_made[-1].url == f'{HOST}/oauth2/v1/token'
@@ -311,7 +362,7 @@ def test_the_token_is_asked_for_at_the_org_authorization_server(private_key, tok
 def test_possession_of_the_key_is_proved_when_dpop_is_asked_for(private_key, token_endpoint):
     """A bound token is useless to anyone who captures it without the key."""
     requests_made = token_endpoint(payload={'access_token': 'a-token', 'token_type': 'DPoP', 'expires_in': 3600})
-    ServiceAppCredentials('0oa1', private_key, ['okta.users.read']).authenticator(HOST, RateLimitedSession())
+    ServiceAppCredentials('0oa1', private_key, ['okta.users.read']).authenticated_session(HOST)
 
     assert 'DPoP' in requests_made[-1].headers
 
@@ -322,7 +373,7 @@ def test_okta_refusing_to_mint_a_token_fails_at_construction(private_key, token_
     credentials = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False)
 
     with pytest.raises(AuthFailed):
-        credentials.authenticator(HOST, RateLimitedSession())
+        credentials.authenticated_session(HOST)
 
 
 def test_a_key_that_cannot_be_read_is_refused_before_anything_is_asked_of_okta():
@@ -357,7 +408,7 @@ def test_nothing_from_the_oauth_dependency_escapes_the_credentials(private_key, 
     credentials = ServiceAppCredentials('0oa1', private_key, ['okta.users.read'], dpop=False)
 
     with pytest.raises(AuthFailed) as raised:
-        credentials.authenticator(HOST, RateLimitedSession())
+        credentials.authenticated_session(HOST)
 
     assert isinstance(raised.value, AuthFailed)
     assert raised.value.__cause__ is not None

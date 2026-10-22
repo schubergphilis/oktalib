@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from betamax import Betamax
 
-from oktalib.oktasession import RateLimitedSession
+from oktalib.ratelimitedsession import RateLimitedSession
 from tests.conftest import configure_betamax, extract_pytest_path, okta_base_url, service_app_credentials
 
 
@@ -40,12 +40,13 @@ class CapturingSession(RateLimitedSession):
 
 
 @pytest.fixture
-def recorded_service_app(request):
+def recorded_service_app(request, monkeypatch):
     """A session authenticated as a service app, with its token exchange recorded too.
 
     Two recorders, because minting deliberately happens on a session of its own and
     betamax wraps a session rather than a client. The exchange therefore lands in a
-    cassette beside the one holding the api call.
+    cassette beside the one holding the api call. The credentials build that session
+    themselves, so the recorded one is handed to them in its place.
 
     Skipped when there is neither a service app configured to record with nor a
     recording to replay, rather than reaching for a real org either way.
@@ -62,10 +63,13 @@ def recorded_service_app(request):
     api_session = CapturingSession()
     minting = Betamax(token_session).use_cassette(token_cassette)
     calling = Betamax(api_session).use_cassette(api_cassette)
+    monkeypatch.setattr('oktalib.oktacredentials.RateLimitedSession', lambda timeout: token_session)
     minting.start()
     calling.start()
     try:
-        api_session.auth = service_app_credentials().authenticator(host, token_session)
+        credentials = service_app_credentials()
+        api_session.auth = credentials.authenticator(host, timeout=None)
+        credentials.validate(api_session, host)
         yield host, api_session
     finally:
         calling.stop()
