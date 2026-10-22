@@ -78,8 +78,8 @@ Replaying needs nothing configured — with no credentials the suite runs entire
 
 | Variable | Needed for | Notes |
 | --- | --- | --- |
-| `OKTA_HOST` | everything | Include the scheme, e.g. `https://your-org.oktapreview.com`. The library does not normalize it. |
-| `OKTA_API_KEY` | recording as an API token | Absent, the suite replaces the session with one that does not authenticate, so recording is skipped rather than failing. |
+| `OKTA_HOST` | everything | e.g. `https://your-org.oktapreview.com`. A bare `your-org.oktapreview.com` is read as https. |
+| `OKTA_API_KEY` | recording as an API token | Absent, the suite authenticates with a stand-in that builds the session without asking Okta, so recording is skipped rather than failing. |
 | `OKTA_CLIENT_ID` | recording as a service app | The client id of an API Services app. |
 | `OKTA_PRIVATE_KEY` | recording as a service app | A JWK, the same as json, or a PEM. Never commit it. |
 | `OKTA_KEY_ID` | recording as a service app | The id Okta assigned the registered public key. Required with a PEM, which carries none. |

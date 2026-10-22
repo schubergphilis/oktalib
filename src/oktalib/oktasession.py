@@ -30,9 +30,9 @@ from a token Okta stopped accepting, pagination and the translation of a failed
 response into a ``ServerError``. The rest of the library names endpoints and
 interprets payloads; it never assembles a url or decides how to retry.
 
-The session doing the talking is not built here. The credentials build it, because
-only they know how to authenticate it and how to tell whether that worked, and it
-arrives already rate limited and already proven. This wraps it rather than being it.
+The session is not authenticated here. An authenticator builds it, because only it
+knows how to sign requests and how to tell whether that worked, and it is the session's
+renewer: the one asked to renew when Okta stops accepting what the session signs with.
 
 .. _Google Python Style Guide:
    https://google.github.io/styleguide/pyguide.html
@@ -42,14 +42,18 @@ arrives already rate limited and already proven. This wraps it rather than being
 import logging
 from collections.abc import Generator
 from http import HTTPStatus
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from requests import Response
 
 from .configuration import DEFAULT_PAGE_SIZE, DEFAULT_TIMEOUT
-from .oktacredentials import OktaCredentials
 from .oktalibexceptions import AuthFailed, ServerError
 from .ratelimitedsession import RateLimitedSession
+
+# Only for the annotation: the authenticators build sessions, so importing them here at
+# runtime would have each module import the other.
+if TYPE_CHECKING:
+    from .oktaauthenticators import OktaAuthenticator
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
 __docformat__ = 'google'
@@ -66,38 +70,37 @@ LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
 
 
-class OktaSession:
-    """An authenticated session against one Okta instance.
+class OktaSession(RateLimitedSession):
+    """A rate limited session against one Okta instance.
 
     Knows where the instance is, so callers name an endpoint rather than assembling
     a url: ``session.get('/users')`` reaches ``{host}/api/v1/users``. A url that is
     already absolute is sent as it stands, which covers both the pagination links
     Okta hands back and the ``/oauth2/v1`` endpoints that sit outside ``/api/v1``.
+
+    Built by an :class:`oktalib.oktaauthenticators.OktaAuthenticator`, which signs it and
+    renews what it signs with.
     """
 
     def __init__(
         self,
         host: str,
-        credentials: OktaCredentials,
+        renewer: 'OktaAuthenticator',
         timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT,
     ) -> None:
-        """Initialize the session, authenticated by the credentials.
+        """Initialize the session.
 
         Args:
-            host: The host of the okta instance, e.g. https://dev.oktapreview.com
-            credentials: What to authenticate with, an api token or a service app.
+            host: The org root, e.g. https://dev.oktapreview.com
+            renewer: The authenticator to ask for renewal when Okta answers 401.
             timeout: The default applied to any request that does not name its own.
 
-        Raises:
-            AuthFailed: Okta rejected the credentials.
-
         """
-        logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
-        self._logger = logging.getLogger(logger_name)
+        super().__init__(timeout=timeout)
+        self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
         self.host = host
-        self._credentials = credentials
-        self._logger.debug(f'Authenticating with {credentials.type}.')
-        self._session = credentials.authenticated_session(host, timeout)
+        self._renewer = renewer
+        self.headers.update({'accept': 'application/json', 'content-type': 'application/json'})
 
     @property
     def api(self) -> str:
@@ -109,34 +112,25 @@ class OktaSession:
         """
         return f'{self.host}/api/v1'
 
-    @property
-    def http_session(self) -> RateLimitedSession:
-        """The requests session underneath, for tooling that has to attach to one.
-
-        Returns:
-            RateLimitedSession: The session the credentials authenticated.
-
-        """
-        return self._session
-
-    def request(self, method: str, url: str, **kwargs: Any) -> Response:
+    def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> Response:  # type: ignore[override]
         """Resolve an endpoint against the instance and make the request.
 
-        A 401 means the credentials stopped being accepted part way through a run, a
-        token revoked or expired early, so the credentials are asked to renew and the
+        A 401 means Okta stopped accepting what the session signs with part way through
+        a run, a token revoked or expired early, so the renewer is asked to renew and the
         request is made once more. That is safe on any verb: Okta refused the request
-        rather than acting on it. A 403 is left alone, since it means a role or scope
-        is missing, which no renewal can grant.
+        rather than acting on it, and the retry is signed afresh. A 403 is left alone,
+        since it means a role or scope is missing, which no renewal can grant.
 
         Args:
             method: HTTP verb.
             url: An endpoint such as ``/users``, resolved against :attr:`api`, or an
                 absolute url, which is used as it stands.
+            args: Positional arguments passed through to requests.
             kwargs: Keyword arguments passed through to requests.
 
         Raises:
-            AuthFailed: Okta still refused the credentials once they were renewed, or
-                they cannot be renewed at all.
+            AuthFailed: Okta still refused the session once it was renewed, or what it
+                signs with cannot be renewed at all.
 
         Returns:
             Response: The response.
@@ -144,67 +138,15 @@ class OktaSession:
         """
         if not url.startswith(('http://', 'https://')):
             url = f'{self.api}{url}'
-        response = self._session.request(method, url, **kwargs)
+        response = super().request(method, url, *args, **kwargs)
         if response.status_code != HTTPStatus.UNAUTHORIZED:
             return response
-        self._logger.debug(f'Okta refused {self._credentials.type} for {url}, renewing.')
-        self._credentials.renew(self._session)
-        response = self._session.request(method, url, **kwargs)
+        self._logger.debug(f'Okta refused {self._renewer.type} for {url}, renewing.')
+        self._renewer.renew(self)
+        response = super().request(method, url, *args, **kwargs)
         if response.status_code == HTTPStatus.UNAUTHORIZED:
-            raise AuthFailed(f'Okta refused {self._credentials.type} even once they were renewed.')
+            raise AuthFailed(f'Okta refused {self._renewer.type} even once it was renewed.')
         return response
-
-    def get(self, url: str, **kwargs: Any) -> Response:
-        """Make a GET request.
-
-        Args:
-            url: An endpoint or an absolute url, see :meth:`request`.
-            kwargs: Keyword arguments passed through to requests.
-
-        Returns:
-            Response: The response.
-
-        """
-        return self.request('GET', url, **kwargs)
-
-    def post(self, url: str, **kwargs: Any) -> Response:
-        """Make a POST request.
-
-        Args:
-            url: An endpoint or an absolute url, see :meth:`request`.
-            kwargs: Keyword arguments passed through to requests.
-
-        Returns:
-            Response: The response.
-
-        """
-        return self.request('POST', url, **kwargs)
-
-    def put(self, url: str, **kwargs: Any) -> Response:
-        """Make a PUT request.
-
-        Args:
-            url: An endpoint or an absolute url, see :meth:`request`.
-            kwargs: Keyword arguments passed through to requests.
-
-        Returns:
-            Response: The response.
-
-        """
-        return self.request('PUT', url, **kwargs)
-
-    def delete(self, url: str, **kwargs: Any) -> Response:
-        """Make a DELETE request.
-
-        Args:
-            url: An endpoint or an absolute url, see :meth:`request`.
-            kwargs: Keyword arguments passed through to requests.
-
-        Returns:
-            Response: The response.
-
-        """
-        return self.request('DELETE', url, **kwargs)
 
     def get_paginated_url(
         self,

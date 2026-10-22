@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# File: oktacredentials.py
+# File: oktaauthenticators.py
 #
 # Copyright 2026 Yorick Hoorneman
 #
@@ -23,15 +23,16 @@
 #
 
 """
-What oktalib authenticates with.
+How oktalib authenticates against an org.
 
-A credential knows how to hand over a session that is already authenticated against
-an org, how to tell that the authentication worked, and how to renew it once Okta stops
-accepting it. Okta accepts two kinds, an api token and a service app holding a private
-key, and they have almost nothing in common beyond that -- one is a header, the other is
-a signed assertion exchanged for a token that is then proved with a fresh signature per
-request. Both sign through an ``AuthBase`` installed on a rate limited session, so the
-api session receives either the same way and never learns which it was handed.
+An authenticator knows the org it is for, and when called hands over a session that is
+already authenticated against it: it installs what signs every request, asks Okta to
+confirm that it works, and is asked again to renew once Okta stops accepting it. Okta
+accepts two kinds, an api token and a service app holding a private key, and they have
+almost nothing in common beyond that -- one is a header, the other is a signed assertion
+exchanged for a token that is then proved with a fresh signature per request. Both sign
+through an ``AuthBase`` installed on the session, so the session uses either the same
+way and never learns which it was handed.
 
 Keeping that behind one interface is also what keeps the OAuth dependency in one place.
 Nothing outside this module imports it, and none of its types appear in a signature or
@@ -54,6 +55,7 @@ from requests_oauth2client import OAuth2Client, OAuth2ClientCredentialsAuth, OAu
 
 from .configuration import ASSERTION_LIFETIME, CURRENT_USER_ENDPOINT, DEFAULT_TIMEOUT, EXPIRY_LEEWAY, TOKEN_ENDPOINT
 from .oktalibexceptions import AuthFailed
+from .oktasession import OktaSession
 from .ratelimitedsession import RateLimitedSession
 
 __author__ = 'Yorick Hoorneman <yhoorneman@schubergphilis.com>'
@@ -67,9 +69,28 @@ __email__ = '<yhoorneman@schubergphilis.com>'
 __status__ = 'Development'  # "Prototype", "Development", "Production".
 
 # This is the main prefix used for logging
-LOGGER_BASENAME = 'oktacredentials'
+LOGGER_BASENAME = 'oktaauthenticators'
 LOGGER = logging.getLogger(LOGGER_BASENAME)
 LOGGER.addHandler(logging.NullHandler())
+
+
+def normalize_host(host: str) -> str:
+    """Spell a host out as the url of the org root.
+
+    A tenant url kept in a secret store or an environment variable is as likely to
+    arrive bare, as ``acme.okta.com``, as it is with a scheme, and requests refuses a
+    url without one.
+
+    Args:
+        host: The host, with or without a scheme and a trailing slash.
+
+    Returns:
+        str: The org root, e.g. https://acme.okta.com
+
+    """
+    if not host.startswith(('http://', 'https://')):
+        host = f'https://{host}'
+    return host.rstrip('/')
 
 
 def read_key(private_key: Jwk | dict[str, Any] | str) -> Jwk:
@@ -94,7 +115,15 @@ def read_key(private_key: Jwk | dict[str, Any] | str) -> Jwk:
 
 
 class ApiTokenAuth(AuthBase):  # pylint: disable=too-few-public-methods
-    """Signs every request with an Okta api token."""
+    """Signs every request with an Okta api token.
+
+    A token never changes, so setting it once in the session's headers would work as
+    well. It is a handler instead for two reasons. The token stays out of
+    ``session.headers``, which is what gets dumped when a session is inspected or
+    logged while debugging, so it only appears on the requests themselves. And the
+    authenticators install either kind the same way, as ``session.auth``, which keeps
+    one path through :meth:`OktaAuthenticator.__call__` for both.
+    """
 
     def __init__(self, token: str) -> None:
         """Initialize the handler.
@@ -127,18 +156,25 @@ class ServiceAppAuth(AuthBase):  # pylint: disable=too-few-public-methods
     it by then -- a scope withdrawn, the app deactivated -- and without this the caller
     would get an exception from a library it never imported, raised from a call site
     whose documented failures are ``ServerError`` and ``ApiLimitReached``.
+
+    That translation can only happen here. The renewal runs while requests prepares the
+    call, inside the handler, so nothing further up sees it before it escapes, and
+    :class:`oktalib.oktasession.OktaSession` cannot catch the dependency's exceptions
+    without importing the dependency, which is kept to this module. The same goes for
+    :meth:`renew`, the renewal asked for after a 401, and for :attr:`token`, which lets
+    callers inspect the token without reaching into the dependency's types.
     """
 
-    def __init__(self, authenticator: AuthBase, credentials: 'ServiceAppCredentials') -> None:
+    def __init__(self, signer: AuthBase, authenticator: 'ServiceAppAuthenticator') -> None:
         """Initialize the handler.
 
         Args:
-            authenticator: The handler that presents and renews the token.
-            credentials: The credentials it was built from, to name in a failure.
+            signer: The handler that presents and renews the token.
+            authenticator: The authenticator it was built by, to name in a failure.
 
         """
+        self._signer = signer
         self._authenticator = authenticator
-        self._credentials = credentials
 
     @property
     def token(self) -> Any:
@@ -148,7 +184,7 @@ class ServiceAppAuth(AuthBase):  # pylint: disable=too-few-public-methods
             Any: The token, as the signer models it.
 
         """
-        return self._authenticator.token  # type: ignore[attr-defined]
+        return self._signer.token  # type: ignore[attr-defined]
 
     def __call__(self, request: PreparedRequest) -> PreparedRequest:
         """Sign the request, renewing the token first if it has nearly expired.
@@ -164,100 +200,48 @@ class ServiceAppAuth(AuthBase):  # pylint: disable=too-few-public-methods
 
         """
         try:
-            return self._authenticator(request)
+            return self._signer(request)
         except (OAuth2Error, RequestException) as error:
-            raise AuthFailed(f'Okta would not renew the token for {self._credentials.type}: {error}') from error
+            raise AuthFailed(f'Okta would not renew the token for {self._authenticator.type}: {error}') from error
 
     def renew(self) -> None:
         """Mint a token now, whether or not the one held has expired.
 
         Raises:
-            AuthFailed: Okta would not mint a token for the credentials.
+            AuthFailed: Okta would not mint a token for the authenticator.
 
         """
         try:
-            self._authenticator.renew_token()  # type: ignore[attr-defined]
+            self._signer.renew_token()  # type: ignore[attr-defined]
         except (OAuth2Error, RequestException) as error:
-            raise AuthFailed(f'Okta would not mint a token for {self._credentials.type}: {error}') from error
+            raise AuthFailed(f'Okta would not mint a token for {self._authenticator.type}: {error}') from error
 
 
-class OktaCredentials(ABC):
-    """How a caller proves to one Okta org that it may use the api."""
+class OktaAuthenticator(ABC):
+    """How a caller proves to one Okta org that it may use the api.
 
-    def authenticated_session(
-        self,
-        host: str,
-        timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT,
-    ) -> RateLimitedSession:
-        """Build a session that signs every call to the org, and prove that it works.
+    Calling it builds a session authenticated against the org. Nothing is asked of Okta
+    before then, so an authenticator can be built where its secrets are read and handed
+    to :class:`oktalib.oktalib.Okta` to do the asking.
+    """
 
-        Args:
-            host: The org root, e.g. https://dev.oktapreview.com
-            timeout: The default applied to any request that does not name its own.
-
-        Raises:
-            AuthFailed: Okta would not accept the credentials.
-
-        Returns:
-            RateLimitedSession: A session Okta has already accepted the credentials on.
-
-        """
-        session = RateLimitedSession(timeout=timeout)
-        # Unauthenticated on purpose, and before the credentials are installed: it only
-        # confirms the host answers, so an unreachable org is not reported as a refusal.
-        session.get(host)
-        session.headers.update({'accept': 'application/json', 'content-type': 'application/json'})
-        # Installed as ``auth`` rather than a header, so the credentials are applied while
-        # each request is prepared. That is what lets a retry re-sign rather than replay,
-        # and it is the only reason a DPoP proof can be per request at all.
-        session.auth = self.authenticator(host, timeout)
-        self.validate(session, host)
-        return session
-
-    @abstractmethod
-    def authenticator(self, host: str, timeout: float | tuple[float, float] | None) -> AuthBase:
-        """Build the handler that signs every call to this org, without calling Okta.
+    def __init__(self, host: str, timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT) -> None:
+        """Initialize the authenticator.
 
         Args:
-            host: The org root, for credentials that derive an endpoint from it.
-            timeout: The timeout for any session the handler needs of its own.
-
-        Raises:
-            AuthFailed: The credentials cannot sign anything.
-
-        Returns:
-            AuthBase: The handler to install on the session.
+            host: The org, e.g. https://acme.okta.com. A bare acme.okta.com is read as
+                https.
+            timeout: The default applied to any request that does not name its own, as
+                seconds or a (connect, read) pair.
 
         """
-
-    @abstractmethod
-    def validate(self, session: RateLimitedSession, host: str) -> None:
-        """Ask Okta to answer for the credentials now, on the session they sign.
-
-        Args:
-            session: The session carrying the handler from :meth:`authenticator`.
-            host: The org root.
-
-        Raises:
-            AuthFailed: Okta rejected the credentials.
-
-        """
-
-    @abstractmethod
-    def renew(self, session: RateLimitedSession) -> None:
-        """Renew what the session signs with, after Okta stopped accepting it.
-
-        Args:
-            session: A session returned by :meth:`authenticated_session`.
-
-        Raises:
-            AuthFailed: There is nothing to renew, or Okta would not renew it.
-
-        """
+        self.host = normalize_host(host)
+        self.timeout = timeout
+        self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
 
     @property
     def type(self) -> str:
-        """The kind of credentials, without disclosing them.
+        """The kind of authenticator, without disclosing what it authenticates with.
 
         Returns:
             str: The class name, safe to log.
@@ -265,27 +249,92 @@ class OktaCredentials(ABC):
         """
         return self.__class__.__name__
 
+    def __call__(self) -> OktaSession:
+        """Build a session that signs every call to the org, and prove that it works.
 
-class ApiTokenCredentials(OktaCredentials):
-    """An Okta api token, the one an administrator creates in the admin console."""
+        A new session on every call, so one authenticator can serve several clients
+        without them sharing a session.
 
-    def __init__(self, token: str) -> None:
-        """Initialize the credentials.
+        Raises:
+            AuthFailed: Okta would not accept the authenticator.
 
-        Args:
-            token: The api token to authenticate with.
+        Returns:
+            OktaSession: A session Okta has already accepted.
 
         """
+        session = OktaSession(self.host, renewer=self, timeout=self.timeout)
+        # Unauthenticated on purpose, and before the handler is installed: it only
+        # confirms the host answers, so an unreachable org is not reported as a refusal.
+        session.get(self.host)
+        # Installed as ``auth`` rather than a header, so the handler is applied while each
+        # request is prepared. That is what lets a retry re-sign rather than replay, and
+        # it is the only reason a DPoP proof can be per request at all.
+        session.auth = self._auth_handler()
+        self._logger.debug(f'Validating {self.type} against {self.host}.')
+        self._validate(session)
+        return session
+
+    @abstractmethod
+    def _auth_handler(self) -> AuthBase:
+        """Build the handler that signs every call to the org, without calling Okta.
+
+        Raises:
+            AuthFailed: Nothing can be signed with what the authenticator holds.
+
+        Returns:
+            AuthBase: The handler to install on the session.
+
+        """
+
+    @abstractmethod
+    def _validate(self, session: OktaSession) -> None:
+        """Ask Okta to answer for the authenticator now, on the session it signs.
+
+        Args:
+            session: The session carrying the handler from :meth:`_auth_handler`.
+
+        Raises:
+            AuthFailed: Okta rejected the authenticator.
+
+        """
+
+    @abstractmethod
+    def renew(self, session: OktaSession) -> None:
+        """Renew what the session signs with, after Okta stopped accepting it.
+
+        Args:
+            session: A session this authenticator built.
+
+        Raises:
+            AuthFailed: There is nothing to renew, or Okta would not renew it.
+
+        """
+
+
+class ApiTokenAuthenticator(OktaAuthenticator):
+    """An Okta api token, the one an administrator creates in the admin console."""
+
+    def __init__(
+        self,
+        host: str,
+        token: str,
+        timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT,
+    ) -> None:
+        """Initialize the authenticator.
+
+        Args:
+            host: The org, e.g. https://acme.okta.com
+            token: The api token to authenticate with.
+            timeout: The default applied to any request that does not name its own.
+
+        """
+        super().__init__(host, timeout)
         self._token = token
 
     # An api token is bearer-like: it carries its own authority, so there is no endpoint
     # to call and nothing about the org to know before signing with it.
-    def authenticator(self, host: str, timeout: float | tuple[float, float] | None) -> AuthBase:  # pylint: disable=unused-argument
+    def _auth_handler(self) -> AuthBase:
         """Build the handler that signs every call with this token.
-
-        Args:
-            host: Unused, the token is not bound to an endpoint.
-            timeout: Unused, nothing has to be exchanged.
 
         Returns:
             AuthBase: A handler stamping the token on every request.
@@ -293,23 +342,22 @@ class ApiTokenCredentials(OktaCredentials):
         """
         return ApiTokenAuth(self._token)
 
-    def validate(self, session: RateLimitedSession, host: str) -> None:
+    def _validate(self, session: OktaSession) -> None:
         """Read the current user, which any valid token may do without a scope.
 
         Args:
             session: The session carrying the token.
-            host: The org root.
 
         Raises:
             AuthFailed: Okta rejected the token.
 
         """
-        response = session.get(f'{host}/api/v1{CURRENT_USER_ENDPOINT}')
+        response = session.get(CURRENT_USER_ENDPOINT)
         if not response.ok:
             raise AuthFailed(response.text)
 
-    def renew(self, session: RateLimitedSession) -> None:
-        """Report that the token stopped working, since there is no renewing it.
+    def renew(self, session: OktaSession) -> None:
+        """Report that Okta refused the token, since there is no renewing one.
 
         Args:
             session: Unused, the token is all there is.
@@ -319,11 +367,12 @@ class ApiTokenCredentials(OktaCredentials):
 
         """
         raise AuthFailed(
-            f'Okta no longer accepts the {self.type}: it was revoked or expired, and only a new one helps.'
+            f'Okta does not accept the token of {self.type}. It may have been revoked or have expired, '
+            f'and an api token cannot be renewed: only an administrator can issue a new one.'
         )
 
 
-class ServiceAppCredentials(OktaCredentials):
+class ServiceAppAuthenticator(OktaAuthenticator):
     """An Okta API Services app, authenticating with a private key.
 
     The app exchanges an assertion signed with its private key for an access token.
@@ -337,8 +386,9 @@ class ServiceAppCredentials(OktaCredentials):
     403 on the first real call.
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
+        host: str,
         client_id: str,
         private_key: Jwk | dict[str, Any] | str,
         scopes: str | Sequence[str],
@@ -346,10 +396,12 @@ class ServiceAppCredentials(OktaCredentials):
         key_id: str | None = None,
         algorithm: str | None = None,
         dpop: bool = True,
+        timeout: float | tuple[float, float] | None = DEFAULT_TIMEOUT,
     ) -> None:
-        """Initialize the credentials.
+        """Initialize the authenticator.
 
         Args:
+            host: The org, e.g. https://acme.okta.com
             client_id: The client id of the API Services app.
             private_key: The private key whose public half is registered on the app, as
                 a JWK mapping, the same as json, or a PEM. A path is deliberately not
@@ -367,15 +419,17 @@ class ServiceAppCredentials(OktaCredentials):
                 when unset.
             dpop: Whether to bind the token to a held key, proving possession on every
                 request. An application setting in Okta, so it has to match the app.
+            timeout: The default applied to any request that does not name its own,
+                the token requests included.
 
         """
+        super().__init__(host, timeout)
         self._client_id = client_id
         # A string is itself a sequence of strings, so tuple() would take it apart into
         # letters and ask Okta for each one, which it reports as a request for custom
         # scopes rather than as the mistake it is.
         self._scopes = tuple(scopes.split() if isinstance(scopes, str) else scopes)
         self._dpop = dpop
-        self._logger = logging.getLogger(f'{LOGGER_BASENAME}.{self.__class__.__name__}')
         self._signing_key = self._load_signing_key(private_key, key_id, algorithm)
 
     def _load_signing_key(
@@ -448,15 +502,13 @@ class ServiceAppCredentials(OktaCredentials):
         """
         return next(iter(jwk.supported_signing_algorithms()), None)
 
-    def authenticator(self, host: str, timeout: float | tuple[float, float] | None) -> AuthBase:
+    def _auth_handler(self) -> AuthBase:
         """Build the handler that signs every call with a minted access token.
 
-        No token is minted yet: that is what :meth:`validate` does, so the handler
-        can be built and installed without Okta being asked anything.
-
-        Args:
-            host: The org root, which the token endpoint hangs off.
-            timeout: The timeout for the session tokens are minted over.
+        No token is minted yet: that is what :meth:`_validate` does, so the handler can
+        be built and installed without Okta being asked anything. Tokens are minted over
+        a session of their own rather than the one being authenticated, which labels
+        every body as json and carries the very handler being renewed.
 
         Raises:
             AuthFailed: The key cannot sign an assertion.
@@ -470,52 +522,49 @@ class ServiceAppCredentials(OktaCredentials):
         # is not attributed to Okta: that would send the caller to the admin console for
         # a problem with the key they hold.
         try:
-            client = self._token_client(host, RateLimitedSession(timeout=timeout))
-            authenticator = OAuth2ClientCredentialsAuth(client, scope=' '.join(self._scopes), leeway=EXPIRY_LEEWAY)
+            client = self._token_client(RateLimitedSession(timeout=self.timeout))
+            signer = OAuth2ClientCredentialsAuth(client, scope=' '.join(self._scopes), leeway=EXPIRY_LEEWAY)
         except ValueError as error:
             raise AuthFailed(f'The key of {self.type} cannot sign a client assertion: {error}') from error
-        return ServiceAppAuth(authenticator, self)
+        return ServiceAppAuth(signer, self)
 
-    def validate(self, session: RateLimitedSession, host: str) -> None:
+    def _validate(self, session: OktaSession) -> None:
         """Mint the first token, which is the only proof a service app can give.
 
         There is no user to read, and every endpoint needs a scope that may not be
         granted, so calling one could only fail a client configured correctly but
-        narrowly. The token is minted here rather than on the first call, so
-        credentials Okta will not accept fail while the caller is still looking at the
-        constructor.
+        narrowly. The token is minted here rather than on the first call, so an app
+        Okta will not accept fails while the caller is still looking at the client.
 
         Args:
-            session: The session carrying the handler from :meth:`authenticator`.
-            host: Unused, the handler already knows its token endpoint.
+            session: The session carrying the handler from :meth:`_auth_handler`.
 
         Raises:
-            AuthFailed: Okta would not mint a token for these credentials.
+            AuthFailed: Okta would not mint a token for this app.
 
         """
         self.renew(session)
 
-    def renew(self, session: RateLimitedSession) -> None:
+    def renew(self, session: OktaSession) -> None:
         """Mint a new token for the session, whether or not the one held has expired.
 
         Args:
-            session: A session whose handler came from :meth:`authenticator`.
+            session: A session this authenticator built.
 
         Raises:
-            AuthFailed: Okta would not mint a token for these credentials.
-            TypeError: The session was not authenticated by service app credentials.
+            AuthFailed: Okta would not mint a token for this app.
+            TypeError: The session was not built by a service app authenticator.
 
         """
         if not isinstance(session.auth, ServiceAppAuth):
-            raise TypeError(f'The session was not authenticated by {self.type}.')
+            raise TypeError(f'The session was not built by {self.type}.')
         session.auth.renew()
         self._logger.debug(f'Minted an access token for {self.type}, scopes {" ".join(self._scopes)}.')
 
-    def _token_client(self, host: str, token_session: RateLimitedSession) -> OAuth2Client:
+    def _token_client(self, token_session: RateLimitedSession) -> OAuth2Client:
         """Build the client that exchanges a signed assertion for a token.
 
         Args:
-            host: The org root, which the token endpoint hangs off.
             token_session: The session to exchange over.
 
         Returns:
@@ -523,7 +572,7 @@ class ServiceAppCredentials(OktaCredentials):
 
         """
         return OAuth2Client(
-            token_endpoint=f'{host}{TOKEN_ENDPOINT}',
+            token_endpoint=f'{self.host}{TOKEN_ENDPOINT}',
             # No alg argument: the key carries it, and the signer reads the key first.
             auth=PrivateKeyJwt(self._client_id, self._signing_key, lifetime=ASSERTION_LIFETIME),
             dpop_bound_access_tokens=self._dpop,

@@ -47,7 +47,7 @@ def test_saml_app(okta_service, okta_recorder):  # pylint: disable=unused-argume
     fixtures can't use function-scoped fixtures.
     """
 
-    with Betamax(okta_service.session.http_session).use_cassette('saml_test_app'):
+    with Betamax(okta_service.session).use_cassette('saml_test_app'):
         app = okta_service.get_application_by_label('test_app')
         assert app is not None, "Test application 'test_app' not found"
         assert app.label == 'test_app'

@@ -18,11 +18,11 @@ oktalib provides a simple, object-oriented interface to Okta's REST API. It hand
 ## Quick Example
 
 ```python
-from oktalib import ApiTokenCredentials, Okta
+from oktalib import ApiTokenAuthenticator, Okta
 
 # Initialize the client. A service app authenticating with a private key goes in the
-# same place, as ServiceAppCredentials -- see the usage guide.
-okta = Okta(host='https://your-domain.okta.com', credentials=ApiTokenCredentials('your-api-token'))
+# same place, as ServiceAppAuthenticator -- see the usage guide.
+okta = Okta(ApiTokenAuthenticator('https://your-domain.okta.com', 'your-api-token'))
 
 # Get a user
 user = okta.get_user_by_login('user@example.com')

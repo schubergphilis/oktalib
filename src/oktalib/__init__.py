@@ -31,7 +31,7 @@ Import all parts from oktalib here
    https://google.github.io/styleguide/pyguide.html
 """
 
-from .oktacredentials import ApiTokenCredentials, OktaCredentials, ServiceAppCredentials
+from .oktaauthenticators import ApiTokenAuthenticator, OktaAuthenticator, ServiceAppAuthenticator
 from .oktalib import Okta
 from .oktalibexceptions import (
     ApiLimitReached,
@@ -63,7 +63,7 @@ __all__ = [
     'ApiLimitReached',
     'ServerError',
     'Okta',
-    'OktaCredentials',
-    'ApiTokenCredentials',
-    'ServiceAppCredentials',
+    'OktaAuthenticator',
+    'ApiTokenAuthenticator',
+    'ServiceAppAuthenticator',
 ]

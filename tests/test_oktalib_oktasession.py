@@ -23,7 +23,7 @@ from oktalib.configuration import (
     RETRY_BACKOFF_MAX,
     RETRY_TOTAL,
 )
-from oktalib.oktacredentials import ApiTokenCredentials, OktaCredentials
+from oktalib.oktaauthenticators import ApiTokenAuthenticator, OktaAuthenticator
 from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
 from oktalib.oktasession import OktaSession
 from oktalib.ratelimitedsession import LOGGER_BASENAME, RateLimitedSession, retry_delay, should_retry
@@ -385,11 +385,11 @@ def test_an_explicit_none_still_means_no_timeout(responder):
 
 @pytest.fixture
 def okta_session(responder):
-    """An OktaSession whose authentication is answered, so construction succeeds."""
+    """An OktaSession whose authentication is answered, so building it succeeds."""
 
     def install(status_codes=(200,)):
         attempts = responder(status_codes)
-        return OktaSession('https://example.okta.com', ApiTokenCredentials('a-token')), attempts
+        return ApiTokenAuthenticator('https://example.okta.com', 'a-token')(), attempts
 
     return install
 
@@ -426,45 +426,65 @@ def test_the_api_root_is_spelled_out_for_the_callers_that_need_it(okta_session):
 
 
 def test_the_token_is_sent_on_every_request(okta_session):
-    """The credentials are applied as each request is prepared rather than pinned once.
+    """The token is applied as each request is prepared rather than pinned once.
 
-    An api token would work either way, but installing it the same way as a credential
+    An api token would work either way, but installing it the same way as a handler
     that has to sign per request is what keeps one code path for both.
     """
     session, attempts = okta_session()
     session.get('/users')
 
     assert attempts[-1].headers['authorization'] == 'SSWS a-token'
-    assert 'authorization' not in session.http_session.headers
+    assert 'authorization' not in session.headers
 
 
-class Renewable(OktaCredentials):
-    """A credential that proves nothing up front and counts how often it is renewed."""
+class Renewable(OktaAuthenticator):
+    """An authenticator that proves nothing up front and counts how often it is renewed."""
 
-    def __init__(self) -> None:
+    def __init__(self, host: str = 'https://example.okta.com', **kwargs: Any) -> None:
         """Initialize, with nothing renewed yet."""
+        super().__init__(host, **kwargs)
         self.renewals = 0
 
-    def authenticator(self, host: str, timeout: float | tuple[float, float] | None) -> AuthBase:
+    def _auth_handler(self) -> AuthBase:
         """Sign with a fresh proof per request, as a DPoP handler would."""
         return FreshProof()
 
-    def validate(self, session: RateLimitedSession, host: str) -> None:
+    def _validate(self, session: OktaSession) -> None:
         """Accept the session without asking Okta."""
 
-    def renew(self, session: RateLimitedSession) -> None:
+    def renew(self, session: OktaSession) -> None:
         """Count the renewal."""
         self.renewals += 1
 
 
-def test_the_session_is_the_one_the_credentials_built(responder):
-    """The credentials authenticate the session, so the api session only wraps it."""
+def test_every_call_builds_a_session_of_its_own(responder):
+    """Clients built from one authenticator must not share, and so tangle, a session."""
     responder([200])
-    session = OktaSession('https://example.okta.com', Renewable(), timeout=17)
+    authenticator = Renewable(timeout=17)
+    first, second = authenticator(), authenticator()
 
-    assert isinstance(session.http_session, RateLimitedSession)
-    assert session.http_session.timeout == 17
-    assert isinstance(session.http_session.auth, FreshProof)
+    assert first is not second
+    assert first.timeout == second.timeout == 17
+    assert isinstance(first.auth, FreshProof)
+
+
+def test_the_host_is_checked_before_anything_is_signed(responder):
+    """An unreachable org should read as unreachable, not as refused credentials."""
+    attempts = responder([200])
+    Renewable()()
+
+    assert attempts[0].url.rstrip('/') == 'https://example.okta.com'
+    assert 'DPoP' not in attempts[0].headers
+
+
+def test_a_bare_host_is_read_as_https(responder):
+    """A tenant url kept in a secret store often arrives without its scheme."""
+    attempts = responder([200])
+    session = Renewable('acme.okta.com/')()
+
+    assert session.host == 'https://acme.okta.com'
+    assert attempts[0].url.rstrip('/') == 'https://acme.okta.com'
 
 
 def test_a_refused_request_is_renewed_and_asked_again(responder):
@@ -474,12 +494,11 @@ def test_a_refused_request_is_renewed_and_asked_again(responder):
     than the one Okta just refused. A 401 means Okta did not act, so even a POST is safe.
     """
     attempts = responder([200, 401, 200])
-    credentials = Renewable()
-    session = OktaSession('https://example.okta.com', credentials)
-    response = session.post('/users', json={})
+    authenticator = Renewable()
+    response = authenticator().post('/users', json={})
 
     assert response.status_code == 200
-    assert credentials.renewals == 1
+    assert authenticator.renewals == 1
     assert len(attempts) == 3
     assert attempts[1].headers['DPoP'] != attempts[2].headers['DPoP']
 
@@ -487,40 +506,40 @@ def test_a_refused_request_is_renewed_and_asked_again(responder):
 def test_a_request_refused_after_renewal_fails_the_authentication(responder):
     """Renewing once is a recovery; renewing in a loop would hide credentials that are gone."""
     attempts = responder([200, 401])
-    credentials = Renewable()
-    session = OktaSession('https://example.okta.com', credentials)
+    authenticator = Renewable()
+    session = authenticator()
 
     with pytest.raises(AuthFailed):
         session.get('/users')
 
-    assert credentials.renewals == 1
+    assert authenticator.renewals == 1
     assert len(attempts) == 3
 
 
 def test_a_forbidden_request_is_not_renewed(responder):
     """A 403 is a missing role or scope, which no renewal can grant, so it is the caller's."""
     responder([200, 403])
-    credentials = Renewable()
-    response = OktaSession('https://example.okta.com', credentials).get('/users')
+    authenticator = Renewable()
+    response = authenticator().get('/users')
 
     assert response.status_code == 403
-    assert credentials.renewals == 0
+    assert authenticator.renewals == 0
 
 
 def test_an_api_token_refused_mid_run_fails_without_asking_again(responder):
     """There is no renewing an api token, so a 401 is reported rather than repeated."""
     attempts = responder([200, 200, 401])
-    session = OktaSession('https://example.okta.com', ApiTokenCredentials('a-token'))
+    session = ApiTokenAuthenticator('https://example.okta.com', 'a-token')()
 
-    with pytest.raises(AuthFailed, match='no longer accepts'):
+    with pytest.raises(AuthFailed, match='cannot be renewed'):
         session.get('/users')
 
     assert len(attempts) == 3
 
 
-def test_a_rejected_token_fails_at_construction(responder):
+def test_a_rejected_token_fails_while_the_session_is_built(responder):
     """A session that cannot authenticate is never handed to the caller."""
     responder([200, 401])
 
     with pytest.raises(AuthFailed):
-        OktaSession('https://example.okta.com', ApiTokenCredentials('a-bad-token'))
+        ApiTokenAuthenticator('https://example.okta.com', 'a-bad-token')()

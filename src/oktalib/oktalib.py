@@ -48,12 +48,11 @@ from .entities import (
     SAMLMetadata,
     User,
 )
-from .oktacredentials import OktaCredentials
+from .oktaauthenticators import OktaAuthenticator
 from .oktalibexceptions import (
     InvalidApplication,
     InvalidGroup,
 )
-from .oktasession import OktaSession
 
 __author__ = 'Costas Tyfoxylos <ctyfoxylos@schubergphilis.com>'
 __docformat__ = 'google'
@@ -80,37 +79,36 @@ LOGGER.addHandler(logging.NullHandler())
 class Okta:
     """Models the api of okta."""
 
-    def __init__(self, host: str, credentials: OktaCredentials) -> None:
+    def __init__(self, authenticator: OktaAuthenticator) -> None:
         """Initializes the Okta object.
 
         Args:
-            host: The host of the okta instance, e.g. https://dev.oktapreview.com
-            credentials: What to authenticate with, either an
-                :class:`oktalib.oktacredentials.ApiTokenCredentials` or a
-                :class:`oktalib.oktacredentials.ServiceAppCredentials`.
+            authenticator: How to authenticate against the org, either an
+                :class:`oktalib.oktaauthenticators.ApiTokenAuthenticator` or a
+                :class:`oktalib.oktaauthenticators.ServiceAppAuthenticator`.
 
         Raises:
-            AuthFailed: Okta rejected the credentials. Raised here rather than on the
+            AuthFailed: Okta rejected the authenticator. Raised here rather than on the
                 first call, so a client that exists is one that authenticated.
 
         Examples:
             With an api token, the kind an administrator creates under Security → API:
 
             ```python
-            from oktalib import ApiTokenCredentials, Okta
+            from oktalib import ApiTokenAuthenticator, Okta
 
-            okta = Okta('https://your-domain.okta.com', ApiTokenCredentials('your-api-token'))
+            okta = Okta(ApiTokenAuthenticator('https://your-domain.okta.com', 'your-api-token'))
             ```
 
             With an API Services app, which signs an assertion with its private key and
             holds a token bound to a second key it proves possession of per request:
 
             ```python
-            from oktalib import Okta, ServiceAppCredentials
+            from oktalib import Okta, ServiceAppAuthenticator
 
             okta = Okta(
-                'https://your-domain.okta.com',
-                ServiceAppCredentials(
+                ServiceAppAuthenticator(
+                    'https://your-domain.okta.com',
                     client_id='0oa1abc...',
                     private_key=private_key,  # a JWK (json), or a PEM (string)
                     scopes=['okta.users.read', 'okta.groups.manage'],
@@ -127,7 +125,7 @@ class Okta:
         """
         logger_name = f'{LOGGER_BASENAME}.{self.__class__.__name__}'
         self._logger = logging.getLogger(logger_name)
-        self.session = OktaSession(host, credentials)
+        self.session = authenticator()
 
     @property
     def applications(self) -> Generator[Application, None, None]:

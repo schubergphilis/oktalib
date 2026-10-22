@@ -16,11 +16,12 @@ from pathlib import Path
 import pytest
 from betamax import Betamax
 
+from oktalib.oktasession import OktaSession
 from oktalib.ratelimitedsession import RateLimitedSession
-from tests.conftest import configure_betamax, extract_pytest_path, okta_base_url, service_app_credentials
+from tests.conftest import configure_betamax, extract_pytest_path, okta_base_url, service_app_authenticator
 
 
-class CapturingSession(RateLimitedSession):
+class CapturingSession(OktaSession):
     """Keeps the headers each request actually went out with.
 
     Betamax replaces a response's request with the recorded one, whose Authorization
@@ -45,8 +46,10 @@ def recorded_service_app(request, monkeypatch):
 
     Two recorders, because minting deliberately happens on a session of its own and
     betamax wraps a session rather than a client. The exchange therefore lands in a
-    cassette beside the one holding the api call. The credentials build that session
-    themselves, so the recorded one is handed to them in its place.
+    cassette beside the one holding the api call. The authenticator builds that session
+    itself, so the recorded one is handed to it in its place. The api session is put
+    together step by step rather than by calling the authenticator, which would first
+    check the host: a request these recordings predate.
 
     Skipped when there is neither a service app configured to record with nor a
     recording to replay, rather than reaching for a real org either way.
@@ -59,17 +62,17 @@ def recorded_service_app(request, monkeypatch):
     if 'OKTA_CLIENT_ID' not in os.environ and not recorded:
         pytest.skip('no service app configured to record with, and nothing recorded to replay')
 
+    authenticator = service_app_authenticator(host)
     token_session = RateLimitedSession()
-    api_session = CapturingSession()
+    api_session = CapturingSession(authenticator.host, renewer=authenticator)
     minting = Betamax(token_session).use_cassette(token_cassette)
     calling = Betamax(api_session).use_cassette(api_cassette)
-    monkeypatch.setattr('oktalib.oktacredentials.RateLimitedSession', lambda timeout: token_session)
+    monkeypatch.setattr('oktalib.oktaauthenticators.RateLimitedSession', lambda timeout: token_session)
     minting.start()
     calling.start()
     try:
-        credentials = service_app_credentials()
-        api_session.auth = credentials.authenticator(host, timeout=None)
-        credentials.validate(api_session, host)
+        api_session.auth = authenticator._auth_handler()  # pylint: disable=protected-access
+        authenticator._validate(api_session)  # pylint: disable=protected-access
         yield host, api_session
     finally:
         calling.stop()
