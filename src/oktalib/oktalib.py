@@ -447,6 +447,27 @@ class Okta:
             return None
         return SAMLMetadata(response.text)
 
+    def get_applications_by_name(self, name: str) -> Generator[Application, None, None]:
+        """Retrieves the applications of one type, by their name.
+
+        An application's name is its type, the key of its integration in the OIN, e.g.
+        okta_org2org for every Org2Org instance, while the label is what an admin
+        called this instance. Okta applies this filter itself, so it costs a page per
+        hundred matches rather than a page per hundred applications in the org.
+
+        Okta refuses to combine the name with any other filter, status included, so
+        inactive applications are returned too.
+
+        Args:
+            name: The application name to match exactly, e.g. okta_org2org
+
+        Returns:
+            generator: The generator of applications with that name, active or not
+
+        """
+        for data in self.session.get_paginated_url('/apps', params={'filter': f'name eq "{name}"'}):
+            yield self._create_application_from_data(data)
+
     def get_expired_app_certificates(self) -> Generator[tuple[Application, AppSigningCertificate], None, None]:
         """Retrieves the app signing certificates that have already expired.
 
