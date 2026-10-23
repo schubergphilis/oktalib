@@ -3,25 +3,30 @@
 
 import logging
 import time
+from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import NamedTuple
+from typing import Any, NamedTuple
+from uuid import uuid4
 
 import pytest
 from requests import PreparedRequest, Response
+from requests.auth import AuthBase
 from requests.exceptions import ReadTimeout
+from urllib3.util.retry import Retry
 
-from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
-from oktalib.oktasession import (
+from oktalib.configuration import (
     DEFAULT_TIMEOUT,
-    IDEMPOTENT_METHODS,
-    LOGGER_BASENAME,
+    RATE_LIMIT_STATUS,
+    RETRY_BACKOFF_FACTOR,
+    RETRY_BACKOFF_JITTER,
+    RETRY_BACKOFF_MAX,
     RETRY_TOTAL,
-    SERVER_ERROR_STATUSES,
-    OktaRetry,
-    OktaSession,
-    RateLimitedSession,
 )
+from oktalib.oktaauthenticators import ApiTokenAuthenticator, OktaAuthenticator
+from oktalib.oktalibexceptions import ApiLimitReached, AuthFailed
+from oktalib.oktasession import OktaSession
+from oktalib.ratelimitedsession import LOGGER_BASENAME, RateLimitedSession, retry_delay, should_retry
 
 
 class Attempt(NamedTuple):
@@ -29,6 +34,29 @@ class Attempt(NamedTuple):
 
     url: str
     timeout: float | tuple[float, float] | None
+    headers: dict[str, Any] = {}  # noqa: RUF012
+    body: Any = None
+
+
+class Served(NamedTuple):
+    """One request as the real server saw it."""
+
+    method: str
+    headers: dict[str, str] = {}  # noqa: RUF012
+
+
+class FreshProof(AuthBase):  # pylint: disable=too-few-public-methods
+    """Stand in for a DPoP handler: stamp a proof that is unique per preparation.
+
+    The real handler derives its proof from the request, so a replay that never runs
+    the auth layer again reuses the jti Okta has already seen. A uuid per call makes
+    that reuse visible without needing a key, the dependency or a cassette.
+    """
+
+    def __call__(self, request: PreparedRequest) -> PreparedRequest:
+        """Sign the request as a DPoP handler would."""
+        request.headers['DPoP'] = str(uuid4())
+        return request
 
 
 @pytest.fixture
@@ -41,15 +69,23 @@ def responder(monkeypatch):
     """
     attempts = []
 
-    def install(status_codes):
+    def install(status_codes, headers=None):
         codes = list(status_codes)
 
         def send(_adapter, request: PreparedRequest, **kwargs) -> Response:
-            attempts.append(Attempt(url=request.url, timeout=kwargs.get('timeout')))
+            attempts.append(
+                Attempt(
+                    url=request.url,
+                    timeout=kwargs.get('timeout'),
+                    headers=dict(request.headers),
+                    body=request.body,
+                )
+            )
             response = Response()
             response.status_code = codes[len(attempts) - 1] if len(attempts) <= len(codes) else codes[-1]
             response._content = b'{}'
             response.request = request
+            response.headers.update(headers or {})
             return response
 
         monkeypatch.setattr('requests.adapters.HTTPAdapter.send', send)
@@ -61,8 +97,8 @@ def responder(monkeypatch):
 @pytest.fixture
 def instant_retries(monkeypatch):
     """Keep the real retry policy but take the sleeping out, so the suite stays quick."""
-    monkeypatch.setattr('oktalib.oktasession.RETRY_BACKOFF_FACTOR', 0)
-    monkeypatch.setattr('oktalib.oktasession.RETRY_BACKOFF_JITTER', 0)
+    monkeypatch.setattr('oktalib.ratelimitedsession.RETRY_BACKOFF_FACTOR', 0)
+    monkeypatch.setattr('oktalib.ratelimitedsession.RETRY_BACKOFF_JITTER', 0)
 
 
 @pytest.fixture
@@ -87,7 +123,8 @@ def okta_answering():
 
             def respond(self):
                 """Serve the next scripted status, after the configured delay."""
-                served.append(self.command)
+                headers = {name.lower(): value for name, value in self.headers.items()}
+                served.append(Served(method=self.command, headers=headers))
                 # Drain the body, or keep-alive would parse it as the next request line.
                 self.rfile.read(int(self.headers.get('content-length') or 0))
                 if delay:
@@ -140,7 +177,7 @@ def test_a_rate_limit_is_retried_until_it_succeeds(okta_answering):
     response = RateLimitedSession().get(url)
 
     assert response.status_code == 200
-    assert served == ['GET', 'GET', 'GET']
+    assert [record.method for record in served] == ['GET', 'GET', 'GET']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -155,7 +192,28 @@ def test_a_rate_limit_is_retried_on_a_post_too(okta_answering):
     response = RateLimitedSession().post(url, data='{}')
 
     assert response.status_code == 200
-    assert served == ['POST', 'POST']
+    assert [record.method for record in served] == ['POST', 'POST']
+
+
+@pytest.mark.usefixtures('instant_retries')
+def test_a_retried_request_is_signed_again(okta_answering):
+    """A retry must carry a new proof, not a replay of the one Okta already saw.
+
+    Retrying below the auth layer resends the serialized bytes, so a DPoP proof goes
+    out a second time with a jti the server has already recorded and rejects, and an
+    iat that has aged by however long the backoff lasted. See
+    okta/terraform-provider-okta#2598 for the same failure in the wild. This is the
+    defect that passes every happy-path test and then fails during a bulk run, so the
+    signing has to happen above whatever repeats the request.
+    """
+    url, served = okta_answering([429, 200])
+    session = RateLimitedSession()
+    session.auth = FreshProof()
+    response = session.post(url, data='{}')
+
+    assert response.status_code == 200
+    assert len(served) == 2
+    assert served[0].headers['dpop'] != served[1].headers['dpop']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -180,7 +238,7 @@ def test_the_giving_up_warning_is_logged_under_the_class(okta_answering, caplog)
     with caplog.at_level(logging.WARNING, logger=LOGGER_BASENAME), pytest.raises(ApiLimitReached):
         RateLimitedSession().get(url)
 
-    assert [record.name for record in caplog.records] == ['oktasession.RateLimitedSession']
+    assert [record.name for record in caplog.records] == ['ratelimitedsession.RateLimitedSession']
     assert any('giving up' in record.message for record in caplog.records)
 
 
@@ -191,7 +249,7 @@ def test_a_server_error_on_a_get_is_retried(okta_answering):
     response = RateLimitedSession().get(url)
 
     assert response.status_code == 200
-    assert served == ['GET', 'GET', 'GET']
+    assert [record.method for record in served] == ['GET', 'GET', 'GET']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -201,7 +259,7 @@ def test_a_server_error_on_a_post_is_not_retried(okta_answering):
     response = RateLimitedSession().post(url, data='{}')
 
     assert response.status_code == 503
-    assert served == ['POST']
+    assert [record.method for record in served] == ['POST']
 
 
 @pytest.mark.usefixtures('instant_retries')
@@ -226,22 +284,71 @@ def test_a_hung_endpoint_is_not_retried(okta_answering):
 
 
 def test_a_rate_limit_is_retryable_on_every_verb():
-    """The policy exempts 429 from allowed_methods; everything else obeys it."""
-    retry = OktaRetry(status_forcelist=SERVER_ERROR_STATUSES, allowed_methods=IDEMPOTENT_METHODS)
-
-    assert retry.is_retry('POST', 429)
-    assert retry.is_retry('GET', 429)
-    assert not retry.is_retry('POST', 503)
-    assert retry.is_retry('GET', 503)
+    """A 429 is safe on any verb; a server error is only safe on the idempotent ones."""
+    assert should_retry('POST', RATE_LIMIT_STATUS)
+    assert should_retry('GET', RATE_LIMIT_STATUS)
+    assert not should_retry('POST', 503)
+    assert should_retry('GET', 503)
 
 
-def test_the_mounted_policy_restricts_server_errors_to_the_safe_verbs():
-    """A dropped connection on a POST leaves it unknown whether Okta acted on it."""
-    retries = RateLimitedSession().get_adapter('https://example.com').max_retries
+def test_a_client_error_is_never_retryable():
+    """A 404 is an answer, and the policy has to say so rather than rely on the caller."""
+    assert not should_retry('GET', 404)
+    assert not should_retry('GET', 200)
 
-    assert 'GET' in retries.allowed_methods
-    assert 'POST' not in retries.allowed_methods
-    assert 'PATCH' not in retries.allowed_methods
+
+def test_okta_is_waited_for_as_long_as_it_asks(responder, monkeypatch):
+    """Okta knows when the limit resets, so its Retry-After beats our own guess."""
+    slept = []
+    monkeypatch.setattr('oktalib.ratelimitedsession.time.sleep', slept.append)
+    responder([429, 200], headers={'retry-after': '2'})
+    response = RateLimitedSession().get('https://example.com/api/v1/users')
+
+    assert response.status_code == 200
+    assert slept == [2]
+
+
+def test_a_retry_after_date_is_understood():
+    """Okta may answer with an HTTP date rather than a number of seconds."""
+    in_thirty_seconds = formatdate(time.time() + 30, usegmt=True)
+
+    assert 25 <= retry_delay(1, in_thirty_seconds) <= 30
+
+
+def test_a_long_retry_after_is_obeyed_rather_than_capped():
+    """Okta said how long it needs, and coming back early only spends another request.
+
+    urllib3 did not cap a server's Retry-After either; it caps the backoff it computes
+    itself. Its own six hour clamp is the only bound left.
+    """
+    assert retry_delay(1, '3600') == 3600
+    assert retry_delay(1, '99999') == Retry.DEFAULT_RETRY_AFTER_MAX
+
+
+def test_a_computed_backoff_is_capped():
+    """Without a header the wait is ours to choose, and it should not grow unbounded."""
+    assert retry_delay(99, None) == RETRY_BACKOFF_MAX
+
+
+def test_an_unparseable_retry_after_falls_back_to_the_backoff():
+    """A header we cannot read is not a reason to give up on retrying."""
+    assert RETRY_BACKOFF_FACTOR <= retry_delay(1, 'in a little while') <= RETRY_BACKOFF_FACTOR + RETRY_BACKOFF_JITTER
+
+
+def test_the_wait_grows_with_each_attempt():
+    """A limit that survived one wait is unlikely to clear within the same again."""
+    assert retry_delay(3, None) > retry_delay(1, None)
+
+
+def test_no_retrying_happens_inside_urllib3():
+    """Retrying below the auth layer would replay a signature the server has seen.
+
+    urllib3 resends the bytes it was handed, so a DPoP proof or a client assertion
+    would go out again with a jti Okta has already recorded. The repeating therefore
+    belongs in request(), and this asserts the adapter was left with none of it.
+    """
+    for scheme in ('https://', 'http://'):
+        assert RateLimitedSession().get_adapter(f'{scheme}example.com').max_retries.total == 0
 
 
 def test_a_request_that_names_no_timeout_gets_the_default(responder):
@@ -278,11 +385,11 @@ def test_an_explicit_none_still_means_no_timeout(responder):
 
 @pytest.fixture
 def okta_session(responder):
-    """An OktaSession whose authentication is answered, so construction succeeds."""
+    """An OktaSession whose authentication is answered, so building it succeeds."""
 
     def install(status_codes=(200,)):
         attempts = responder(status_codes)
-        return OktaSession('https://example.okta.com', 'a-token'), attempts
+        return ApiTokenAuthenticator('https://example.okta.com', 'a-token')(), attempts
 
     return install
 
@@ -319,15 +426,120 @@ def test_the_api_root_is_spelled_out_for_the_callers_that_need_it(okta_session):
 
 
 def test_the_token_is_sent_on_every_request(okta_session):
-    """Authentication is installed once on the session, not per call."""
-    session, _ = okta_session()
+    """The token is applied as each request is prepared rather than pinned once.
 
-    assert session.headers['authorization'] == 'SSWS a-token'
+    An api token would work either way, but installing it the same way as a handler
+    that has to sign per request is what keeps one code path for both.
+    """
+    session, attempts = okta_session()
+    session.get('/users')
+
+    assert attempts[-1].headers['authorization'] == 'SSWS a-token'
+    assert 'authorization' not in session.headers
 
 
-def test_a_rejected_token_fails_at_construction(responder):
+class Renewable(OktaAuthenticator):
+    """An authenticator that proves nothing up front and counts how often it is renewed."""
+
+    def __init__(self, host: str = 'https://example.okta.com', **kwargs: Any) -> None:
+        """Initialize, with nothing renewed yet."""
+        super().__init__(host, **kwargs)
+        self.renewals = 0
+
+    def _auth_handler(self) -> AuthBase:
+        """Sign with a fresh proof per request, as a DPoP handler would."""
+        return FreshProof()
+
+    def _validate(self, session: OktaSession) -> None:
+        """Accept the session without asking Okta."""
+
+    def renew(self, session: OktaSession) -> None:
+        """Count the renewal."""
+        self.renewals += 1
+
+
+def test_every_call_builds_a_session_of_its_own(responder):
+    """Clients built from one authenticator must not share, and so tangle, a session."""
+    responder([200])
+    authenticator = Renewable(timeout=17)
+    first, second = authenticator(), authenticator()
+
+    assert first is not second
+    assert first.timeout == second.timeout == 17
+    assert isinstance(first.auth, FreshProof)
+
+
+def test_the_host_is_checked_before_anything_is_signed(responder):
+    """An unreachable org should read as unreachable, not as refused credentials."""
+    attempts = responder([200])
+    Renewable()()
+
+    assert attempts[0].url.rstrip('/') == 'https://example.okta.com'
+    assert 'DPoP' not in attempts[0].headers
+
+
+def test_a_bare_host_is_read_as_https(responder):
+    """A tenant url kept in a secret store often arrives without its scheme."""
+    attempts = responder([200])
+    session = Renewable('acme.okta.com/')()
+
+    assert session.host == 'https://acme.okta.com'
+    assert attempts[0].url.rstrip('/') == 'https://acme.okta.com'
+
+
+def test_a_refused_request_is_renewed_and_asked_again(responder):
+    """A token Okta stopped accepting part way through a run is renewed, not reported.
+
+    The second attempt is prepared again, so it goes out with a proof of its own rather
+    than the one Okta just refused. A 401 means Okta did not act, so even a POST is safe.
+    """
+    attempts = responder([200, 401, 200])
+    authenticator = Renewable()
+    response = authenticator().post('/users', json={})
+
+    assert response.status_code == 200
+    assert authenticator.renewals == 1
+    assert len(attempts) == 3
+    assert attempts[1].headers['DPoP'] != attempts[2].headers['DPoP']
+
+
+def test_a_request_refused_after_renewal_fails_the_authentication(responder):
+    """Renewing once is a recovery; renewing in a loop would hide credentials that are gone."""
+    attempts = responder([200, 401])
+    authenticator = Renewable()
+    session = authenticator()
+
+    with pytest.raises(AuthFailed):
+        session.get('/users')
+
+    assert authenticator.renewals == 1
+    assert len(attempts) == 3
+
+
+def test_a_forbidden_request_is_not_renewed(responder):
+    """A 403 is a missing role or scope, which no renewal can grant, so it is the caller's."""
+    responder([200, 403])
+    authenticator = Renewable()
+    response = authenticator().get('/users')
+
+    assert response.status_code == 403
+    assert authenticator.renewals == 0
+
+
+def test_an_api_token_refused_mid_run_fails_without_asking_again(responder):
+    """There is no renewing an api token, so a 401 is reported rather than repeated."""
+    attempts = responder([200, 200, 401])
+    session = ApiTokenAuthenticator('https://example.okta.com', 'a-token')()
+
+    with pytest.raises(AuthFailed, match='cannot be renewed'):
+        session.get('/users')
+
+    assert len(attempts) == 3
+
+
+def test_a_rejected_token_fails_while_the_session_is_built(responder):
     """A session that cannot authenticate is never handed to the caller."""
     responder([200, 401])
 
     with pytest.raises(AuthFailed):
-        OktaSession('https://example.okta.com', 'a-bad-token')
+        ApiTokenAuthenticator('https://example.okta.com', 'a-bad-token')()

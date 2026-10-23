@@ -1,0 +1,132 @@
+{
+  "http_interactions": [
+    {
+      "recorded_at": "2026-09-17T06:28:34",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "grant_type=client_credentials&scope=okta.users.read+okta.groups.read&client_id=0oa2udiot7iQ6hRG80h8&client_assertion=REDACTED&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer"
+        },
+        "headers": {
+          "Content-Length": [
+            "922"
+          ],
+          "Content-Type": [
+            "application/x-www-form-urlencoded"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/oauth2/v1/token"
+      },
+      "response": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"error\": \"use_dpop_nonce\", \"error_description\": \"Authorization server requires nonce in DPoP proof.\"}"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "dpop-nonce": [
+            "REDACTED"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 400,
+          "message": "Bad Request"
+        },
+        "url": "https://example.com/oauth2/v1/token"
+      }
+    },
+    {
+      "recorded_at": "2026-09-17T06:28:34",
+      "request": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "grant_type=client_credentials&scope=okta.users.read+okta.groups.read&client_id=0oa2udiot7iQ6hRG80h8&client_assertion=REDACTED&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer"
+        },
+        "headers": {
+          "Content-Length": [
+            "922"
+          ],
+          "Content-Type": [
+            "application/x-www-form-urlencoded"
+          ]
+        },
+        "method": "POST",
+        "uri": "https://example.com/oauth2/v1/token"
+      },
+      "response": {
+        "body": {
+          "encoding": "utf-8",
+          "string": "{\"token_type\": \"DPoP\", \"expires_in\": 3600, \"access_token\": \"REDACTED\", \"scope\": \"okta.users.read okta.groups.read\"}"
+        },
+        "headers": {
+          "Connection": [
+            "keep-alive"
+          ],
+          "Content-Type": [
+            "application/json"
+          ],
+          "Transfer-Encoding": [
+            "chunked"
+          ],
+          "X-Robots-Tag": [
+            "noindex,nofollow"
+          ],
+          "accept-ch": [
+            "Sec-CH-UA-Platform-Version"
+          ],
+          "dpop-nonce": [
+            "REDACTED"
+          ],
+          "expires": [
+            "0"
+          ],
+          "p3p": [
+            "CP=\"HONK\""
+          ],
+          "pragma": [
+            "no-cache"
+          ],
+          "referrer-policy": [
+            "strict-origin-when-cross-origin"
+          ],
+          "x-xss-protection": [
+            "0"
+          ]
+        },
+        "status": {
+          "code": 200,
+          "message": "OK"
+        },
+        "url": "https://example.com/oauth2/v1/token"
+      }
+    }
+  ],
+  "recorded_with": "betamax/0.9.0"
+}

@@ -12,6 +12,36 @@ Main client for interacting with the Okta API.
       members: true
       heading_level: 3
 
+## Authenticators
+
+How the client authenticates against an org. Either kind is passed to `Okta` the same way.
+
+### ApiTokenAuthenticator
+
+::: oktalib.oktaauthenticators.ApiTokenAuthenticator
+    options:
+      show_source: false
+      members: true
+      heading_level: 4
+
+### ServiceAppAuthenticator
+
+::: oktalib.oktaauthenticators.ServiceAppAuthenticator
+    options:
+      show_source: false
+      members: true
+      heading_level: 4
+
+### OktaAuthenticator
+
+The interface both implement, for anyone adding a third.
+
+::: oktalib.oktaauthenticators.OktaAuthenticator
+    options:
+      show_source: false
+      members: true
+      heading_level: 4
+
 ## Entities
 
 ### Group

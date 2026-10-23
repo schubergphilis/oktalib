@@ -12,8 +12,14 @@ dependencies = [
     "cachetools>=7.0.1",
     "python-dateutil>=2.9.0.post0",
     "requests>=2.32.5",
-    # requests only asks for urllib3>=1.21.1, but the retry policy in oktasession
-    # needs backoff_jitter, which urllib3 added in 2.0.
+    # Signs the private_key_jwt client assertion and the per-request DPoP proofs, as a
+    # requests auth handler. Okta's org authorization server refuses client secrets, so
+    # a service app has no simpler route, and this is the only library that covers both
+    # without bringing a second http stack alongside requests.
+    "requests-oauth2client>=1.8.0,<2",
+    # requests only asks for urllib3>=1.21.1. oktasession does its own retrying now, so
+    # nothing here needs 2.0 in particular; the floor stays to keep one known-good
+    # transport rather than supporting a line that reached end of life.
     "urllib3>=2.0",
 ]
 classifiers = [

@@ -320,6 +320,49 @@ def test_an_interaction_without_bodies_is_tolerated():
     sanitize_interaction(interaction, host='')  # must not raise
 
 
+def test_a_minted_token_is_not_recorded():
+    """The token endpoint answers with a credential that is usable for the next hour."""
+    body = make_body({'access_token': 'eyJraWQ.a-real-token', 'token_type': 'DPoP', 'expires_in': 3600})
+    sanitize_body(body, host='')
+
+    assert read_body(body)['access_token'] == REDACTED
+
+
+def test_a_token_response_keeps_the_shape_the_client_expects():
+    """Over-redaction breaks replay: the oauth client parses this back into a token."""
+    body = make_body(
+        {'access_token': 'a-real-token', 'token_type': 'DPoP', 'expires_in': 3600, 'scope': 'okta.users.read'}
+    )
+    sanitize_body(body, host='')
+    payload = read_body(body)
+
+    assert payload['token_type'] == 'DPoP'
+    assert payload['expires_in'] == 3600
+    assert payload['scope'] == 'okta.users.read'
+
+
+def test_a_form_encoded_client_assertion_is_redacted():
+    """The token request is form encoded, so redacting json alone would leave it whole.
+
+    The assertion is signed with the service app's key and Okta accepts it until it
+    expires, so a recorded one is a working credential.
+    """
+    request = 'grant_type=client_credentials&client_assertion=eyJraWQ.signed&scope=okta.users.read'
+
+    redacted = redact_text(request, host='')
+
+    assert 'eyJraWQ.signed' not in redacted
+    assert 'grant_type=client_credentials' in redacted
+    assert 'scope=okta.users.read' in redacted
+
+
+def test_a_body_that_is_neither_json_nor_a_form_is_left_alone():
+    """The SAML metadata endpoint answers with XML, which must survive intact."""
+    xml = '<?xml version="1.0"?><EntityDescriptor entityID="https://example.com/saml"/>'
+
+    assert redact_text(xml, host='') == xml
+
+
 def test_host_aliases_include_the_admin_console_host():
     """An app's help link points at the admin host, which is not the org host."""
     assert host_aliases('anorg.oktapreview.com') == [
