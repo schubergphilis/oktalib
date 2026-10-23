@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [5.1.0](https://github.com/schubergphilis/oktalib/compare/v5.0.0...v5.1.0) (2026-10-23)
+
+
+### Features
+
+* list applications by name, filtered by Okta ([74ea072](https://github.com/schubergphilis/oktalib/commit/74ea0723afbd0c4b80027eff38021b45a30f3029))
+* list applications by name, filtered by Okta ([5064383](https://github.com/schubergphilis/oktalib/commit/50643836c1a5595b70dd2fbc1d45f89aa17d0b2b))
+
 ## [5.0.0](https://github.com/schubergphilis/oktalib/compare/v4.0.0...v5.0.0) (2026-10-23)
 
 
