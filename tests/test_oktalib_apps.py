@@ -1,12 +1,14 @@
 """Tests for Application functionality."""
 # pylint: disable=redefined-outer-name
 
+import json
 import logging
 
 import pytest
 from betamax import Betamax
+from requests import Response
 
-from oktalib.entities import APIServiceApp
+from oktalib.entities import APIServiceApp, SAMLApplication
 
 
 @pytest.fixture
@@ -339,3 +341,35 @@ def test_create_api_service_app_max_client_secrets_limit(okta_cassette, okta_ser
 def test_get_application_metadata_handles_non_json_error(okta_with_error):
     """get_application_metadata returns None on a non-JSON error body, not raise."""
     assert okta_with_error.get_application_metadata('app', 'kid') is None
+
+
+def make_json_response(payload):
+    """Build an ok Response carrying the provided JSON payload."""
+    response = Response()
+    response.status_code = 200
+    response._content = json.dumps(payload).encode()
+    return response
+
+
+def test_get_applications_by_name_filters_server_side(okta_service, monkeypatch):
+    """The name is sent to Okta as a filter rather than matched against every app locally."""
+    requested = {}
+
+    def record(url=None, params=None, **_kwargs):
+        requested['url'] = url
+        requested['params'] = params
+        return make_json_response([{'id': 'app1', 'name': 'okta_org2org', 'signOnMode': 'SAML_2_0'}])
+
+    monkeypatch.setattr(okta_service.session, 'get', record)
+    apps = list(okta_service.get_applications_by_name('okta_org2org'))
+
+    assert [app.id for app in apps] == ['app1']
+    assert isinstance(apps[0], SAMLApplication)
+    assert requested['url'] == '/apps'
+    assert requested['params']['filter'] == 'name eq "okta_org2org"'
+
+
+def test_get_applications_by_name_not_found(okta_service, monkeypatch):
+    """A name matching nothing yields nothing rather than raising."""
+    monkeypatch.setattr(okta_service.session, 'get', lambda *a, **k: make_json_response([]))
+    assert not list(okta_service.get_applications_by_name('does_not_exist'))
